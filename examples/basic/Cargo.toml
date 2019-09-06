@@ -6,13 +6,18 @@ edition = "2018"
 
 [dependencies]
 
-[[test]]
-name = "fuzz_oracle"
-path = "tests/fuzz_oracle/main.rs"
-harness = false
-
 [dev-dependencies]
 bolero = { path = "../../bolero" }
 
 [workspace]
 members = ["."]
+
+[[test]]
+name = "fuzz_bytes"
+path = "tests/fuzz_bytes/main.rs"
+harness = false
+
+[[test]]
+name = "fuzz_generator"
+path = "tests/fuzz_generator/main.rs"
+harness = false

@@ -63,6 +63,9 @@ macro_rules! fuzz {
     (for $value:pat in every($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(for $value in ($gen) { $($tt)* });
     };
+    (for $value:pat in each($gen:expr) { $($tt:tt)* }) => {
+        $crate::fuzz!(for $value in ($gen) { $($tt)* });
+    };
     (for $value:pat in ($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(|input| {
             if input.is_empty() {

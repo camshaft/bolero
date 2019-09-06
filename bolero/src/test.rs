@@ -38,6 +38,7 @@ pub unsafe fn exec(file: &str) {
         .expect("missing test corpus")
         .map(|item| item.unwrap().path())
         .filter(|path| path.is_file())
+        .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
         .map(|path| Test {
             name: path.to_str().unwrap().to_owned(),
             kind: "".into(),
