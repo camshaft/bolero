@@ -1,0 +1,5 @@
+edition = "2018"
+format_macro_matchers = true
+merge_imports = true
+reorder_impl_items = true
+use_field_init_shorthand = true

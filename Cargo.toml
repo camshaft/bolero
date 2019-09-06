@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "bolero",
+    "bolero-*",
+    "cargo-bolero",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
+incremental = false

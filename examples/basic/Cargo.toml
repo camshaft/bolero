@@ -1,0 +1,18 @@
+[package]
+name = "basic"
+version = "0.1.0"
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+
+[[test]]
+name = "fuzz_oracle"
+path = "tests/fuzz_oracle/main.rs"
+harness = false
+
+[dev-dependencies]
+bolero = { path = "../../bolero" }
+
+[workspace]
+members = ["."]
