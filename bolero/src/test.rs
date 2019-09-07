@@ -42,7 +42,7 @@ pub unsafe fn exec(file: &str) {
         .filter(|path| path.is_file())
         .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
         .map(|path| Test {
-            name: path.to_str().unwrap().to_owned(),
+            name: format!("corpus/{}", path.file_stem().unwrap().to_str().unwrap()),
             kind: "".into(),
             is_ignored: false,
             is_bench: false,
