@@ -1,9 +1,8 @@
-use serde::Deserialize;
+use crate::manifest::resolve;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
-    path::{Path, PathBuf},
-    process::Command,
+    path::Path,
 };
 use structopt::StructOpt;
 
@@ -56,7 +55,7 @@ impl New {
         }
         .trim_start();
 
-        let manifest_path = self.manifest_path();
+        let manifest_path = resolve(&self.manifest_path, &self.package);
         let project_dir = manifest_path.parent().unwrap();
         let target_dir = project_dir.join("tests").join(&self.test);
 
@@ -90,42 +89,6 @@ harness = false
 
         println!("Created {:?}", &self.test);
     }
-
-    fn manifest_path(&self) -> PathBuf {
-        let mut cmd = Command::new("cargo");
-
-        cmd.arg("metadata")
-            .arg("--format-version")
-            .arg("1")
-            .arg("--no-deps");
-
-        if let Some(path) = self.manifest_path.as_ref() {
-            cmd.arg("--manifest-path").arg(path);
-        }
-
-        let Metadata { mut packages } =
-            serde_json::from_slice(&cmd.output().expect("could not read metadata").stdout).unwrap();
-
-        if packages.is_empty() {
-            panic!("not in a cargo project");
-        }
-
-        if packages.len() == 1 {
-            return PathBuf::from(packages.pop().unwrap().manifest_path);
-        }
-
-        let package_name = self
-            .package
-            .clone()
-            .expect("package needs to be specified in a workspace");
-
-        let package = packages
-            .into_iter()
-            .find(|pkg| pkg.name == package_name)
-            .unwrap_or_else(|| panic!("could not find {:?} package", package_name));
-
-        package.manifest_path.into()
-    }
 }
 
 fn mkdir<P: AsRef<Path>>(path: P) {
@@ -136,15 +99,4 @@ fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) {
     let path = path.as_ref();
     fs::write(path, contents).expect("could not create file");
     println!("wrote {:?}", path);
-}
-
-#[derive(Debug, Deserialize)]
-struct Metadata {
-    packages: Vec<Project>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Project {
-    name: String,
-    manifest_path: String,
 }

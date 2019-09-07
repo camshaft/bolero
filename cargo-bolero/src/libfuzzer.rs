@@ -1,5 +1,5 @@
 use crate::{exec, Config, FuzzArgs, ShrinkArgs};
-use std::{fs, path::Path};
+use std::fs;
 
 macro_rules! optional_arg {
     ($cmd:ident, $arg:expr, $fmt:expr) => {
@@ -17,9 +17,8 @@ const FLAGS: &[&str] = &[
 ];
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
-    let info = config.info(FLAGS);
+    let workdir = config.workdir();
     let mut cmd = config.cmd("test", FLAGS);
-    let workdir = Path::new(&info.workdir);
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");
 
@@ -40,9 +39,8 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
 }
 
 pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) {
-    let info = config.info(FLAGS);
+    let workdir = config.workdir();
     let mut cmd = config.cmd("test", FLAGS);
-    let workdir = Path::new(&info.workdir);
     let corpus_dir = workdir.join("corpus");
 
     let tmp = tempfile::tempdir().expect("could not create tmpdir");

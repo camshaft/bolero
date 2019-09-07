@@ -1,5 +1,4 @@
 use crate::{Config, FuzzArgs, ShrinkArgs};
-use std::path::Path;
 
 const FLAGS: &[&str] = &["--cfg fuzzing_afl"];
 
@@ -8,8 +7,8 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
-    let info = config.info(FLAGS);
-    let workdir = Path::new(&info.workdir);
+    let bin_path = config.bin_path(FLAGS);
+    let workdir = config.workdir();
     let corpus_dir = workdir.join("corpus");
     let afl_state = workdir.join("afl_state");
 
@@ -26,7 +25,7 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
         "-o".to_string(),
         afl_state.to_str().unwrap().to_string(),
         "--".to_string(),
-        info.bin_path,
+        bin_path.to_str().unwrap().to_string(),
     ]
     .into_iter();
 

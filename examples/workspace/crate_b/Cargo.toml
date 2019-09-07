@@ -1,0 +1,13 @@
+[package]
+name = "crate_b"
+version = "0.1.0"
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+edition = "2018"
+
+[dev-dependencies]
+bolero = { path = "../../../bolero" }
+
+[[test]]
+name = "fuzz_b"
+path = "tests/fuzz_b/main.rs"
+harness = false

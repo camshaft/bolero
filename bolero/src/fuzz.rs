@@ -1,5 +1,3 @@
-use crate::workdir;
-
 cfg_if::cfg_if! {
     if #[cfg(fuzzing_libfuzzer)] {
         use bolero_libfuzzer::fuzz;
@@ -14,10 +12,9 @@ cfg_if::cfg_if! {
 }
 
 #[allow(dead_code)]
-pub unsafe fn exec(file: &str) {
+pub unsafe fn exec(_file: &str) {
     if std::env::var("BOLERO_INFO").is_ok() {
-        println!("{}", std::env::args().nth(0).unwrap());
-        println!("{}", workdir(file));
+        print!("{}", std::env::args().nth(0).unwrap());
         return;
     }
 

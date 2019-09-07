@@ -49,10 +49,10 @@ impl<I: Clone + Iterator<Item = u8>> generator::RngCore for CycleRng<I> {
     }
 }
 
-fn workdir(file: &str) -> String {
+fn testname(file: &str) -> String {
     let mut path = PathBuf::from(file);
     path.pop();
-    path.to_str().unwrap().to_owned()
+    path.file_stem().unwrap().to_str().unwrap().to_owned()
 }
 
 #[macro_export]

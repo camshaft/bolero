@@ -11,6 +11,7 @@ mod config;
 mod fuzz;
 mod fuzzer;
 mod libfuzzer;
+mod manifest;
 mod new;
 mod shrink;
 

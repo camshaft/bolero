@@ -1,9 +1,8 @@
-use crate::{__BOLERO__test, workdir};
+use crate::{__BOLERO__test, testname};
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 use std::{
     env, fs,
     panic::{self, catch_unwind},
-    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -32,9 +31,12 @@ pub unsafe fn exec(file: &str) {
         *panic_error.lock().unwrap() = message;
     }));
 
-    let workdir = workdir(file);
+    // tests are executed in the crate root
+    let mut workdir = std::env::current_dir().unwrap();
+    workdir.push("tests");
+    workdir.push(testname(file));
 
-    let entries = fs::read_dir(Path::new(&workdir).join("corpus"))
+    let entries = fs::read_dir(workdir.join("corpus"))
         .expect("missing test corpus")
         .map(|item| item.unwrap().path())
         .filter(|path| path.is_file())

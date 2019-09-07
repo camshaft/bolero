@@ -1,5 +1,5 @@
-use crate::{exec, DEFAULT_TARGET};
-use std::process::Command;
+use crate::{exec, manifest::resolve, DEFAULT_TARGET};
+use std::{path::PathBuf, process::Command};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -37,17 +37,27 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn info(&self, flags: &[&str]) -> Info {
+    pub fn bin_path(&self, flags: &[&str]) -> PathBuf {
         exec(self.cmd("build", flags)).exit_on_error();
 
-        Info::parse(
-            &self
-                .cmd("test", flags)
-                .env("BOLERO_INFO", "1")
-                .output()
-                .expect("could not read info")
-                .stdout,
+        PathBuf::from(
+            String::from_utf8(
+                self.cmd("test", flags)
+                    .env("BOLERO_INFO", "1")
+                    .output()
+                    .expect("could not read info")
+                    .stdout,
+            )
+            .unwrap(),
         )
+    }
+
+    pub fn workdir(&self) -> PathBuf {
+        let mut manifest_path = resolve(&self.manifest_path, &self.package);
+        manifest_path.pop();
+        manifest_path.push("tests");
+        manifest_path.push(&self.test);
+        manifest_path
     }
 
     pub fn cmd(&self, call: &str, flags: &[&str]) -> Command {
@@ -106,24 +116,5 @@ impl Config {
         cmd.env("RUSTFLAGS", rustflags).arg("--");
 
         cmd
-    }
-}
-
-#[derive(Debug)]
-pub struct Info {
-    pub bin_path: String,
-    pub workdir: String,
-}
-
-impl Info {
-    fn parse(bytes: &[u8]) -> Self {
-        let mut input = std::str::from_utf8(bytes)
-            .expect("invalid bin info")
-            .split('\n');
-
-        let bin_path = input.next().expect("bin_path").to_string();
-        let workdir = input.next().expect("workdir").to_string();
-
-        Self { bin_path, workdir }
     }
 }
