@@ -1,0 +1,11 @@
+[package]
+name = "bolero-afl"
+version = "0.1.0"
+authors = ["Cameron Bytheway <bythewc@amazon.com>"]
+edition = "2018"
+
+[features]
+bin = []
+
+[build-dependencies]
+cc = "1.0"

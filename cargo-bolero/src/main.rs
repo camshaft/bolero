@@ -6,6 +6,7 @@ use crate::{
 };
 use structopt::StructOpt;
 
+mod afl;
 mod config;
 mod fuzz;
 mod fuzzer;

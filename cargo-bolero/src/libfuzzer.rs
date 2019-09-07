@@ -9,18 +9,24 @@ macro_rules! optional_arg {
     };
 }
 
+const FLAGS: &[&str] = &[
+    "--cfg fuzzing_libfuzzer",
+    "-Cllvm-args=-sanitizer-coverage-trace-compares",
+    "-Cllvm-args=-sanitizer-coverage-trace-divs",
+    "-Cllvm-args=-sanitizer-coverage-trace-geps",
+];
+
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
-    let mut cmd = config.cmd("test");
-    let workdir_str = config.workdir();
-    let workdir = Path::new(&workdir_str);
+    let info = config.info(FLAGS);
+    let mut cmd = config.cmd("test", FLAGS);
+    let workdir = Path::new(&info.workdir);
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");
 
     fs::create_dir_all(&crashes_dir).unwrap();
 
     cmd.arg(corpus_dir)
-        .arg(&format!("-artifact_prefix={}/", crashes_dir.display()))
-        .env("BOLERO_FUZZER", "libfuzzer");
+        .arg(&format!("-artifact_prefix={}/", crashes_dir.display()));
 
     optional_arg!(cmd, fuzz.seed, "-seed={}");
     optional_arg!(cmd, fuzz.runs, "-runs={}");
@@ -34,9 +40,9 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
 }
 
 pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) {
-    let mut cmd = config.cmd("test");
-    let workdir_str = config.workdir();
-    let workdir = Path::new(&workdir_str);
+    let info = config.info(FLAGS);
+    let mut cmd = config.cmd("test", FLAGS);
+    let workdir = Path::new(&info.workdir);
     let corpus_dir = workdir.join("corpus");
 
     let tmp = tempfile::tempdir().expect("could not create tmpdir");
@@ -47,8 +53,7 @@ pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) {
         .arg(&corpus_dir)
         .arg("-shrink=1")
         .arg("-merge=1")
-        .arg("-reduce_inputs=1")
-        .env("BOLERO_FUZZER", "libfuzzer");
+        .arg("-reduce_inputs=1");
 
     let status = exec(cmd);
 

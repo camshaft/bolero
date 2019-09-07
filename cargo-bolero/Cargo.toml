@@ -5,6 +5,7 @@ authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+bolero-afl = { path = "../bolero-afl", features = ["bin"] }
 structopt = "0.3"
 tempfile = "3"
 serde = { version = "1.0", features = ["derive"] }

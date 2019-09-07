@@ -37,20 +37,20 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn workdir(&self) -> String {
-        exec(self.cmd("build")).exit_on_error();
+    pub fn info(&self, flags: &[&str]) -> Info {
+        exec(self.cmd("build", flags)).exit_on_error();
 
-        String::from_utf8(
-            self.cmd("test")
-                .env("BOLERO_READ_WORKDIR", "1")
+        Info::parse(
+            &self
+                .cmd("test", flags)
+                .env("BOLERO_INFO", "1")
                 .output()
-                .expect("could not read workdir")
+                .expect("could not read info")
                 .stdout,
         )
-        .expect("valid workdir")
     }
 
-    pub fn cmd(&self, call: &str) -> Command {
+    pub fn cmd(&self, call: &str, flags: &[&str]) -> Command {
         let mut cmd = Command::new("cargo");
 
         cmd.arg(call)
@@ -83,16 +83,16 @@ impl Config {
         let rustflags = [
             "--cfg fuzzing",
             "-Cpasses=sancov",
-            "-Cllvm-args=-sanitizer-coverage-level=4",
+            "-Cllvm-args=-sanitizer-coverage-level=3",
             "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-            "-Cllvm-args=-sanitizer-coverage-trace-compares",
-            "-Cllvm-args=-sanitizer-coverage-trace-divs",
-            "-Cllvm-args=-sanitizer-coverage-trace-geps",
             "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
             "-Cdebug-assertions",
-            "-g",
+            "-Ctarget-cpu=native",
+            "-Cdebuginfo=2",
+            "-Coverflow_checks",
         ]
         .iter()
+        .chain(flags.iter())
         .map(|v| v.to_string())
         .chain(
             self.sanitizer
@@ -106,5 +106,24 @@ impl Config {
         cmd.env("RUSTFLAGS", rustflags).arg("--");
 
         cmd
+    }
+}
+
+#[derive(Debug)]
+pub struct Info {
+    pub bin_path: String,
+    pub workdir: String,
+}
+
+impl Info {
+    fn parse(bytes: &[u8]) -> Self {
+        let mut input = std::str::from_utf8(bytes)
+            .expect("invalid bin info")
+            .split('\n');
+
+        let bin_path = input.next().expect("bin_path").to_string();
+        let workdir = input.next().expect("workdir").to_string();
+
+        Self { bin_path, workdir }
     }
 }

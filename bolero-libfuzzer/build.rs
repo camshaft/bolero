@@ -1,7 +1,7 @@
 extern crate cc;
 
 fn main() {
-    if std::env::var("CARGO_CFG_FUZZING").is_ok() {
+    if std::env::var("CARGO_CFG_FUZZING_LIBFUZZER").is_ok() {
         let mut build = cc::Build::new();
         let sources = ::std::fs::read_dir("libfuzzer")
             .expect("listable source directory")

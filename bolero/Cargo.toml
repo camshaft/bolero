@@ -6,7 +6,9 @@ edition = "2018"
 
 [dependencies]
 backtrace = "0.3"
+bolero-afl = { path = "../bolero-afl" }
 bolero-generator = { path = "../bolero-generator" }
 bolero-libfuzzer = { path = "../bolero-libfuzzer" }
+cfg-if = "0.1"
 lazy_static = "1"
 libtest-mimic = "0.1.0"
