@@ -15,7 +15,7 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
 
     if let Some(runs) = fuzz.runs {
         std::env::set_var("AFL_EXIT_WHEN_DONE", "1");
-        let cycles = runs / 10000; // a cycle is about 10000 runs
+        let cycles = runs / 100_000; // a cycle is about 100,000 runs
         std::env::set_var("BOLERO_AFL_MAX_CYCLES", format!("{}", cycles));
     }
 

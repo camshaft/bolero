@@ -35,7 +35,14 @@ impl Commands {
 const DEFAULT_TARGET: &str = env!("DEFAULT_TARGET");
 
 fn main() {
-    Commands::from_args().exec();
+    let args = std::env::args()
+        .enumerate()
+        .filter_map(|(i, v)| match (i, v.as_ref()) {
+            (1, "bolero") => None, // cargo passes the subcommand so filter it out
+            _ => Some(v),
+        });
+
+    Commands::from_iter(args).exec();
 }
 
 pub(crate) fn exec(mut cmd: std::process::Command) -> Exit {
