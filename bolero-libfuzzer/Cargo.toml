@@ -2,6 +2,11 @@
 name = "bolero-libfuzzer"
 version = "0.1.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+description = "libfuzzer plugin for bolero"
+homepage = "https://github.com/camshaft/bolero"
+repository = "https://github.com/camshaft/bolero"
+keywords = ["testing", "fuzz"]
+license = "MIT"
 edition = "2018"
 
 [build-dependencies]
