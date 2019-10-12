@@ -4,7 +4,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(fuzzing_afl)] {
         use bolero_afl::fuzz;
     } else {
-        fn fuzz() {
+        fn fuzz(_testfn: fn(&[u8])) {
             panic!("test not compiled with a valid fuzzer")
         }
 
@@ -12,11 +12,11 @@ cfg_if::cfg_if! {
 }
 
 #[allow(dead_code)]
-pub unsafe fn exec(_file: &str) {
+pub unsafe fn exec(_file: &str, testfn: fn(&[u8])) {
     if std::env::var("BOLERO_INFO").is_ok() {
         print!("{}", std::env::args().nth(0).unwrap());
         return;
     }
 
-    fuzz()
+    fuzz(testfn)
 }

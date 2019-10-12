@@ -1,4 +1,5 @@
 use crate::manifest::resolve;
+use failure::Error;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -47,7 +48,7 @@ fuzz!(for value in each(u8::gen()) {
 "#;
 
 impl New {
-    pub fn exec(&self) {
+    pub fn exec(&self) -> Result<(), Error> {
         let file = if self.generator {
             GENERATOR_FILE
         } else {
@@ -55,7 +56,7 @@ impl New {
         }
         .trim_start();
 
-        let manifest_path = resolve(&self.manifest_path, &self.package);
+        let manifest_path = resolve(&self.manifest_path, &self.package, None)?;
         let project_dir = manifest_path.parent().unwrap();
         let target_dir = project_dir.join("tests").join(&self.test);
 
@@ -88,6 +89,8 @@ harness = false
             .expect("could not write test config");
 
         println!("Created {:?}", &self.test);
+
+        Ok(())
     }
 }
 

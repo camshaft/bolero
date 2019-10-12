@@ -1,6 +1,6 @@
 [package]
 name = "cargo-bolero"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 bolero-afl = { version = "0.1", path = "../bolero-afl", features = ["bin"] }
+failure = "0.1"
 structopt = "0.3"
 tempfile = "3"
 serde = { version = "1.0", features = ["derive"] }

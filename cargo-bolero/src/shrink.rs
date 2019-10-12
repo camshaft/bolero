@@ -1,4 +1,5 @@
 use crate::{config::Config, fuzzer::Fuzzer};
+use failure::Error;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -15,8 +16,8 @@ pub struct Shrink {
 }
 
 impl Shrink {
-    pub fn exec(&self) {
-        self.fuzzer.shrink(&self.config, &self.args);
+    pub fn exec(&self) -> Result<(), Error> {
+        self.fuzzer.shrink(&self.config, &self.args)
     }
 }
 

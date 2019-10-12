@@ -4,6 +4,7 @@ use crate::{
     new::New,
     shrink::{Shrink, ShrinkArgs},
 };
+use failure::Error;
 use structopt::StructOpt;
 
 mod afl;
@@ -24,7 +25,7 @@ enum Commands {
 }
 
 impl Commands {
-    fn exec(&self) {
+    fn exec(&self) -> Result<(), Error> {
         match self {
             Self::Fuzz(cmd) => cmd.exec(),
             Self::Shrink(cmd) => cmd.exec(),
@@ -43,7 +44,10 @@ fn main() {
             _ => Some(v),
         });
 
-    Commands::from_iter(args).exec();
+    if let Err(err) = Commands::from_iter(args).exec() {
+        eprintln!("error: {}", err);
+        std::process::exit(1);
+    }
 }
 
 pub(crate) fn exec(mut cmd: std::process::Command) -> Exit {

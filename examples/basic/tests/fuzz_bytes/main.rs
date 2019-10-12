@@ -1,9 +1,14 @@
 use basic::add;
 use bolero::fuzz;
+use std::env;
 
 fuzz!(|input| {
     if input.len() < 2 {
-        return;
+        if env::var("SHOULD_PANIC").is_ok() {
+            panic!("UH OH...");
+        } else {
+            return;
+        }
     }
 
     let a = input[0];

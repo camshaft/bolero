@@ -1,4 +1,5 @@
 use crate::{exec, manifest::resolve, DEFAULT_TARGET};
+use failure::Error;
 use std::{path::PathBuf, process::Command};
 use structopt::StructOpt;
 
@@ -52,12 +53,12 @@ impl Config {
         )
     }
 
-    pub fn workdir(&self) -> PathBuf {
-        let mut manifest_path = resolve(&self.manifest_path, &self.package);
+    pub fn workdir(&self) -> Result<PathBuf, Error> {
+        let mut manifest_path = resolve(&self.manifest_path, &self.package, Some(&self.test))?;
         manifest_path.pop();
         manifest_path.push("tests");
         manifest_path.push(&self.test);
-        manifest_path
+        Ok(manifest_path)
     }
 
     pub fn cmd(&self, call: &str, flags: &[&str]) -> Command {

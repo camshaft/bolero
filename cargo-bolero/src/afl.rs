@@ -1,4 +1,5 @@
 use crate::{Config, FuzzArgs, ShrinkArgs};
+use failure::Error;
 
 const FLAGS: &[&str] = &["--cfg fuzzing_afl"];
 
@@ -6,9 +7,9 @@ fn bin() -> String {
     std::env::args().nth(0).unwrap()
 }
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
+pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     let bin_path = config.bin_path(FLAGS);
-    let workdir = config.workdir();
+    let workdir = config.workdir()?;
     let corpus_dir = workdir.join("corpus");
     let afl_state = workdir.join("afl_state");
 
@@ -30,8 +31,10 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
     .into_iter();
 
     unsafe { bolero_afl::exec(args) };
+
+    Ok(())
 }
 
-pub(crate) fn shrink(_config: &Config, _shrink: &ShrinkArgs) {
+pub(crate) fn shrink(_config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
     unimplemented!()
 }

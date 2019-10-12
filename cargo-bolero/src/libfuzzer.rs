@@ -1,4 +1,5 @@
 use crate::{exec, Config, FuzzArgs, ShrinkArgs};
+use failure::Error;
 use std::fs;
 
 macro_rules! optional_arg {
@@ -16,12 +17,13 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-trace-geps",
 ];
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
-    let workdir = config.workdir();
+pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
+    let workdir = config.workdir()?;
     let mut cmd = config.cmd("test", FLAGS);
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");
 
+    fs::create_dir_all(&corpus_dir).unwrap();
     fs::create_dir_all(&crashes_dir).unwrap();
 
     cmd.arg(corpus_dir)
@@ -36,10 +38,12 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) {
     optional_arg!(cmd, fuzz.jobs, "-jobs={}");
 
     exec(cmd).exit_on_error();
+
+    Ok(())
 }
 
-pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) {
-    let workdir = config.workdir();
+pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
+    let workdir = config.workdir()?;
     let mut cmd = config.cmd("test", FLAGS);
     let corpus_dir = workdir.join("corpus");
 
@@ -58,5 +62,7 @@ pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) {
     fs::remove_dir_all(&corpus_dir).unwrap();
     fs::rename(&tmp_corpus, &corpus_dir).unwrap();
 
-    status.exit_on_error()
+    status.exit_on_error();
+
+    Ok(())
 }

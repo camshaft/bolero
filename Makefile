@@ -27,4 +27,5 @@ test_all:
 	    shrink \
 	    fuzz_generator \
 	    --manifest-path Cargo.toml \
-	  && cargo test
+	  && cargo test \
+	  && (SHOULD_PANIC=1 cargo test || exit 0)

@@ -3,9 +3,6 @@ pub mod fuzzer {
     use std::io::Read;
 
     extern "C" {
-        #[allow(improper_ctypes)]
-        fn __BOLERO__test(input: &[u8]);
-
         // from the afl-llvm-rt
         fn __afl_persistent_loop(counter: usize) -> isize;
         fn __afl_manual_init();
@@ -17,7 +14,7 @@ pub mod fuzzer {
     #[used]
     static DEFERED_MARKER: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 
-    pub unsafe fn fuzz() {
+    pub unsafe fn fuzz(testfn: fn(&[u8])) {
         std::panic::set_hook(Box::new(|info| {
             println!("{}", info);
             std::process::abort();
@@ -33,7 +30,7 @@ pub mod fuzzer {
             }
 
             let panicked = std::panic::catch_unwind(|| {
-                __BOLERO__test(&input);
+                testfn(&input);
             })
             .is_err();
 

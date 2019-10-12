@@ -1,6 +1,6 @@
 [package]
 name = "bolero-generator"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "generational testing traits for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -10,8 +10,9 @@ license = "MIT"
 edition = "2018"
 
 [features]
-std = []
+std = ["either/use_std"]
 
 [dependencies]
 byteorder = "1.3"
+either = { version = "1.5", default-features = false }
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }

@@ -1,8 +1,8 @@
-use crate::{__BOLERO__test, testname};
+use crate::testname;
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 use std::{
     env, fs,
-    panic::{self, catch_unwind},
+    panic::{self, catch_unwind, AssertUnwindSafe},
     sync::{Arc, Mutex},
 };
 
@@ -11,7 +11,7 @@ lazy_static::lazy_static! {
 }
 
 #[allow(dead_code)]
-pub unsafe fn exec(file: &str) {
+pub unsafe fn exec(file: &str, testfn: fn(&[u8])) {
     let print_backtrace = env::var("RUST_BACKTRACE")
         .ok()
         .map(|v| v == "1")
@@ -50,13 +50,13 @@ pub unsafe fn exec(file: &str) {
         })
         .collect();
 
-    let exec = move |data: &[u8]| {
-        catch_unwind(|| __BOLERO__test(data)).map_err(|_err| ERROR.lock().unwrap().clone())
-    };
+    run_tests(&Arguments::from_args(), entries, move |test| {
+        let result = catch_unwind(AssertUnwindSafe(|| testfn(&test.data)));
 
-    run_tests(&Arguments::from_args(), entries, |test| {
-        if let Err(err) = exec(&test.data) {
-            Outcome::Failed { msg: Some(err) }
+        if result.is_err() {
+            Outcome::Failed {
+                msg: Some(ERROR.lock().unwrap().to_string()),
+            }
         } else {
             Outcome::Passed
         }
