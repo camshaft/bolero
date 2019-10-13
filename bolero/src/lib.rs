@@ -29,7 +29,8 @@ macro_rules! fuzz {
     };
     (for $value:pat in ($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(|input| {
-            let $value = ($gen).generate(&mut $crate::generator::FuzzRng::new(input));
+            use $crate::generator::{ValueGenerator, TypeGenerator, rng::FuzzRng, TypeGeneratorWithParams, gen, gen_with};
+            let $value = ValueGenerator::generate(&($gen), &mut FuzzRng::new(input));
 
             $($tt)*
         });
@@ -39,10 +40,10 @@ macro_rules! fuzz {
     };
     (|$input:ident $(: &[u8])?| $impl:expr) => {
         fn main() {
-            fn test($input: &[u8]) {
+            fn fuzz($input: &[u8]) {
                 $impl
             }
-            unsafe { $crate::exec(file!(), test); }
+            unsafe { $crate::exec(file!(), fuzz); }
         }
     };
 }

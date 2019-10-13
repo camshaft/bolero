@@ -1,4 +1,4 @@
-use crate::{BoundedValue, Rng, TypeGenerator, ValueGenerator};
+use crate::{bounded::BoundedValue, Rng, TypeGenerator, ValueGenerator};
 use core::ops::Bound;
 
 impl TypeGenerator for char {
@@ -48,12 +48,10 @@ fn coerce_char(mut value: u32) -> char {
     loop {
         if let Some(value) = core::char::from_u32(value) {
             return value;
+        } else if let Some(next_value) = value.checked_sub(1) {
+            value = next_value;
         } else {
-            if let Some(next_value) = value.checked_sub(1) {
-                value = next_value;
-            } else {
-                return ' ';
-            }
+            return ' ';
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    gen, BoundedGenerator, BoundedValue, Rng, TypeGenerator, TypeGeneratorWithParams,
-    TypeValueGenerator, ValueGenerator,
+    bounded::{BoundedGenerator, BoundedValue},
+    Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator,
 };
 use byteorder::{ByteOrder, NativeEndian};
 use core::{mem::size_of, ops::Bound};
@@ -128,10 +128,6 @@ impl_native_integer!(gen_isize, isize);
 
 macro_rules! impl_float {
     ($name:ident, $ty:ident, $call:ident) => {
-        pub fn $name() -> TypeValueGenerator<$ty> {
-            gen::<$ty>()
-        }
-
         impl TypeGenerator for $ty {
             fn generate<R: Rng>(rng: &mut R) -> Self {
                 let mut bytes = [0; size_of::<$ty>()];
@@ -154,9 +150,3 @@ macro_rules! impl_float {
 
 impl_float!(gen_f32, f32, read_f32);
 impl_float!(gen_f64, f64, read_f64);
-
-impl TypeGenerator for core::time::Duration {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        Self::new(rng.gen(), (0u32..1_000_000_000).generate(rng))
-    }
-}

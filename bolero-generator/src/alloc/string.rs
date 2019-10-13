@@ -1,4 +1,6 @@
-use crate::{BytesGenerator, Rng, TypeGenerator, TypeGeneratorWithParams, ValueGenerator};
+use crate::{
+    alloc_generators::BytesGenerator, Rng, TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
+};
 use alloc::{string::String, vec::Vec};
 use core::ops::RangeInclusive;
 

@@ -1,5 +1,6 @@
-#![no_std]
+#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
+use crate::combinator::{AndThenGenerator, MapGenerator};
 use core::marker::PhantomData;
 
 #[cfg(feature = "either")]
@@ -9,7 +10,7 @@ pub use either;
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::*;
-        ValueGenerator::generate(&($gen), &mut FuzzRng::new(&[]))
+        ValueGenerator::generate(&($gen), &mut $crate::rng::FuzzRng::new(&[]))
     }};
 }
 
@@ -18,11 +19,17 @@ extern crate alloc;
 
 #[cfg(feature = "alloc")]
 #[path = "alloc/mod.rs"]
-pub mod alloc_geneator;
+#[macro_use]
+pub mod alloc_generators;
 
-#[cfg(feature = "alloc")]
-pub use alloc_geneator::*;
+#[cfg(feature = "std")]
+extern crate std;
 
+#[cfg(feature = "std")]
+#[path = "std/mod.rs"]
+pub mod std_generators;
+
+pub mod atomic;
 pub mod bool;
 pub mod bounded;
 pub mod char;
@@ -31,18 +38,10 @@ pub mod num;
 pub mod range;
 pub mod result;
 pub mod rng;
+pub mod time;
 pub mod tuple;
-pub mod with;
 
-pub use crate::{bool::*, char::*};
-pub use bounded::*;
-pub use combinator::*;
-pub use num::*;
-pub use range::*;
-pub use result::*;
-pub use rng::*;
-pub use tuple::*;
-pub use with::*;
+pub use rng::Rng;
 
 pub trait TypeGenerator: Sized {
     fn generate<R: Rng>(rng: &mut R) -> Self;
@@ -75,12 +74,24 @@ pub trait ValueGenerator: Sized {
     }
 }
 
+pub trait TypeGeneratorWithParams {
+    type Output: ValueGenerator;
+
+    fn gen_with() -> Self::Output;
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct TypeValueGenerator<T: TypeGenerator>(PhantomData<T>);
 
 impl<T: TypeGenerator> Default for TypeValueGenerator<T> {
     fn default() -> Self {
         Self(PhantomData)
+    }
+}
+
+impl<T: TypeGenerator + TypeGeneratorWithParams> TypeValueGenerator<T> {
+    pub fn with(self) -> <T as TypeGeneratorWithParams>::Output {
+        T::gen_with()
     }
 }
 
