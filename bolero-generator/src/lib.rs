@@ -1,54 +1,61 @@
 #![no_std]
 
-extern crate alloc;
-
 use core::marker::PhantomData;
 
+#[cfg(feature = "either")]
 pub use either;
 
 #[cfg(test)]
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::*;
-        let mut generator = $gen;
-        ValueGenerator::generate(&mut generator, &mut FuzzRng::new(&[]))
+        ValueGenerator::generate(&($gen), &mut FuzzRng::new(&[]))
     }};
 }
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+#[path = "alloc/mod.rs"]
+pub mod alloc_geneator;
+
+#[cfg(feature = "alloc")]
+pub use alloc_geneator::*;
+
 pub mod bool;
 pub mod bounded;
+pub mod char;
 pub mod combinator;
 pub mod num;
 pub mod range;
 pub mod result;
 pub mod rng;
-pub mod string;
 pub mod tuple;
-pub mod vec;
+pub mod with;
 
-pub use crate::bool::*;
+pub use crate::{bool::*, char::*};
 pub use bounded::*;
 pub use combinator::*;
 pub use num::*;
 pub use range::*;
 pub use result::*;
 pub use rng::*;
-pub use string::*;
 pub use tuple::*;
-pub use vec::*;
+pub use with::*;
 
 pub trait TypeGenerator: Sized {
     fn generate<R: Rng>(rng: &mut R) -> Self;
 
     #[inline]
-    fn gen() -> TypedGen<Self> {
+    fn gen() -> TypeValueGenerator<Self> {
         gen()
     }
 }
 
 pub trait ValueGenerator: Sized {
     type Output;
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output;
+    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output;
 
     fn map<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
         MapGenerator {
@@ -68,20 +75,45 @@ pub trait ValueGenerator: Sized {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct TypedGen<T: TypeGenerator>(PhantomData<T>);
+#[derive(Copy, Clone, Debug)]
+pub struct TypeValueGenerator<T: TypeGenerator>(PhantomData<T>);
 
-impl<T: TypeGenerator> ValueGenerator for TypedGen<T> {
+impl<T: TypeGenerator> Default for TypeValueGenerator<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
     type Output = T;
 
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
+    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
         T::generate(rng)
     }
 }
 
+impl<T> ValueGenerator for PhantomData<T> {
+    type Output = Self;
+
+    fn generate<R: Rng>(&self, _rng: &mut R) -> Self::Output {
+        PhantomData
+    }
+}
+
+impl<T> TypeGenerator for PhantomData<T> {
+    fn generate<R: Rng>(_rng: &mut R) -> Self {
+        PhantomData
+    }
+}
+
 #[inline]
-pub fn gen<T: TypeGenerator>() -> TypedGen<T> {
-    TypedGen(PhantomData)
+pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
+    TypeValueGenerator(PhantomData)
+}
+
+#[inline]
+pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
+    T::gen_with()
 }
 
 impl TypeGenerator for () {
@@ -91,17 +123,17 @@ impl TypeGenerator for () {
 impl ValueGenerator for () {
     type Output = ();
 
-    fn generate<R: Rng>(&mut self, _rng: &mut R) -> Self {}
+    fn generate<R: Rng>(&self, _rng: &mut R) -> Self {}
 }
 
-pub struct Constant<T: Clone> {
+pub struct Constant<T> {
     value: T,
 }
 
 impl<T: Clone> ValueGenerator for Constant<T> {
     type Output = T;
 
-    fn generate<R: Rng>(&mut self, _rng: &mut R) -> Self::Output {
+    fn generate<R: Rng>(&self, _rng: &mut R) -> Self::Output {
         self.value.clone()
     }
 }

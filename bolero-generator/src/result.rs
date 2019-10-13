@@ -1,49 +1,207 @@
-use crate::{Rng, TypeGenerator, ValueGenerator};
+use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
+
+#[cfg(feature = "either")]
 use either::Either;
 
-pub fn gen_result<V: ValueGenerator, E: ValueGenerator>(
+macro_rules! impl_either {
+    (
+        $generator:ident,
+        $ty:ident,
+        $A:ident,
+        $with_a:ident,
+        $map_a:ident,
+        $B:ident,
+        $with_b:ident,
+        $map_b:ident
+    ) => {
+        #[derive(Debug, Clone)]
+        pub struct $generator<$A, $B, Selector> {
+            a: $A,
+            b: $B,
+            selector: Selector,
+        }
+
+        impl<$A: ValueGenerator, $B: ValueGenerator, Selector: ValueGenerator<Output = bool>>
+            $generator<$A, $B, Selector>
+        {
+            pub fn $with_a<Gen: ValueGenerator<Output = $A::Output>>(
+                self,
+                gen: Gen,
+            ) -> $generator<Gen, $B, Selector> {
+                $generator {
+                    a: gen,
+                    b: self.b,
+                    selector: self.selector,
+                }
+            }
+
+            pub fn $map_a<Gen: ValueGenerator<Output = $A::Output>, F: Fn($A) -> Gen>(
+                self,
+                map: F,
+            ) -> $generator<Gen, $B, Selector> {
+                $generator {
+                    a: map(self.a),
+                    b: self.b,
+                    selector: self.selector,
+                }
+            }
+
+            pub fn $with_b<Gen: ValueGenerator<Output = $B::Output>>(
+                self,
+                gen: Gen,
+            ) -> $generator<$A, Gen, Selector> {
+                $generator {
+                    a: self.a,
+                    b: gen,
+                    selector: self.selector,
+                }
+            }
+
+            pub fn $map_b<Gen: ValueGenerator<Output = $B::Output>, F: Fn($B) -> Gen>(
+                self,
+                map: F,
+            ) -> $generator<$A, Gen, Selector> {
+                $generator {
+                    a: self.a,
+                    b: map(self.b),
+                    selector: self.selector,
+                }
+            }
+
+            pub fn with_selector<Gen: ValueGenerator<Output = bool>>(
+                self,
+                selector: Gen,
+            ) -> $generator<$A, $B, Gen> {
+                $generator {
+                    a: self.a,
+                    b: self.b,
+                    selector,
+                }
+            }
+
+            pub fn map_selector<Gen: ValueGenerator<Output = bool>, F: Fn(Selector) -> Gen>(
+                self,
+                map: F,
+            ) -> $generator<$A, $B, Gen> {
+                $generator {
+                    a: self.a,
+                    b: self.b,
+                    selector: map(self.selector),
+                }
+            }
+        }
+
+        impl<$A: ValueGenerator, $B: ValueGenerator, Selector: ValueGenerator<Output = bool>>
+            ValueGenerator for $generator<$A, $B, Selector>
+        {
+            type Output = $ty<$A::Output, $B::Output>;
+
+            fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
+                if self.selector.generate(rng) {
+                    $ty::$A(self.a.generate(rng))
+                } else {
+                    $ty::$B(self.b.generate(rng))
+                }
+            }
+        }
+
+        impl<$A: TypeGenerator, $B: TypeGenerator> TypeGenerator for $ty<$A, $B> {
+            fn generate<R: Rng>(rng: &mut R) -> Self {
+                if rng.gen() {
+                    $ty::$A(rng.gen())
+                } else {
+                    $ty::$B(rng.gen())
+                }
+            }
+        }
+
+        impl<$A: TypeGenerator, $B: TypeGenerator> TypeGeneratorWithParams for $ty<$A, $B> {
+            type Output = $generator<
+                TypeValueGenerator<$A>,
+                TypeValueGenerator<$B>,
+                TypeValueGenerator<bool>,
+            >;
+
+            fn gen_with() -> Self::Output {
+                $generator {
+                    a: Default::default(),
+                    b: Default::default(),
+                    selector: Default::default(),
+                }
+            }
+        }
+    };
+}
+
+impl_either!(ResultGenerator, Result, Ok, ok, map_ok, Err, err, map_err);
+
+#[cfg(feature = "either")]
+impl_either!(
+    EitherGenerator,
+    Either,
+    Left,
+    left,
+    map_left,
+    Right,
+    right,
+    map_right
+);
+
+pub struct OptionGenerator<V, Selector> {
     value: V,
-    error: E,
-) -> ResultGenerator<V, E> {
-    ResultGenerator(value, error)
+    selector: Selector,
 }
 
-pub struct ResultGenerator<V, E>(V, E);
+impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> OptionGenerator<V, Selector> {
+    pub fn value<Gen: ValueGenerator<Output = V::Output>>(
+        self,
+        value: Gen,
+    ) -> OptionGenerator<Gen, Selector> {
+        OptionGenerator {
+            value,
+            selector: self.selector,
+        }
+    }
 
-impl<V: ValueGenerator, E: ValueGenerator> ValueGenerator for ResultGenerator<V, E> {
-    type Output = Result<V::Output, E::Output>;
+    pub fn map_value<Gen: ValueGenerator<Output = V::Output>, F: Fn(V) -> Gen>(
+        self,
+        map: F,
+    ) -> OptionGenerator<Gen, Selector> {
+        OptionGenerator {
+            value: map(self.value),
+            selector: self.selector,
+        }
+    }
 
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
-        if rng.gen() {
-            Ok(self.0.generate(rng))
-        } else {
-            Err(self.1.generate(rng))
+    pub fn selector<Gen: ValueGenerator<Output = bool>>(
+        self,
+        selector: Gen,
+    ) -> OptionGenerator<V, Gen> {
+        OptionGenerator {
+            value: self.value,
+            selector,
+        }
+    }
+
+    pub fn map_selector<Gen: ValueGenerator<Output = bool>, F: Fn(Selector) -> Gen>(
+        self,
+        map: F,
+    ) -> OptionGenerator<V, Gen> {
+        OptionGenerator {
+            value: self.value,
+            selector: map(self.selector),
         }
     }
 }
 
-impl<V: TypeGenerator, E: TypeGenerator> TypeGenerator for Result<V, E> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        if rng.gen() {
-            Ok(rng.gen())
-        } else {
-            Err(rng.gen())
-        }
-    }
-}
-
-pub fn gen_option<V: ValueGenerator>(value: V) -> OptionGenerator<V> {
-    OptionGenerator(value)
-}
-
-pub struct OptionGenerator<V>(V);
-
-impl<V: ValueGenerator> ValueGenerator for OptionGenerator<V> {
+impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
+    for OptionGenerator<V, Selector>
+{
     type Output = Option<V::Output>;
 
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
-        if rng.gen() {
-            Some(self.0.generate(rng))
+    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
+        if self.selector.generate(rng) {
+            Some(self.value.generate(rng))
         } else {
             None
         }
@@ -60,33 +218,13 @@ impl<V: TypeGenerator> TypeGenerator for Option<V> {
     }
 }
 
-pub fn gen_either<L: ValueGenerator, R: ValueGenerator>(
-    value: L,
-    error: R,
-) -> ResultGenerator<L, R> {
-    ResultGenerator(value, error)
-}
+impl<V: TypeGenerator> TypeGeneratorWithParams for Option<V> {
+    type Output = OptionGenerator<TypeValueGenerator<V>, TypeValueGenerator<bool>>;
 
-pub struct EitherGenerator<L, R>(L, R);
-
-impl<Left: ValueGenerator, Right: ValueGenerator> ValueGenerator for EitherGenerator<Left, Right> {
-    type Output = Either<Left::Output, Right::Output>;
-
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
-        if rng.gen() {
-            Either::Left(self.0.generate(rng))
-        } else {
-            Either::Right(self.1.generate(rng))
-        }
-    }
-}
-
-impl<Left: TypeGenerator, Right: TypeGenerator> TypeGenerator for Either<Left, Right> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        if rng.gen() {
-            Either::Left(rng.gen())
-        } else {
-            Either::Right(rng.gen())
+    fn gen_with() -> Self::Output {
+        OptionGenerator {
+            value: Default::default(),
+            selector: Default::default(),
         }
     }
 }

@@ -7,22 +7,12 @@ use rand_core::{Error as RngError, RngCore};
 
 pub trait Rng {
     fn gen<T: TypeGenerator>(&mut self) -> T;
-    fn next_u32(&mut self) -> u32;
-    fn next_u64(&mut self) -> u64;
     fn fill_bytes(&mut self, bytes: &mut [u8]);
 }
 
 impl<R: RngCore> Rng for R {
     fn gen<T: TypeGenerator>(&mut self) -> T {
         T::generate(self)
-    }
-
-    fn next_u32(&mut self) -> u32 {
-        RngCore::next_u32(self)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        RngCore::next_u64(self)
     }
 
     fn fill_bytes(&mut self, bytes: &mut [u8]) {

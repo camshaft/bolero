@@ -16,7 +16,7 @@ macro_rules! impl_tuple {
         impl<$head: ValueGenerator $(, $acc: ValueGenerator)*> ValueGenerator for ($($acc, )* $head ,) {
             type Output = ($head::Output, $( $acc::Output, )*);
 
-            fn generate<R_: Rng>(&mut self, rng: &mut R_) -> Self::Output {
+            fn generate<R_: Rng>(&self, rng: &mut R_) -> Self::Output {
                 (self.$h_value.generate(rng), $(
                     self.$a_value.generate(rng),
                 )*)
@@ -60,5 +60,5 @@ impl_tuple!(
 #[test]
 fn tuple_test() {
     let _ = generator_test!(gen::<(u8, u16, u32, u64)>());
-    let _ = generator_test!((gen_u8(), gen_u16()));
+    let _ = generator_test!((gen::<u8>(), gen::<u16>()));
 }

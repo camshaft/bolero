@@ -10,9 +10,11 @@ license = "MIT"
 edition = "2018"
 
 [features]
-std = ["either/use_std"]
+default = ["alloc", "either"]
+std = ["alloc", "either/use_std"]
+alloc = []
 
 [dependencies]
 byteorder = "1.3"
-either = { version = "1.5", default-features = false }
+either = { version = "1.5", default-features = false, optional = true }
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }

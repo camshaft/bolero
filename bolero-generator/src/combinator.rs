@@ -9,7 +9,7 @@ pub struct MapGenerator<Generator, Map> {
 impl<G: ValueGenerator, M: Fn(G::Output) -> T, T> ValueGenerator for MapGenerator<G, M> {
     type Output = T;
 
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
+    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
         (self.map)(self.generator.generate(rng))
     }
 }
@@ -17,7 +17,7 @@ impl<G: ValueGenerator, M: Fn(G::Output) -> T, T> ValueGenerator for MapGenerato
 #[test]
 fn map_test() {
     let _ = generator_test!(gen::<bool>().map(|value| !value));
-    let _ = generator_test!(gen_u8().map(|value| value > 4));
+    let _ = generator_test!(gen::<u8>().map(|value| value > 4));
 }
 
 #[derive(Clone, Debug)]
@@ -31,7 +31,7 @@ impl<G: ValueGenerator, H: ValueGenerator, F: Fn(G::Output) -> H> ValueGenerator
 {
     type Output = H::Output;
 
-    fn generate<R: Rng>(&mut self, rng: &mut R) -> Self::Output {
+    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
         let value = self.generator.generate(rng);
         (self.and_then)(value).generate(rng)
     }
@@ -40,5 +40,5 @@ impl<G: ValueGenerator, H: ValueGenerator, F: Fn(G::Output) -> H> ValueGenerator
 #[test]
 fn and_then_test() {
     let _ = generator_test!(gen::<bool>().and_then(|value| !value));
-    let _ = generator_test!(gen_u8().and_then(|value| value..));
+    let _ = generator_test!(gen::<u8>().and_then(|value| value..));
 }
