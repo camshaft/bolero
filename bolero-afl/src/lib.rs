@@ -54,7 +54,7 @@ pub mod bin {
     };
 
     extern "C" {
-        // entrypoint for libfuzzer
+        // entrypoint for afl
         pub fn afl_fuzz_main(a: c_int, b: *const *const c_char) -> c_int;
     }
 

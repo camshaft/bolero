@@ -94,9 +94,6 @@ impl Config {
         let rustflags = [
             "--cfg fuzzing",
             "-Cpasses=sancov",
-            "-Cllvm-args=-sanitizer-coverage-level=3",
-            "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-            "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
             "-Cdebug-assertions",
             "-Ctarget-cpu=native",
             "-Cdebuginfo=2",

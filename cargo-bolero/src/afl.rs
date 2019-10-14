@@ -1,7 +1,12 @@
 use crate::{Config, FuzzArgs, ShrinkArgs};
 use failure::Error;
 
-const FLAGS: &[&str] = &["--cfg fuzzing_afl"];
+const FLAGS: &[&str] = &[
+    "--cfg fuzzing_afl",
+    "-Cllvm-args=-sanitizer-coverage-level=3",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
+    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
+];
 
 fn bin() -> String {
     std::env::args().nth(0).unwrap()

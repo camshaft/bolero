@@ -12,6 +12,9 @@ macro_rules! optional_arg {
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_libfuzzer",
+    "-Cllvm-args=-sanitizer-coverage-level=3",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
+    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
     "-Cllvm-args=-sanitizer-coverage-trace-compares",
     "-Cllvm-args=-sanitizer-coverage-trace-divs",
     "-Cllvm-args=-sanitizer-coverage-trace-geps",

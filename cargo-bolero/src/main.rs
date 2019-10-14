@@ -11,6 +11,7 @@ mod afl;
 mod config;
 mod fuzz;
 mod fuzzer;
+mod honggfuzz;
 mod libfuzzer;
 mod manifest;
 mod new;

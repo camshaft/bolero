@@ -6,6 +6,7 @@ use std::str::FromStr;
 pub enum Fuzzer {
     Libfuzzer,
     Afl,
+    Honggfuzz,
 }
 
 impl Fuzzer {
@@ -13,6 +14,7 @@ impl Fuzzer {
         match self {
             Self::Libfuzzer => crate::libfuzzer::fuzz(config, args),
             Self::Afl => crate::afl::fuzz(config, args),
+            Self::Honggfuzz => crate::honggfuzz::fuzz(config, args),
         }
     }
 
@@ -20,6 +22,7 @@ impl Fuzzer {
         match self {
             Self::Libfuzzer => crate::libfuzzer::shrink(config, args),
             Self::Afl => crate::afl::shrink(config, args),
+            Self::Honggfuzz => crate::honggfuzz::shrink(config, args),
         }
     }
 }
@@ -31,6 +34,7 @@ impl FromStr for Fuzzer {
         match value {
             "libfuzzer" => Ok(Self::Libfuzzer),
             "afl" => Ok(Self::Afl),
+            "honggfuzz" => Ok(Self::Honggfuzz),
             _ => Err(format!("invalid fuzzer {:?}", value)),
         }
     }

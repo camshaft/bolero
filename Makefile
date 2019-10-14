@@ -7,6 +7,12 @@ test_all:
 	    fuzz_bytes \
 	    --manifest-path Cargo.toml \
 	    --runs 100000 \
+	    --fuzzer honggfuzz \
+	  && ../../target/debug/cargo-bolero \
+	    fuzz \
+	    fuzz_bytes \
+	    --manifest-path Cargo.toml \
+	    --runs 100000 \
 	    --fuzzer afl \
 	  && ../../target/debug/cargo-bolero \
 	    fuzz \

@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 bolero-afl = { version = "0.1", path = "../bolero-afl", features = ["bin"] }
+bolero-honggfuzz = { version = "0.1", path = "../bolero-honggfuzz", features = ["bin"] }
 failure = "0.1"
 structopt = "0.3"
 tempfile = "3"
