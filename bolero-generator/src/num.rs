@@ -39,7 +39,7 @@ macro_rules! impl_bounded_integer {
             type Output = BoundedGenerator<TypeValueGenerator<$ty>, $ty>;
 
             fn gen_with() -> Self::Output {
-                BoundedGenerator::new(Default::default(), ..)
+                BoundedGenerator::new(Default::default(), $ty::default()..)
             }
         }
     };

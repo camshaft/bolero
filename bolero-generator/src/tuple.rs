@@ -1,4 +1,4 @@
-use crate::{Rng, TypeGenerator, ValueGenerator};
+use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
 macro_rules! impl_tuple {
     ([$($acc:ident($a_value:tt),)*]) => {
@@ -14,12 +14,22 @@ macro_rules! impl_tuple {
         }
 
         impl<$head: ValueGenerator $(, $acc: ValueGenerator)*> ValueGenerator for ($($acc, )* $head ,) {
-            type Output = ($head::Output, $( $acc::Output, )*);
+            type Output = ($( $acc::Output, )* $head::Output, );
 
             fn generate<R_: Rng>(&self, rng: &mut R_) -> Self::Output {
-                (self.$h_value.generate(rng), $(
+                ($(
                     self.$a_value.generate(rng),
-                )*)
+                )* self.$h_value.generate(rng),)
+            }
+        }
+
+        impl<$head: TypeGenerator $(, $acc: TypeGenerator)*> TypeGeneratorWithParams for ($($acc, )* $head ,) {
+            type Output = ($( TypeValueGenerator<$acc>, )* TypeValueGenerator<$head>, );
+
+            fn gen_with() -> Self::Output {
+                ($(
+                    <TypeValueGenerator<$acc>>::default(),
+                )* Default::default(),)
             }
         }
 

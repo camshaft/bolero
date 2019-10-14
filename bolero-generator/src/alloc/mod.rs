@@ -5,7 +5,9 @@ pub mod boxed;
 pub mod string;
 pub mod sync;
 
-use alloc::{
+use crate::{Rng, TypeGenerator};
+pub use alloc::{
+    borrow::{Cow, ToOwned},
     collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque},
     vec::Vec,
 };
@@ -21,6 +23,16 @@ impl_key_values_collection_generator!(BTreeMap, BTreeMapGenerator, DEFAULT_LEN_R
 
 pub type Bytes = Vec<u8>;
 pub type BytesGenerator<L> = VecGenerator<crate::TypeValueGenerator<u8>, L>;
+
+impl<T> TypeGenerator for Cow<'static, T>
+where
+    T: ToOwned + ?Sized,
+    <T as ToOwned>::Owned: TypeGenerator,
+{
+    fn generate<R: Rng>(rng: &mut R) -> Self {
+        Cow::Owned(rng.gen())
+    }
+}
 
 #[test]
 fn vec_test() {

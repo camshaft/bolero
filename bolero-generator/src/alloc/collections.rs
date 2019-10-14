@@ -98,7 +98,7 @@ macro_rules! impl_values_collection_generator {
                 assert!(!self.is_empty());
 
                 let len = $crate::ValueGenerator::generate(&$default_len_range, rng);
-                let generators: Vec<_> = self.iter().collect();
+                let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                 let generators_len = 0..generators.len();
 
                 Iterator::map(0..len, |_| {
@@ -255,7 +255,7 @@ macro_rules! impl_key_values_collection_generator {
                 assert!(!self.is_empty());
 
                 let len = ValueGenerator::generate(&$default_len_range, rng);
-                let generators: Vec<_> = self.iter().collect();
+                let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                 let generators_len = 0..generators.len();
 
                 Iterator::map(0..len, |_| {

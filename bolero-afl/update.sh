@@ -1,11 +1,12 @@
 #!/bin/bash -e
 
+version=${1:-master}
 project_dir="$(pwd)"
 tmp_dir="$(mktemp -d)"
 
 git clone https://github.com/google/AFL.git "$tmp_dir"
 cd "$tmp_dir"
-git checkout "$1"
+git checkout $version --force
 rm -rf "$project_dir/afl/"
 mkdir -p "$project_dir/afl/llvm_mode"
 mv "$tmp_dir/llvm_mode/afl-llvm-rt.o.c" "$project_dir/afl/llvm_mode/"

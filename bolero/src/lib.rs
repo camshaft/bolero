@@ -18,8 +18,14 @@ fn testname(file: &str) -> String {
 
 #[macro_export]
 macro_rules! fuzz {
+    (for $value:pat in all() { $($tt:tt)* }) => {
+        $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
+    };
     (for $value:pat in all($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(for $value in ($gen) { $($tt)* });
+    };
+    (for $value:pat in every() { $($tt:tt)* }) => {
+        $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
     };
     (for $value:pat in every($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(for $value in ($gen) { $($tt)* });

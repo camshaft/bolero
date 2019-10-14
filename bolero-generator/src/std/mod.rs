@@ -1,5 +1,6 @@
+#![allow(clippy::implicit_hasher)]
+
 use crate::{Rng, TypeGenerator};
-use alloc::vec::Vec;
 use core::{hash::Hash, ops::RangeInclusive};
 use std::{
     collections::{HashMap, HashSet},

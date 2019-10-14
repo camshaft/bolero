@@ -8,8 +8,8 @@ macro_rules! range_generator {
 
             fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
                 T::generate(rng).bounded(
-                    clone_bound(self.start_bound()),
-                    clone_bound(self.end_bound()),
+                    map_bound(self.start_bound(), |b| b.clone()),
+                    map_bound(self.end_bound(), |b| b.clone()),
                 )
             }
         }
@@ -34,19 +34,19 @@ pub struct BoundedGenerator<G, T> {
 }
 
 impl<G: ValueGenerator<Output = T>, T: BoundedValue> BoundedGenerator<G, T> {
-    pub fn new<Bounds: RangeBounds<T>>(generator: G, bounds: Bounds) -> Self {
+    pub fn new<Bounds: RangeBounds<B>, B: Clone + Into<T>>(generator: G, bounds: Bounds) -> Self {
         BoundedGenerator {
             generator,
-            start: clone_bound(bounds.start_bound()),
-            end: clone_bound(bounds.end_bound()),
+            start: map_bound(bounds.start_bound(), |b| b.clone().into()),
+            end: map_bound(bounds.end_bound(), |b| b.clone().into()),
         }
     }
 
-    pub fn bounds<Bounds: RangeBounds<T>>(self, bounds: Bounds) -> Self {
+    pub fn bounds<Bounds: RangeBounds<B>, B: Clone + Into<T>>(self, bounds: Bounds) -> Self {
         BoundedGenerator {
             generator: self.generator,
-            start: clone_bound(bounds.start_bound()),
-            end: clone_bound(bounds.end_bound()),
+            start: map_bound(bounds.start_bound(), |b| b.clone().into()),
+            end: map_bound(bounds.end_bound(), |b| b.clone().into()),
         }
     }
 }
@@ -61,11 +61,11 @@ impl<T: BoundedValue, G: ValueGenerator<Output = T>> ValueGenerator for BoundedG
     }
 }
 
-fn clone_bound<T: Clone>(bound: Bound<&T>) -> Bound<T> {
+fn map_bound<T, U, F: Fn(&T) -> U>(bound: Bound<&T>, map: F) -> Bound<U> {
     match bound {
         Bound::Unbounded => Bound::Unbounded,
-        Bound::Included(x) => Bound::Included(x.clone()),
-        Bound::Excluded(x) => Bound::Excluded(x.clone()),
+        Bound::Included(x) => Bound::Included(map(x)),
+        Bound::Excluded(x) => Bound::Excluded(map(x)),
     }
 }
 
@@ -78,8 +78,8 @@ fn with_bounds_test() {
 fn bounded_u8_test() {
     fn test_bound<Bounds: RangeBounds<u8>>(v: u8, bounds: Bounds) {
         let v = v.bounded(
-            clone_bound(bounds.start_bound()),
-            clone_bound(bounds.end_bound()),
+            map_bound(bounds.start_bound(), |b| *b),
+            map_bound(bounds.end_bound(), |b| *b),
         );
         assert!(bounds.contains(&v));
     }
