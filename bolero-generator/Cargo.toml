@@ -10,7 +10,7 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = ["alloc", "std", "either"]
+default = ["alloc", "either"]
 std = ["alloc", "either/use_std"]
 alloc = []
 

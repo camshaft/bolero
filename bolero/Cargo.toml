@@ -9,10 +9,15 @@ keywords = ["testing", "fuzz"]
 license = "MIT"
 edition = "2018"
 
+[features]
+default = ["std"]
+std = ["alloc", "bolero-generator/std"]
+alloc = ["bolero-generator/alloc"]
+
 [dependencies]
 backtrace = "0.3"
 bolero-afl = { version = "0.1", path = "../bolero-afl" }
-bolero-generator = { version = "0.1", path = "../bolero-generator" }
+bolero-generator = { version = "0.1", path = "../bolero-generator", default-features = false }
 bolero-honggfuzz = { version = "0.1", path = "../bolero-honggfuzz" }
 bolero-libfuzzer = { version = "0.1", path = "../bolero-libfuzzer" }
 cfg-if = "0.1"
