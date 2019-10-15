@@ -1,5 +1,4 @@
 pub use bolero_generator as generator;
-use std::path::PathBuf;
 
 mod fuzz;
 mod test;
@@ -9,12 +8,6 @@ pub use fuzz::exec;
 
 #[cfg(not(fuzzing))]
 pub use test::exec;
-
-fn testname(file: &str) -> String {
-    let mut path = PathBuf::from(file);
-    path.pop();
-    path.file_stem().unwrap().to_str().unwrap().to_owned()
-}
 
 #[macro_export]
 macro_rules! fuzz {

@@ -35,6 +35,10 @@ pub struct Config {
     /// Path to Cargo.toml
     #[structopt(long = "manifest-path")]
     manifest_path: Option<String>,
+
+    /// Use rustup to execute cargo build
+    #[structopt(long = "toolchain")]
+    toolchain: Option<String>,
 }
 
 impl Config {
@@ -61,8 +65,27 @@ impl Config {
         Ok(manifest_path)
     }
 
+    fn cargo(&self) -> Command {
+        let rustup = |toolchain| {
+            let mut cmd = Command::new("rustup");
+            cmd.arg("run").arg(toolchain).arg("cargo");
+            cmd
+        };
+
+        let cargo = || Command::new("cargo");
+
+        let requires_nightly = self.requires_nightly();
+
+        match (requires_nightly, self.toolchain.as_ref()) {
+            (true, None) => rustup("nightly"),
+            (false, None) => cargo(),
+            (_, Some(toolchain)) if toolchain == "default" => cargo(),
+            (_, Some(toolchain)) => rustup(toolchain),
+        }
+    }
+
     pub fn cmd(&self, call: &str, flags: &[&str]) -> Command {
-        let mut cmd = Command::new("cargo");
+        let mut cmd = self.cargo();
 
         cmd.arg(call)
             .arg("--test")
@@ -114,5 +137,9 @@ impl Config {
         cmd.env("RUSTFLAGS", rustflags).arg("--");
 
         cmd
+    }
+
+    pub fn requires_nightly(&self) -> bool {
+        !self.sanitizer.is_empty()
     }
 }

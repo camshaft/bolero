@@ -1,8 +1,8 @@
-use crate::testname;
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 use std::{
     env, fs,
     panic::{self, catch_unwind, AssertUnwindSafe},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -62,4 +62,10 @@ pub unsafe fn exec(file: &str, testfn: fn(&[u8])) {
         }
     })
     .exit();
+}
+
+fn testname(file: &str) -> String {
+    let mut path = PathBuf::from(file);
+    path.pop();
+    path.file_stem().unwrap().to_str().unwrap().to_owned()
 }
