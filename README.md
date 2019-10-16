@@ -8,21 +8,21 @@ fuzz and property testing framework
 
 ```toml
 [dev-dependencies]
-bolero = "0.1"
+bolero = "0.2"
 ```
 
 `bolero` includes a test generator library, [`bolero-generator`](https://crates.io/crates/bolero-generator). This is useful for crates wishing to implement generator traits for downstream applications or libraries. It is `#![no_std]` compatible and can be included as a regular dependency.
 
 ```toml
 [dependencies]
-bolero-generator = "0.1"
+bolero-generator = "0.2"
 ```
 
 `std` support can be enabled if needed:
 
 ```toml
 [dependencies]
-bolero-generator = { version = "0.1", features = ["std"] }
+bolero-generator = { version = "0.2", features = ["std"] }
 ```
 
 `bolero` also provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:

@@ -9,6 +9,22 @@ pub use fuzz::exec;
 #[cfg(not(fuzzing))]
 pub use test::exec;
 
+/// Execute fuzz tests
+/// ```rust
+/// use bolero::fuzz;
+///
+/// fn main() {
+///     fuzz!(|input| {
+///         if input.len() < 3 {
+///             return;
+///         }
+///
+///         if input[0] == 0 && input[1] == 1 && input[2] == 2 {
+///             panic!("you found me!");
+///         }
+///     });
+/// }
+/// ```
 #[macro_export]
 macro_rules! fuzz {
     (for $value:pat in gen() { $($tt:tt)* }) => {
