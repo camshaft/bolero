@@ -8,6 +8,7 @@ repository = "https://github.com/camshaft/bolero"
 keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
+readme = "README.md"
 
 [dependencies]
 bolero-afl = { version = "0.2", path = "../bolero-afl", features = ["bin"] }
