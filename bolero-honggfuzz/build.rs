@@ -43,6 +43,12 @@ fn build(target: &str, file: &str, lib: &str) -> String {
 
     println!("cargo:rustc-link-lib=static=hfcommon");
 
+    // don't fail after cleaning
+    Command::new(MAKE_COMMAND)
+        .args(&["-C", "honggfuzz", "clean"])
+        .status()
+        .unwrap();
+
     return out_dir;
 }
 
