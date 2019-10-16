@@ -1,6 +1,9 @@
 #[cfg(fuzzing_afl)]
 pub mod fuzzer {
-    use std::io::Read;
+    use std::{
+        io::Read,
+        panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
+    };
 
     extern "C" {
         // from the afl-llvm-rt
@@ -14,8 +17,11 @@ pub mod fuzzer {
     #[used]
     static DEFERED_MARKER: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 
-    pub unsafe fn fuzz(testfn: fn(&[u8])) {
-        std::panic::set_hook(Box::new(|info| {
+    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F)
+    where
+        F: RefUnwindSafe,
+    {
+        panic::set_hook(Box::new(|info| {
             println!("{}", info);
             std::process::abort();
         }));
@@ -29,10 +35,7 @@ pub mod fuzzer {
                 return;
             }
 
-            let panicked = std::panic::catch_unwind(|| {
-                testfn(&input);
-            })
-            .is_err();
+            let panicked = catch_unwind(AssertUnwindSafe(|| testfn(&input))).is_err();
 
             if panicked {
                 std::process::abort();

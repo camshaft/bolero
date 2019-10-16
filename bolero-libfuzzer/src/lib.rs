@@ -3,10 +3,10 @@ pub mod fuzzer {
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
-        panic::{self, catch_unwind, AssertUnwindSafe},
+        panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
     };
 
-    static mut TESTFN: fn(&[u8]) = uninit;
+    static mut TESTFN: &dyn Fn(&[u8]) = &uninit as &dyn Fn(&[u8]);
 
     fn uninit(_input: &[u8]) {
         panic!("uninitialized test");
@@ -43,8 +43,11 @@ pub mod fuzzer {
         0
     }
 
-    pub unsafe fn fuzz(testfn: fn(&[u8])) {
-        TESTFN = testfn;
+    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F)
+    where
+        F: RefUnwindSafe,
+    {
+        TESTFN = std::mem::transmute(&testfn as &dyn Fn(&[u8]));
 
         // create a vector of zero terminated strings
         let args = std::env::args()

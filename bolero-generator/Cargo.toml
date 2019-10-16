@@ -1,11 +1,11 @@
 [package]
 name = "bolero-generator"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
-description = "generational testing traits for bolero"
+description = "value generator for testing and fuzzing"
 homepage = "https://github.com/camshaft/bolero"
 repository = "https://github.com/camshaft/bolero"
-keywords = ["testing", "fuzz"]
+keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
 

@@ -50,7 +50,7 @@ macro_rules! impl_byte {
         impl TypeGenerator for $ty {
             fn generate<R: Rng>(rng: &mut R) -> Self {
                 let mut bytes = [0; size_of::<$ty>()];
-                rng.fill_bytes(&mut bytes);
+                Rng::fill_bytes(rng, &mut bytes);
                 bytes[0] as $ty
             }
         }
@@ -75,7 +75,7 @@ macro_rules! impl_integer {
         impl TypeGenerator for $ty {
             fn generate<R: Rng>(rng: &mut R) -> Self {
                 let mut bytes = [0; size_of::<$ty>()];
-                rng.fill_bytes(&mut bytes);
+                Rng::fill_bytes(rng, &mut bytes);
                 NativeEndian::$call(&bytes)
             }
         }
@@ -106,7 +106,7 @@ macro_rules! impl_native_integer {
         impl TypeGenerator for $ty {
             fn generate<R: Rng>(rng: &mut R) -> Self {
                 let mut bytes = [0; size_of::<$ty>()];
-                rng.fill_bytes(&mut bytes);
+                Rng::fill_bytes(rng, &mut bytes);
                 NativeEndian::read_uint(&bytes, bytes.len()) as $ty
             }
         }
@@ -131,7 +131,7 @@ macro_rules! impl_float {
         impl TypeGenerator for $ty {
             fn generate<R: Rng>(rng: &mut R) -> Self {
                 let mut bytes = [0; size_of::<$ty>()];
-                rng.fill_bytes(&mut bytes);
+                Rng::fill_bytes(rng, &mut bytes);
                 NativeEndian::$call(&bytes)
             }
         }

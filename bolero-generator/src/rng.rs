@@ -5,7 +5,7 @@ use core::{
 };
 use rand_core::{Error as RngError, RngCore};
 
-pub trait Rng {
+pub trait Rng: RngCore {
     fn gen<T: TypeGenerator>(&mut self) -> T;
     fn fill_bytes(&mut self, bytes: &mut [u8]);
 }

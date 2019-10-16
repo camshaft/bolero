@@ -36,7 +36,7 @@ pub struct Config {
     #[structopt(long = "manifest-path")]
     manifest_path: Option<String>,
 
-    /// Use rustup to execute cargo build
+    /// Use a rustup toolchain to execute cargo build
     #[structopt(long = "toolchain")]
     toolchain: Option<String>,
 }

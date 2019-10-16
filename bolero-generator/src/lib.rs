@@ -43,6 +43,7 @@ pub mod tuple;
 
 pub use rng::Rng;
 
+/// Generate a value for a given type
 pub trait TypeGenerator: Sized {
     fn generate<R: Rng>(rng: &mut R) -> Self;
 
@@ -52,6 +53,7 @@ pub trait TypeGenerator: Sized {
     }
 }
 
+/// Generate a value with a parameterized generator
 pub trait ValueGenerator: Sized {
     type Output;
     fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output;
@@ -74,12 +76,14 @@ pub trait ValueGenerator: Sized {
     }
 }
 
+/// Convert a type generator into the default value generator
 pub trait TypeGeneratorWithParams {
     type Output: ValueGenerator;
 
     fn gen_with() -> Self::Output;
 }
 
+/// Non-parameterized ValueGenerator given a TypeGenerator
 #[derive(Copy, Clone, Debug)]
 pub struct TypeValueGenerator<T: TypeGenerator>(PhantomData<T>);
 
@@ -103,25 +107,13 @@ impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
     }
 }
 
-impl<T> ValueGenerator for PhantomData<T> {
-    type Output = Self;
-
-    fn generate<R: Rng>(&self, _rng: &mut R) -> Self::Output {
-        PhantomData
-    }
-}
-
-impl<T> TypeGenerator for PhantomData<T> {
-    fn generate<R: Rng>(_rng: &mut R) -> Self {
-        PhantomData
-    }
-}
-
+/// Generate a value for a given type
 #[inline]
 pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
     TypeValueGenerator(PhantomData)
 }
 
+/// Generate a value for a given type with additional constraints
 #[inline]
 pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
     T::gen_with()
@@ -137,6 +129,20 @@ impl ValueGenerator for () {
     fn generate<R: Rng>(&self, _rng: &mut R) -> Self {}
 }
 
+impl<T> ValueGenerator for PhantomData<T> {
+    type Output = Self;
+
+    fn generate<R: Rng>(&self, _rng: &mut R) -> Self::Output {
+        PhantomData
+    }
+}
+
+impl<T> TypeGenerator for PhantomData<T> {
+    fn generate<R: Rng>(_rng: &mut R) -> Self {
+        PhantomData
+    }
+}
+
 pub struct Constant<T> {
     value: T,
 }
@@ -149,6 +155,7 @@ impl<T: Clone> ValueGenerator for Constant<T> {
     }
 }
 
+/// Always generate the same value
 #[inline]
 pub fn constant<T: Clone>(value: T) -> Constant<T> {
     Constant { value }

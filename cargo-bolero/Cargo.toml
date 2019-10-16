@@ -1,17 +1,17 @@
 [package]
 name = "cargo-bolero"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
 repository = "https://github.com/camshaft/bolero"
-keywords = ["testing", "fuzz"]
+keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
 
 [dependencies]
-bolero-afl = { version = "0.1", path = "../bolero-afl", features = ["bin"] }
-bolero-honggfuzz = { version = "0.1", path = "../bolero-honggfuzz", features = ["bin"] }
+bolero-afl = { version = "0.2", path = "../bolero-afl", features = ["bin"] }
+bolero-honggfuzz = { version = "0.2", path = "../bolero-honggfuzz", features = ["bin"] }
 failure = "0.1"
 structopt = "0.3"
 tempfile = "3"

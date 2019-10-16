@@ -1,19 +1,21 @@
-test_all:
-	@cargo build
+test: test_bolero test_fuzzers
+
+test_bolero:
 	@cargo test
+
+test_fuzzers: test_libfuzzer test_honggfuzz test_afl
+
+test_afl: cargo-bolero
 	@cd examples/basic \
 	  && ../../target/debug/cargo-bolero \
 	    fuzz \
 	    fuzz_bytes \
 	    --manifest-path Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer honggfuzz \
-	  && ../../target/debug/cargo-bolero \
-	    fuzz \
-	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
-	    --runs 100000 \
-	    --fuzzer afl \
+	    --fuzzer afl
+
+test_libfuzzer: cargo-bolero
+	@cd examples/basic \
 	  && ../../target/debug/cargo-bolero \
 	    fuzz \
 	    fuzz_bytes \
@@ -21,17 +23,46 @@ test_all:
 	    --runs 100000 \
 	    --fuzzer libfuzzer \
 	  && ../../target/debug/cargo-bolero \
+	    fuzz \
+	    fuzz_bytes \
+	    --manifest-path Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer libfuzzer \
+	    --sanitizer address \
+	  && ../../target/debug/cargo-bolero \
 	    shrink \
 	    fuzz_bytes \
 	    --manifest-path Cargo.toml \
+	    --fuzzer libfuzzer \
 	  && ../../target/debug/cargo-bolero \
 	    fuzz \
 	    fuzz_generator \
 	    --manifest-path Cargo.toml \
 	    --runs 100000 \
+	    --fuzzer libfuzzer \
 	  && ../../target/debug/cargo-bolero \
 	    shrink \
 	    fuzz_generator \
 	    --manifest-path Cargo.toml \
-	  && cargo test \
-	  && (SHOULD_PANIC=1 cargo test || exit 0)
+	    --fuzzer libfuzzer
+
+test_honggfuzz: cargo-bolero
+	@cd examples/basic \
+	  && ../../target/debug/cargo-bolero \
+	    fuzz \
+	    fuzz_bytes \
+	    --manifest-path Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer honggfuzz \
+	    --sanitizer address
+
+cargo-bolero:
+	@cargo build
+
+publish:
+	@cd bolero-afl && cargo publish
+	@cd bolero-generator && cargo publish
+	@cd bolero-honggfuzz && cargo publish
+	@cd bolero-libfuzzer && cargo publish
+	@cd cargo-bolero && cargo publish
+	@cd bolero && cargo publish

@@ -36,7 +36,7 @@ where
 
 #[test]
 fn vec_test() {
-    let vec = generator_test!(gen::<Vec<u8>>().with().len(8usize));
+    let vec: Vec<u8> = generator_test!(gen::<Vec<u8>>().with().len(8usize));
     assert_eq!(vec.len(), 8);
 
     let _ = generator_test!(gen::<Vec<_>>().with().values(4u16..6));

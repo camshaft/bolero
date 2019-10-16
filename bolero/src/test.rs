@@ -1,7 +1,7 @@
 use libtest_mimic::{run_tests, Arguments, Outcome, Test};
 use std::{
     env, fs,
-    panic::{self, catch_unwind, AssertUnwindSafe},
+    panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -11,7 +11,10 @@ lazy_static::lazy_static! {
 }
 
 #[allow(dead_code)]
-pub unsafe fn exec(file: &str, testfn: fn(&[u8])) {
+pub unsafe fn exec<F: Fn(&[u8])>(file: &str, testfn: F)
+where
+    F: RefUnwindSafe,
+{
     let print_backtrace = env::var("RUST_BACKTRACE")
         .ok()
         .map(|v| v == "1")
@@ -36,19 +39,21 @@ pub unsafe fn exec(file: &str, testfn: fn(&[u8])) {
     workdir.push("tests");
     workdir.push(testname(file));
 
-    let entries = fs::read_dir(workdir.join("corpus"))
-        .expect("missing test corpus")
-        .map(|item| item.unwrap().path())
-        .filter(|path| path.is_file())
-        .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
-        .map(|path| Test {
-            name: format!("corpus/{}", path.file_stem().unwrap().to_str().unwrap()),
-            kind: "".into(),
-            is_ignored: false,
-            is_bench: false,
-            data: fs::read(&path).unwrap(),
-        })
-        .collect();
+    let entries = if let Ok(dir) = fs::read_dir(workdir.join("corpus")) {
+        dir.map(|item| item.unwrap().path())
+            .filter(|path| path.is_file())
+            .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
+            .map(|path| Test {
+                name: format!("corpus/{}", path.file_stem().unwrap().to_str().unwrap()),
+                kind: "".into(),
+                is_ignored: false,
+                is_bench: false,
+                data: fs::read(&path).unwrap(),
+            })
+            .collect()
+    } else {
+        vec![]
+    };
 
     run_tests(&Arguments::from_args(), entries, move |test| {
         let result = catch_unwind(AssertUnwindSafe(|| testfn(&test.data)));

@@ -10,7 +10,7 @@ pub mod fuzzer {
         fn HF_ITER(buf_ptr: *mut *const u8, len_ptr: *mut usize);
     }
 
-    pub unsafe fn fuzz(testfn: fn(&[u8])) {
+    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F) {
         std::panic::set_hook(Box::new(|info| {
             println!("{}", info);
             std::process::abort();

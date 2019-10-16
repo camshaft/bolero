@@ -6,7 +6,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(fuzzing_honggfuzz)] {
         use bolero_honggfuzz::fuzz;
     } else {
-        fn fuzz(_testfn: fn(&[u8])) {
+        fn fuzz<F: Fn(&[u8])>(_testfn: F) {
             panic!("test not compiled with a valid fuzzer")
         }
 
@@ -14,7 +14,10 @@ cfg_if::cfg_if! {
 }
 
 #[allow(dead_code)]
-pub unsafe fn exec(_file: &str, testfn: fn(&[u8])) {
+pub unsafe fn exec<F: Fn(&[u8])>(_file: &str, testfn: F)
+where
+    F: std::panic::RefUnwindSafe,
+{
     if std::env::var("BOLERO_INFO").is_ok() {
         print!("{}", std::env::args().nth(0).unwrap());
         return;

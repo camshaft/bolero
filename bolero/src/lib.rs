@@ -11,6 +11,9 @@ pub use test::exec;
 
 #[macro_export]
 macro_rules! fuzz {
+    (for $value:pat in gen() { $($tt:tt)* }) => {
+        $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
+    };
     (for $value:pat in all() { $($tt:tt)* }) => {
         $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
     };
@@ -26,6 +29,9 @@ macro_rules! fuzz {
     (for $value:pat in each($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(for $value in ($gen) { $($tt)* });
     };
+    (for $value:pat in $gen:path { $($tt:tt)* }) => {
+        $crate::fuzz!(for $value in ($gen) { $($tt)* });
+    };
     (for $value:pat in ($gen:expr) { $($tt:tt)* }) => {
         $crate::fuzz!(|input| {
             use $crate::generator::{ValueGenerator, TypeGenerator, rng::FuzzRng, TypeGeneratorWithParams, gen, gen_with};
@@ -35,14 +41,16 @@ macro_rules! fuzz {
         });
     };
     ($fun:path) => {
-        $crate::fuzz!(|input| $fuzz(input););
+        $crate::fuzz!(|input| { $fun(input); });
     };
     (|$input:ident $(: &[u8])?| $impl:expr) => {
-        fn main() {
-            fn fuzz($input: &[u8]) {
+        unsafe {
+            $crate::exec(file!(), move |$input: &[u8]| {
                 $impl
-            }
-            unsafe { $crate::exec(file!(), fuzz); }
+            })
         }
+    };
+    (|$input:ident: $ty:ty| $impl:expr) => {
+        $crate::fuzz!(for $input in ($crate::generator::gen::<$ty>()) { $impl });
     };
 }
