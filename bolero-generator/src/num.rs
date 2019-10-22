@@ -150,3 +150,72 @@ macro_rules! impl_float {
 
 impl_float!(gen_f32, f32, read_f32);
 impl_float!(gen_f64, f64, read_f64);
+
+macro_rules! impl_non_zero_integer {
+    ($ty:ident) => {
+        impl TypeGenerator for core::num::$ty {
+            fn generate<R: Rng>(rng: &mut R) -> Self {
+                let value = (1..).generate(rng);
+                unsafe { Self::new_unchecked(value) }
+            }
+        }
+
+        impl BoundedValue for core::num::$ty {
+            fn bounded(self, start: Bound<Self>, end: Bound<Self>) -> Self {
+                use Bound::*;
+
+                let start = match start {
+                    Included(value) => Included(value.get()),
+                    Excluded(value) => Excluded(value.get()),
+                    Unbounded => Unbounded,
+                };
+
+                let end = match end {
+                    Included(value) => Included(value.get()),
+                    Excluded(value) => Excluded(value.get()),
+                    Unbounded => Unbounded,
+                };
+
+                let mut inner = self.get();
+
+                // try a few times before giving up
+                for _ in 0..=3 {
+                    if let Some(value) = Self::new(inner.bounded(start, end)) {
+                        return value;
+                    } else {
+                        inner = inner.wrapping_add(1);
+                    }
+                }
+
+                panic!(concat!(
+                    "could not satisfy bounded value for ",
+                    stringify!($ty)
+                ))
+            }
+        }
+
+        impl TypeGeneratorWithParams for core::num::$ty {
+            type Output = BoundedGenerator<TypeValueGenerator<core::num::$ty>, core::num::$ty>;
+
+            fn gen_with() -> Self::Output {
+                BoundedGenerator::new(
+                    Default::default(),
+                    unsafe { core::num::$ty::new_unchecked(1) }..,
+                )
+            }
+        }
+    };
+}
+
+impl_non_zero_integer!(NonZeroI8);
+impl_non_zero_integer!(NonZeroU8);
+impl_non_zero_integer!(NonZeroI16);
+impl_non_zero_integer!(NonZeroU16);
+impl_non_zero_integer!(NonZeroI32);
+impl_non_zero_integer!(NonZeroU32);
+impl_non_zero_integer!(NonZeroI64);
+impl_non_zero_integer!(NonZeroU64);
+impl_non_zero_integer!(NonZeroI128);
+impl_non_zero_integer!(NonZeroU128);
+impl_non_zero_integer!(NonZeroIsize);
+impl_non_zero_integer!(NonZeroUsize);
