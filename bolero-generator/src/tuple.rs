@@ -1,5 +1,21 @@
 use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
+impl TypeGenerator for () {
+    fn generate<R: Rng>(_rng: &mut R) -> Self {}
+}
+
+impl ValueGenerator for () {
+    type Output = ();
+
+    fn generate<R: Rng>(&self, _rng: &mut R) -> Self {}
+}
+
+impl TypeGeneratorWithParams for () {
+    type Output = ();
+
+    fn gen_with() -> Self::Output {}
+}
+
 macro_rules! impl_tuple {
     ([$($acc:ident($a_value:tt),)*]) => {
         // done
@@ -64,6 +80,13 @@ impl_tuple!(
     X(23),
     Y(24),
     Z(25),
+    AA(26),
+    AB(27),
+    AC(28),
+    AD(29),
+    AE(30),
+    AF(31),
+    AG(32),
     []
 );
 

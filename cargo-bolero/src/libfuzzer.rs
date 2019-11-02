@@ -22,7 +22,7 @@ const FLAGS: &[&str] = &[
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     let workdir = config.workdir()?;
-    let mut cmd = config.cmd("test", FLAGS);
+    let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");
 
@@ -47,7 +47,7 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
 
 pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
     let workdir = config.workdir()?;
-    let mut cmd = config.cmd("test", FLAGS);
+    let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
     let corpus_dir = workdir.join("corpus");
 
     let tmp = tempfile::tempdir().expect("could not create tmpdir");

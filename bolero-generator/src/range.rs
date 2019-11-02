@@ -98,4 +98,5 @@ fn range_test() {
 
     let _ = generator_test!(gen::<Range<usize>>());
     let _ = generator_test!(gen::<Range<usize>>().with().start(4..6).end(6..10));
+    let _ = generator_test!(0usize..10);
 }

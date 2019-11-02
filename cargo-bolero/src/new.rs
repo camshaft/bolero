@@ -28,23 +28,27 @@ pub struct New {
 const FUZZ_FILE: &str = r#"
 use bolero::fuzz;
 
-fuzz!(|input| {
-    if input.len() < 3 {
-        return;
-    }
+fn main() {
+    fuzz!().for_each(|input| {
+        if input.len() < 3 {
+            return;
+        }
 
-    if input[0] == 0 && input[1] == 1 && input[2] == 2 {
-        panic!("you found me!");
-    }
-});
+        if input[0] == 0 && input[1] == 1 && input[2] == 2 {
+            panic!("you found me!");
+        }
+    });
+}
 "#;
 
 const GENERATOR_FILE: &str = r#"
-use bolero::{fuzz, generator::*};
+use bolero::fuzz;
 
-fuzz!(for value in each(u8::gen()) {
-    assert!(value * 2 > value);
-});
+fn main() {
+    fuzz!().with_type().for_each(|value: u8| {
+        assert!(value * 2 > value);
+    });
+}
 "#;
 
 impl New {

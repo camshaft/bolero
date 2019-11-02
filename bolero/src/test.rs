@@ -10,8 +10,9 @@ lazy_static::lazy_static! {
     static ref ERROR: Arc<Mutex<String>> = Arc::new(Mutex::new("unknown failure".to_owned()));
 }
 
+#[doc(hidden)]
 #[allow(dead_code)]
-pub unsafe fn exec<F: Fn(&[u8])>(file: &str, testfn: F)
+pub unsafe fn exec<F: FnMut(&[u8])>(file: &str, testfn: &mut F) -> !
 where
     F: RefUnwindSafe,
 {
@@ -55,8 +56,15 @@ where
         vec![]
     };
 
-    run_tests(&Arguments::from_args(), entries, move |test| {
-        let result = catch_unwind(AssertUnwindSafe(|| testfn(&test.data)));
+    // `run_tests` only accepts `Fn` instead of `FnMut`
+    // convert the function to a dynamic FnMut and drop the lifetime
+    static mut TESTFN: Option<&mut dyn FnMut(&[u8])> = None;
+    TESTFN = Some(std::mem::transmute(testfn as &mut dyn FnMut(&[u8])));
+
+    run_tests(&Arguments::from_args(), entries, |test| {
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            (TESTFN.as_mut().expect("uninitialized test function"))(&test.data)
+        }));
 
         if result.is_err() {
             Outcome::Failed {

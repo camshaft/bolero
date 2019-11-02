@@ -13,7 +13,7 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
-    let bin_path = config.bin_path(FLAGS);
+    let bin_path = config.bin_path(FLAGS, "afl");
     let workdir = config.workdir()?;
     let corpus_dir = workdir.join("corpus");
     let afl_state = workdir.join("afl_state");

@@ -1,7 +1,7 @@
 use bolero::fuzz;
 
 fn main() {
-    fuzz!(|input| {
+    fuzz!().for_each(|input| {
         if input.len() < 3 {
             return;
         }

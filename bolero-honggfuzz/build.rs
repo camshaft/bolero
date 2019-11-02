@@ -21,7 +21,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
     let out_dir = env::var("OUT_DIR").unwrap();
 
     let status = Command::new(MAKE_COMMAND)
-        .args(&["-C", "honggfuzz", target])
+        .args(&["-C", "honggfuzz", target, "libhfcommon/libhfcommon.a"])
         .status()
         .unwrap();
     assert!(status.success());
@@ -30,7 +30,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
         format!("honggfuzz/{}", target),
         format!("{}/{}", out_dir, file),
     )
-    .unwrap();
+    .expect("could not copy target");
 
     println!("cargo:rustc-link-lib=static={}", lib);
     println!("cargo:rustc-link-search=native={}", &out_dir);
@@ -39,7 +39,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
         "honggfuzz/libhfcommon/libhfcommon.a",
         format!("{}/libhfcommon.a", out_dir),
     )
-    .unwrap();
+    .expect("could not copy libhfcommon.a");
 
     println!("cargo:rustc-link-lib=static=hfcommon");
 
@@ -53,6 +53,10 @@ fn build(target: &str, file: &str, lib: &str) -> String {
 }
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=BOLERO_FUZZER");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_FUZZING_HONGGFUZZ");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_BIN");
+
     if std::env::var("CARGO_CFG_FUZZING_HONGGFUZZ").is_ok() {
         build("libhfuzz/libhfuzz.a", "libhfuzz.a", "hfuzz");
         return;

@@ -42,12 +42,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn bin_path(&self, flags: &[&str]) -> PathBuf {
-        exec(self.cmd("build", flags)).exit_on_error();
+    pub fn bin_path(&self, flags: &[&str], fuzzer: &str) -> PathBuf {
+        exec(self.cmd("build", flags, fuzzer)).exit_on_error();
 
         PathBuf::from(
             String::from_utf8(
-                self.cmd("test", flags)
+                self.cmd("test", flags, fuzzer)
                     .env("BOLERO_INFO", "1")
                     .output()
                     .expect("could not read info")
@@ -84,7 +84,7 @@ impl Config {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str]) -> Command {
+    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: &str) -> Command {
         let mut cmd = self.cargo();
 
         cmd.arg(call)
@@ -124,7 +124,7 @@ impl Config {
         ]
         .iter()
         .chain(flags.iter())
-        .map(|v| v.to_string())
+        .map(|v| (*v).to_string())
         .chain(
             self.sanitizer
                 .iter()
@@ -134,7 +134,9 @@ impl Config {
         .collect::<Vec<_>>()
         .join(" ");
 
-        cmd.env("RUSTFLAGS", rustflags).arg("--");
+        cmd.env("RUSTFLAGS", rustflags)
+            .env("BOLERO_FUZZER", fuzzer)
+            .arg("--");
 
         cmd
     }

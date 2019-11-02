@@ -1,8 +1,13 @@
+//! honggfuzz plugin for bolero
+//!
+//! This crate should not be used directly. Instead, use `bolero`.
+
+#[doc(hidden)]
 #[cfg(fuzzing_honggfuzz)]
 pub mod fuzzer {
     use std::{
         mem::MaybeUninit,
-        panic::{catch_unwind, AssertUnwindSafe},
+        panic::{catch_unwind, AssertUnwindSafe, RefUnwindSafe},
         slice,
     };
 
@@ -10,7 +15,10 @@ pub mod fuzzer {
         fn HF_ITER(buf_ptr: *mut *const u8, len_ptr: *mut usize);
     }
 
-    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F) {
+    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
+    where
+        F: RefUnwindSafe,
+    {
         std::panic::set_hook(Box::new(|info| {
             println!("{}", info);
             std::process::abort();
@@ -34,9 +42,11 @@ pub mod fuzzer {
     }
 }
 
+#[doc(hidden)]
 #[cfg(fuzzing_honggfuzz)]
 pub use fuzzer::*;
 
+#[doc(hidden)]
 #[cfg(feature = "bin")]
 pub mod bin {
     use std::{
@@ -66,5 +76,6 @@ pub mod bin {
     }
 }
 
+#[doc(hidden)]
 #[cfg(feature = "bin")]
 pub use bin::*;

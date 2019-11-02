@@ -1,3 +1,8 @@
+//! libfuzzer plugin for bolero
+//!
+//! This crate should not be used directly. Instead, use `bolero`.
+
+#[doc(hidden)]
 #[cfg(fuzzing_libfuzzer)]
 pub mod fuzzer {
     use std::{
@@ -6,11 +11,7 @@ pub mod fuzzer {
         panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
     };
 
-    static mut TESTFN: &dyn Fn(&[u8]) = &uninit as &dyn Fn(&[u8]);
-
-    fn uninit(_input: &[u8]) {
-        panic!("uninitialized test");
-    }
+    static mut TESTFN: Option<&mut dyn FnMut(&[u8])> = None;
 
     extern "C" {
         // entrypoint for libfuzzer
@@ -21,7 +22,7 @@ pub mod fuzzer {
     pub unsafe extern "C" fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32 {
         let exec = || {
             let data_slice = std::slice::from_raw_parts(data, size);
-            TESTFN(data_slice);
+            (TESTFN.as_mut().expect("uninitialized test function"))(data_slice);
         };
 
         if catch_unwind(AssertUnwindSafe(exec)).is_err() {
@@ -43,11 +44,11 @@ pub mod fuzzer {
         0
     }
 
-    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F)
+    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
     where
         F: RefUnwindSafe,
     {
-        TESTFN = std::mem::transmute(&testfn as &dyn Fn(&[u8]));
+        TESTFN = Some(std::mem::transmute(testfn as &mut dyn FnMut(&[u8])));
 
         // create a vector of zero terminated strings
         let args = std::env::args()
@@ -65,5 +66,6 @@ pub mod fuzzer {
     }
 }
 
+#[doc(hidden)]
 #[cfg(fuzzing_libfuzzer)]
 pub use fuzzer::*;

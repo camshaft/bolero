@@ -17,7 +17,7 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
-    let bin_path = config.bin_path(FLAGS);
+    let bin_path = config.bin_path(FLAGS, "honggfuzz");
     let workdir = config.workdir()?;
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");
@@ -45,7 +45,7 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
 }
 
 pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
-    let bin_path = config.bin_path(FLAGS);
+    let bin_path = config.bin_path(FLAGS, "honggfuzz");
     let workdir = config.workdir()?;
     let corpus_dir = workdir.join("corpus");
     let crashes_dir = workdir.join("crashes");

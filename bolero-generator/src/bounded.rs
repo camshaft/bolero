@@ -76,20 +76,45 @@ fn with_bounds_test() {
 
 #[test]
 fn bounded_u8_test() {
-    fn test_bound<Bounds: RangeBounds<u8>>(v: u8, bounds: Bounds) {
-        let v = v.bounded(
+    fn test_bound<Bounds: std::fmt::Debug + RangeBounds<u8>>(v: u8, bounds: Bounds) {
+        let out = v.bounded(
             map_bound(bounds.start_bound(), |b| *b),
             map_bound(bounds.end_bound(), |b| *b),
         );
-        assert!(bounds.contains(&v));
+        assert!(bounds.contains(&out), "{:?} not in {:?}", out, bounds);
     }
 
-    for v in 0u8..255 {
+    for v in 0u8..=255 {
         test_bound(v, 4..10);
         test_bound(v, 4..=10);
         test_bound(v, ..10);
         test_bound(v, ..);
         test_bound(v, 4..);
+        test_bound(v, (Bound::Excluded(4), Bound::Unbounded));
+    }
+}
+
+#[test]
+fn bounded_i8_test() {
+    fn test_bound<Bounds: core::fmt::Debug + RangeBounds<i8>>(v: i8, bounds: Bounds) {
+        let out = v.bounded(
+            map_bound(bounds.start_bound(), |b| *b),
+            map_bound(bounds.end_bound(), |b| *b),
+        );
+        assert!(bounds.contains(&out), "{:?} not in {:?}", out, bounds);
+    }
+
+    for v in -128i8..=127 {
+        test_bound(v, -5..=5);
+        test_bound(v, -10..=-5);
+        test_bound(v, 4..10);
+        test_bound(v, 4..=10);
+        test_bound(v, ..-10);
+        test_bound(v, ..=-10);
+        test_bound(v, ..);
+        test_bound(v, 4..);
+        test_bound(v, -127..0);
+        test_bound(v, -120..120);
         test_bound(v, (Bound::Excluded(4), Bound::Unbounded));
     }
 }

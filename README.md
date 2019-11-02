@@ -158,7 +158,7 @@ extern crate your_crate;
 use bolero::fuzz;
 
 fn main() {
-    fuzz!(|input| {
+    fuzz!().for_each(|input| {
         // code to fuzz goes here
     });
 }

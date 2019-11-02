@@ -20,26 +20,20 @@ impl BoundedValue for char {
         use Bound::*;
 
         let start = match start {
-            Included(value) => value as u32,
-            Excluded(value) => (value as u32).saturating_add(1),
-            Unbounded => 0,
+            Included(value) => Included(value as u32),
+            Excluded(value) => Excluded(value as u32),
+            Unbounded => Unbounded,
         };
 
         let end = match end {
-            Included(value) => value as u32,
-            Excluded(value) => (value as u32).saturating_sub(1),
-            Unbounded => core::char::MAX as u32,
+            Included(value) => Included(value as u32),
+            Excluded(value) => Excluded(value as u32),
+            Unbounded => Unbounded,
         };
 
-        let (lower, upper) = if start < end {
-            (start, end)
-        } else {
-            (end, start)
-        };
+        let value = BoundedValue::bounded(self as u32, start, end);
 
-        let range = upper - lower;
-
-        coerce_char((self as u32 % range) + lower)
+        coerce_char(value)
     }
 }
 

@@ -1,3 +1,8 @@
+//! afl plugin for bolero
+//!
+//! This crate should not be used directly. Instead, use `bolero`.
+
+#[doc(hidden)]
 #[cfg(fuzzing_afl)]
 pub mod fuzzer {
     use std::{
@@ -17,7 +22,7 @@ pub mod fuzzer {
     #[used]
     static DEFERED_MARKER: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 
-    pub unsafe fn fuzz<F: Fn(&[u8])>(testfn: F)
+    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
     where
         F: RefUnwindSafe,
     {
@@ -46,9 +51,11 @@ pub mod fuzzer {
     }
 }
 
+#[doc(hidden)]
 #[cfg(fuzzing_afl)]
 pub use fuzzer::*;
 
+#[doc(hidden)]
 #[cfg(feature = "bin")]
 pub mod bin {
     use std::{
@@ -78,5 +85,6 @@ pub mod bin {
     }
 }
 
+#[doc(hidden)]
 #[cfg(feature = "bin")]
 pub use bin::*;

@@ -10,7 +10,11 @@ pub use either;
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::*;
-        ValueGenerator::generate(&($gen), &mut $crate::rng::FuzzRng::new(&[]))
+        let gen = $gen;
+        for i in 1u8..=255 {
+            ValueGenerator::generate(&gen, &mut $crate::rng::FuzzRng::new(&vec![i; i as usize]));
+        }
+        ValueGenerator::generate(&gen, &mut $crate::rng::FuzzRng::new(&[]))
     }};
 }
 
@@ -29,6 +33,7 @@ extern crate std;
 #[path = "std/mod.rs"]
 pub mod std_generators;
 
+pub mod array;
 pub mod atomic;
 pub mod bool;
 pub mod bounded;
@@ -47,6 +52,7 @@ pub use rng::Rng;
 pub trait TypeGenerator: Sized {
     fn generate<R: Rng>(rng: &mut R) -> Self;
 
+    /// Returns a generator for a given type
     #[inline]
     fn gen() -> TypeValueGenerator<Self> {
         gen()
@@ -58,6 +64,7 @@ pub trait ValueGenerator: Sized {
     type Output;
     fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output;
 
+    /// Map the value of a generator
     fn map<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
         MapGenerator {
             generator: self,
@@ -65,7 +72,29 @@ pub trait ValueGenerator: Sized {
         }
     }
 
+    /// Map the value of a generator, exists to reduce conflicts with
+    /// other `map` functions.
+    fn map_gen<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
+        MapGenerator {
+            generator: self,
+            map,
+        }
+    }
+
+    /// Map the value of a generator with a new generator
     fn and_then<F: Fn(Self::Output) -> T, T: ValueGenerator>(
+        self,
+        and_then: F,
+    ) -> AndThenGenerator<Self, F> {
+        AndThenGenerator {
+            generator: self,
+            and_then,
+        }
+    }
+
+    /// Map the value of a generator with a new generator, exists to
+    /// reduce conflicts with other `map` functions.
+    fn and_then_gen<F: Fn(Self::Output) -> T, T: ValueGenerator>(
         self,
         and_then: F,
     ) -> AndThenGenerator<Self, F> {
@@ -117,16 +146,6 @@ pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
 #[inline]
 pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
     T::gen_with()
-}
-
-impl TypeGenerator for () {
-    fn generate<R: Rng>(_rng: &mut R) -> Self {}
-}
-
-impl ValueGenerator for () {
-    type Output = ();
-
-    fn generate<R: Rng>(&self, _rng: &mut R) -> Self {}
 }
 
 impl<T> ValueGenerator for PhantomData<T> {

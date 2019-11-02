@@ -1,6 +1,9 @@
 extern crate cc;
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=BOLERO_FUZZER");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_FUZZING_LIBFUZZER");
+
     if std::env::var("CARGO_CFG_FUZZING_LIBFUZZER").is_ok() {
         let mut build = cc::Build::new();
         let sources = ::std::fs::read_dir("libfuzzer")

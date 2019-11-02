@@ -1,63 +1,62 @@
-test: test_bolero test_fuzzers
+test: test_bolero test_harness test_fuzzers
+
+test_harness:
+	@cargo test \
+	    --manifest-path examples/basic/Cargo.toml
+	@cargo test \
+	    --manifest-path examples/workspace/Cargo.toml
 
 test_bolero:
 	@cargo test
 
-test_fuzzers: test_libfuzzer test_honggfuzz test_afl
+test_fuzzers: test_libfuzzer test_afl test_honggfuzz
 
-test_afl: cargo-bolero
-	@cd examples/basic \
-	  && ../../target/debug/cargo-bolero \
+test_afl:
+	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer afl
 
-test_libfuzzer: cargo-bolero
-	@cd examples/basic \
-	  && ../../target/debug/cargo-bolero \
+test_libfuzzer:
+	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer libfuzzer \
-	  && ../../target/debug/cargo-bolero \
+	    --fuzzer libfuzzer
+	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer libfuzzer \
-	    --sanitizer address \
-	  && ../../target/debug/cargo-bolero \
+	    --sanitizer address
+	@cargo run \
 	    shrink \
 	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
-	    --fuzzer libfuzzer \
-	  && ../../target/debug/cargo-bolero \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --fuzzer libfuzzer
+	@cargo run \
 	    fuzz \
 	    fuzz_generator \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer libfuzzer \
-	  && ../../target/debug/cargo-bolero \
+	    --fuzzer libfuzzer
+	@cargo run \
 	    shrink \
 	    fuzz_generator \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --fuzzer libfuzzer
 
-test_honggfuzz: cargo-bolero
-	@cd examples/basic \
-	  && ../../target/debug/cargo-bolero \
+test_honggfuzz:
+	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
-	    --manifest-path Cargo.toml \
+	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer honggfuzz \
-	    --sanitizer address
-
-cargo-bolero:
-	@cargo build
+	    --fuzzer honggfuzz
 
 publish:
 	@cd bolero-afl && cargo publish
