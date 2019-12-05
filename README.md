@@ -22,7 +22,7 @@ bolero-generator = "0.3"
 
 ```toml
 [dependencies]
-bolero-generator = { version = "0.2", features = ["std"] }
+bolero-generator = { version = "0.3", features = ["std"] }
 ```
 
 `bolero` also provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:
