@@ -66,6 +66,7 @@ test_honggfuzz:
 	    --release
 
 publish:
+	@cd bolero-generator-derive && cargo publish
 	@cd bolero-generator && cargo publish
 	@cd bolero-afl && cargo publish
 	@cd bolero-honggfuzz && cargo publish

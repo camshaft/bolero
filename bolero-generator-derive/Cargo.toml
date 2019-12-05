@@ -1,8 +1,14 @@
 [package]
 name = "bolero-generator-derive"
 version = "0.3.0"
-authors = ["Cameron Bytheway <bythewc@amazon.com>"]
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+description = "value generator for testing and fuzzing"
+homepage = "https://github.com/camshaft/bolero"
+repository = "https://github.com/camshaft/bolero"
+keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
+license = "MIT"
 edition = "2018"
+readme = "../bolero-generator/README.md"
 
 [lib]
 proc-macro = true
