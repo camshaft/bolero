@@ -1,20 +1,20 @@
-use crate::{Rng, TypeGenerator};
+use crate::{Driver, TypeGenerator};
 use alloc::{boxed::Box, string::String, vec::Vec};
 
 impl<T: TypeGenerator> TypeGenerator for Box<T> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        Box::new(rng.gen())
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(Box::new(driver.gen()?))
     }
 }
 
 impl<T: TypeGenerator> TypeGenerator for Box<[T]> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        rng.gen::<Vec<T>>().into_boxed_slice()
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(driver.gen::<Vec<T>>()?.into_boxed_slice())
     }
 }
 
 impl TypeGenerator for Box<str> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        rng.gen::<String>().into_boxed_str()
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(driver.gen::<String>()?.into_boxed_str())
     }
 }

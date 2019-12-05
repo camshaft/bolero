@@ -1,4 +1,4 @@
-use crate::{exec, manifest::resolve, DEFAULT_TARGET};
+use crate::{exec, manifest::TestTarget, DEFAULT_TARGET};
 use failure::Error;
 use std::{path::PathBuf, process::Command};
 use structopt::StructOpt;
@@ -19,6 +19,10 @@ pub struct Config {
     /// Activate all available features
     #[structopt(long = "all-features")]
     all_features: bool,
+
+    /// Build artifacts in release mode, with optimizations
+    #[structopt(long = "release")]
+    release: bool,
 
     /// Do not activate the `default` feature
     #[structopt(long = "no-default-features")]
@@ -57,30 +61,32 @@ impl Config {
         )
     }
 
-    pub fn workdir(&self) -> Result<PathBuf, Error> {
-        let mut manifest_path = resolve(&self.manifest_path, &self.package, Some(&self.test))?;
-        manifest_path.pop();
-        manifest_path.push("tests");
-        manifest_path.push(&self.test);
-        Ok(manifest_path)
+    pub fn test_target(&self) -> Result<TestTarget, Error> {
+        TestTarget::resolve(
+            self.manifest_path.as_ref().map(AsRef::as_ref),
+            self.package.as_ref().map(AsRef::as_ref),
+            &self.test,
+        )
     }
 
     fn cargo(&self) -> Command {
-        let rustup = |toolchain| {
-            let mut cmd = Command::new("rustup");
-            cmd.arg("run").arg(toolchain).arg("cargo");
-            cmd
-        };
+        match self.toolchain() {
+            "default" => Command::new("cargo"),
+            toolchain => {
+                let mut cmd = Command::new("rustup");
+                cmd.arg("run").arg(toolchain).arg("cargo");
+                cmd
+            }
+        }
+    }
 
-        let cargo = || Command::new("cargo");
-
-        let requires_nightly = self.requires_nightly();
-
-        match (requires_nightly, self.toolchain.as_ref()) {
-            (true, None) => rustup("nightly"),
-            (false, None) => cargo(),
-            (_, Some(toolchain)) if toolchain == "default" => cargo(),
-            (_, Some(toolchain)) => rustup(toolchain),
+    fn toolchain(&self) -> &str {
+        if let Some(toolchain) = self.toolchain.as_ref() {
+            toolchain
+        } else if self.requires_nightly() {
+            "nightly"
+        } else {
+            "default"
         }
     }
 
@@ -91,8 +97,11 @@ impl Config {
             .arg("--test")
             .arg(&self.test)
             .arg("--target")
-            .arg(&self.target)
-            .arg("--release");
+            .arg(&self.target);
+
+        if self.release {
+            cmd.arg("--release");
+        }
 
         if self.no_default_features {
             cmd.arg("--no-default-features");

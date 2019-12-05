@@ -1,6 +1,6 @@
 [package]
 name = "bolero-honggfuzz"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "honggfuzz plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -12,3 +12,6 @@ readme = "../README.md"
 
 [features]
 bin = []
+
+[dependencies]
+bolero-generator = { version = "0.3", path = "../bolero-generator", default-features = false }

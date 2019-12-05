@@ -1,4 +1,4 @@
-use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
+use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
 #[cfg(feature = "either")]
 use either::Either;
@@ -96,21 +96,21 @@ macro_rules! impl_either {
         {
             type Output = $ty<$A::Output, $B::Output>;
 
-            fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-                if self.selector.generate(rng) {
-                    $ty::$A(self.a.generate(rng))
+            fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+                Some(if self.selector.generate(driver)? {
+                    $ty::$A(self.a.generate(driver)?)
                 } else {
-                    $ty::$B(self.b.generate(rng))
-                }
+                    $ty::$B(self.b.generate(driver)?)
+                })
             }
         }
 
         impl<$A: TypeGenerator, $B: TypeGenerator> TypeGenerator for $ty<$A, $B> {
-            fn generate<R: Rng>(rng: &mut R) -> Self {
-                if rng.gen() {
-                    $ty::$A(rng.gen())
+            fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+                if driver.gen()? {
+                    Some($ty::$A(driver.gen()?))
                 } else {
-                    $ty::$B(rng.gen())
+                    Some($ty::$B(driver.gen()?))
                 }
             }
         }
@@ -199,22 +199,22 @@ impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
 {
     type Output = Option<V::Output>;
 
-    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-        if self.selector.generate(rng) {
-            Some(self.value.generate(rng))
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        Some(if self.selector.generate(driver)? {
+            Some(self.value.generate(driver)?)
         } else {
             None
-        }
+        })
     }
 }
 
 impl<V: TypeGenerator> TypeGenerator for Option<V> {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        if rng.gen() {
-            Some(rng.gen())
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(if driver.gen()? {
+            Some(driver.gen()?)
         } else {
             None
-        }
+        })
     }
 }
 

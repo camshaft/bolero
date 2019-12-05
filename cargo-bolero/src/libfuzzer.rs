@@ -1,4 +1,4 @@
-use crate::{exec, Config, FuzzArgs, ShrinkArgs};
+use crate::{exec, Config, FuzzArgs, ReduceArgs};
 use failure::Error;
 use std::fs;
 
@@ -12,19 +12,22 @@ macro_rules! optional_arg {
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_libfuzzer",
-    "-Cllvm-args=-sanitizer-coverage-level=3",
-    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
+    "-Cllvm-args=-sanitizer-coverage-inline-8bit-counters",
+    "-Cllvm-args=-sanitizer-coverage-level=4",
+    "-Cllvm-args=-sanitizer-coverage-pc-table",
     "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
     "-Cllvm-args=-sanitizer-coverage-trace-compares",
     "-Cllvm-args=-sanitizer-coverage-trace-divs",
     "-Cllvm-args=-sanitizer-coverage-trace-geps",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
 ];
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
-    let workdir = config.workdir()?;
     let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
-    let corpus_dir = workdir.join("corpus");
-    let crashes_dir = workdir.join("crashes");
+    let test_target = config.test_target()?;
+    let corpus_dir = test_target.corpus_dir();
+    let crashes_dir = test_target.crashes_dir();
 
     fs::create_dir_all(&corpus_dir).unwrap();
     fs::create_dir_all(&crashes_dir).unwrap();
@@ -45,10 +48,10 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
-    let workdir = config.workdir()?;
+pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error> {
     let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
-    let corpus_dir = workdir.join("corpus");
+    let test_target = config.test_target()?;
+    let corpus_dir = test_target.corpus_dir();
 
     let tmp = tempfile::tempdir().expect("could not create tmpdir");
     let tmp_corpus = tmp.path().join("corpus");

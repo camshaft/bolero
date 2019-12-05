@@ -1,4 +1,4 @@
-use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
+use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 use core::{ops::Range, time::Duration};
 
 pub struct DurationGenerator<Seconds, Nanos> {
@@ -61,16 +61,19 @@ where
 {
     type Output = Duration;
 
-    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-        let seconds = self.seconds.generate(rng);
-        let nanos = self.nanos.generate(rng);
-        Duration::new(seconds, nanos)
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        let seconds = self.seconds.generate(driver)?;
+        let nanos = self.nanos.generate(driver)?;
+        Some(Duration::new(seconds, nanos))
     }
 }
 
 impl TypeGenerator for Duration {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        Self::new(rng.gen(), VALID_NANOS_RANGE.generate(rng))
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(Self::new(
+            driver.gen()?,
+            VALID_NANOS_RANGE.generate(driver)?,
+        ))
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{Config, FuzzArgs, ShrinkArgs};
+use crate::{Config, FuzzArgs, ReduceArgs};
 use failure::Error;
 
 const FLAGS: &[&str] = &[
@@ -14,9 +14,9 @@ fn bin() -> String {
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     let bin_path = config.bin_path(FLAGS, "afl");
-    let workdir = config.workdir()?;
-    let corpus_dir = workdir.join("corpus");
-    let afl_state = workdir.join("afl_state");
+    let test_target = config.test_target()?;
+    let corpus_dir = test_target.corpus_dir();
+    let afl_state = test_target.workdir().join("afl_state");
 
     if let Some(runs) = fuzz.runs {
         std::env::set_var("AFL_EXIT_WHEN_DONE", "1");
@@ -40,6 +40,6 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn shrink(_config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
+pub(crate) fn reduce(_config: &Config, _shrink: &ReduceArgs) -> Result<(), Error> {
     unimplemented!()
 }

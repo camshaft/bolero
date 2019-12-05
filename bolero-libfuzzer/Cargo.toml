@@ -1,6 +1,6 @@
 [package]
 name = "bolero-libfuzzer"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "libfuzzer plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -9,6 +9,9 @@ keywords = ["testing", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
 readme = "../README.md"
+
+[dependencies]
+bolero-generator = { version = "0.3", path = "../bolero-generator", default-features = false }
 
 [build-dependencies]
 cc = "1.0"

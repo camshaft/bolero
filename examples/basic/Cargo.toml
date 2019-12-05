@@ -5,6 +5,7 @@ authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+arrayvec = "0.5"
 
 [dev-dependencies]
 bolero = { path = "../../bolero" }
@@ -20,4 +21,9 @@ harness = false
 [[test]]
 name = "fuzz_generator"
 path = "tests/fuzz_generator/main.rs"
+harness = false
+
+[[test]]
+name = "fuzz_operations"
+path = "tests/fuzz_operations/main.rs"
 harness = false

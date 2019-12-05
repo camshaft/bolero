@@ -5,13 +5,14 @@
 #[doc(hidden)]
 #[cfg(fuzzing_libfuzzer)]
 pub mod fuzzer {
+    use bolero_generator::driver::DriverMode;
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
         panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
     };
 
-    static mut TESTFN: Option<&mut dyn FnMut(&[u8])> = None;
+    static mut TESTFN: Option<&mut dyn FnMut(&[u8], Option<DriverMode>) -> bool> = None;
 
     extern "C" {
         // entrypoint for libfuzzer
@@ -22,7 +23,7 @@ pub mod fuzzer {
     pub unsafe extern "C" fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32 {
         let exec = || {
             let data_slice = std::slice::from_raw_parts(data, size);
-            (TESTFN.as_mut().expect("uninitialized test function"))(data_slice);
+            (TESTFN.as_mut().expect("uninitialized test function"))(data_slice, None);
         };
 
         if catch_unwind(AssertUnwindSafe(exec)).is_err() {
@@ -44,11 +45,13 @@ pub mod fuzzer {
         0
     }
 
-    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
+    pub unsafe fn fuzz<F: FnMut(&[u8], Option<DriverMode>) -> bool>(testfn: &mut F) -> !
     where
         F: RefUnwindSafe,
     {
-        TESTFN = Some(std::mem::transmute(testfn as &mut dyn FnMut(&[u8])));
+        TESTFN = Some(std::mem::transmute(
+            testfn as &mut dyn FnMut(&[u8], Option<DriverMode>) -> bool,
+        ));
 
         // create a vector of zero terminated strings
         let args = std::env::args()
@@ -59,10 +62,12 @@ pub mod fuzzer {
         let c_args = args
             .iter()
             .map(|arg| arg.as_ptr())
-            .chain(Some(0 as *const _)) // add a null pointer to the end
+            .chain(Some(core::ptr::null())) // add a null pointer to the end
             .collect::<Vec<_>>();
 
         LLVMFuzzerStartTest(args.len() as c_int, c_args.as_ptr());
+
+        std::process::exit(0);
     }
 }
 

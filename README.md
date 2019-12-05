@@ -8,14 +8,14 @@ fuzz and property testing framework
 
 ```toml
 [dev-dependencies]
-bolero = "0.2"
+bolero = "0.3"
 ```
 
 `bolero` includes a test generator library, [`bolero-generator`](https://crates.io/crates/bolero-generator). This is useful for crates wishing to implement generator traits for downstream applications or libraries. It is `#![no_std]` compatible and can be included as a regular dependency.
 
 ```toml
 [dependencies]
-bolero-generator = "0.2"
+bolero-generator = "0.3"
 ```
 
 `std` support can be enabled if needed:
@@ -47,7 +47,7 @@ This will create a new directory in `tests/my_fuzz_target`, along with a file lo
 use bolero::fuzz;
 
 fn main() {
-    fuzz!(|input| {
+    fuzz!().for_each(|input| {
         if input.len() < 3 {
             return;
         }
@@ -63,7 +63,7 @@ fn main() {
 
 ```rust
 fn main() {
-    fuzz!(for (a, b, c) in gen() {
+    fuzz!().with_type().for_each(|(a, b, c): (u8, u8, u8)| {
         if a == 0 && b == 1 && c == 2 {
             panic!("you found me!");
         }

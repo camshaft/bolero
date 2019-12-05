@@ -5,6 +5,7 @@
 #[doc(hidden)]
 #[cfg(fuzzing_honggfuzz)]
 pub mod fuzzer {
+    use bolero_generator::driver::DriverMode;
     use std::{
         mem::MaybeUninit,
         panic::{catch_unwind, AssertUnwindSafe, RefUnwindSafe},
@@ -15,7 +16,7 @@ pub mod fuzzer {
         fn HF_ITER(buf_ptr: *mut *const u8, len_ptr: *mut usize);
     }
 
-    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
+    pub unsafe fn fuzz<F: FnMut(&[u8], Option<DriverMode>) -> bool>(testfn: &mut F) -> !
     where
         F: RefUnwindSafe,
     {
@@ -31,7 +32,7 @@ pub mod fuzzer {
             HF_ITER(buf_ptr.as_mut_ptr(), len_ptr.as_mut_ptr());
             let input = slice::from_raw_parts(buf_ptr.assume_init(), len_ptr.assume_init());
             let panicked = catch_unwind(AssertUnwindSafe(|| {
-                testfn(&input);
+                testfn(&input, None);
             }))
             .is_err();
 
@@ -69,7 +70,7 @@ pub mod bin {
         let c_args = args
             .iter()
             .map(|arg| arg.as_ptr())
-            .chain(Some(0 as *const _)) // add a null pointer to the end
+            .chain(Some(core::ptr::null())) // add a null pointer to the end
             .collect::<Vec<_>>();
 
         honggfuzz_main(args.len() as c_int, c_args.as_ptr());

@@ -1,10 +1,11 @@
 use crate::{
-    alloc_generators::BytesGenerator, Rng, TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
+    alloc_generators::CharsGenerator, Driver, TypeGenerator, TypeGeneratorWithParams,
+    ValueGenerator,
 };
 use alloc::{string::String, vec::Vec};
 use core::ops::RangeInclusive;
 
-pub struct StringGenerator<L>(BytesGenerator<L>);
+pub struct StringGenerator<L>(CharsGenerator<L>);
 
 impl<L> StringGenerator<L> {
     pub fn len<Gen: ValueGenerator<Output = Len>, Len: Into<usize>>(
@@ -25,8 +26,8 @@ impl<L> StringGenerator<L> {
 impl<L: ValueGenerator<Output = Len>, Len: Into<usize>> ValueGenerator for StringGenerator<L> {
     type Output = String;
 
-    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-        to_string(self.0.generate(rng))
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        Some(to_string(self.0.generate(driver)?))
     }
 }
 
@@ -41,24 +42,24 @@ impl TypeGeneratorWithParams for String {
 impl ValueGenerator for String {
     type Output = Self;
 
-    fn generate<R: Rng>(&self, _rng: &mut R) -> Self {
-        self.clone()
+    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
+        Some(self.clone())
     }
 }
 
 impl TypeGenerator for String {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        to_string(rng.gen())
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(to_string(driver.gen()?))
     }
 }
 
-fn to_string(vec: Vec<u8>) -> String {
-    String::from_utf8_lossy(&vec).into_owned()
+fn to_string(mut vec: Vec<char>) -> String {
+    vec.drain(..).collect()
 }
 
 #[test]
 fn string_test() {
     let _ = generator_test!(gen::<String>());
-    let string = generator_test!(gen::<String>().with().len(32usize));
-    assert_eq!(string.len(), 32);
+    let string = generator_test!(gen::<String>().with().len(32usize)).unwrap();
+    assert_eq!(string.chars().map(|_| 1usize).sum::<usize>(), 32usize);
 }

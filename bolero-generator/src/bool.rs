@@ -1,4 +1,4 @@
-use crate::{rng::Rng, TypeGenerator, TypeGeneratorWithParams, ValueGenerator};
+use crate::{driver::Driver, TypeGenerator, TypeGeneratorWithParams, ValueGenerator};
 
 #[derive(Debug)]
 pub struct BooleanGenerator {
@@ -14,8 +14,8 @@ impl Default for BooleanGenerator {
 impl ValueGenerator for bool {
     type Output = bool;
 
-    fn generate<R: Rng>(&self, _rng: &mut R) -> Self::Output {
-        *self
+    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {
+        Some(*self)
     }
 }
 
@@ -38,15 +38,15 @@ impl TypeGeneratorWithParams for bool {
 impl ValueGenerator for BooleanGenerator {
     type Output = bool;
 
-    fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-        let value = rng.gen::<u32>() as f32 / core::u32::MAX as f32;
-        value < self.weight
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        let value = driver.gen::<u32>()? as f32 / core::u32::MAX as f32;
+        Some(value < self.weight)
     }
 }
 
 impl TypeGenerator for bool {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        BooleanGenerator::default().generate(rng)
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(driver.gen::<u8>()? > (core::u8::MAX / 2))
     }
 }
 

@@ -2,6 +2,7 @@ use crate::{config::Config, fuzzer::Fuzzer};
 use failure::Error;
 use structopt::StructOpt;
 
+/// Run a fuzzing engine for a target
 #[derive(Debug, StructOpt)]
 pub struct Fuzz {
     /// Run the test with a specific fuzzer

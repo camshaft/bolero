@@ -1,4 +1,4 @@
-use crate::manifest::resolve;
+use crate::manifest::Package;
 use failure::Error;
 use std::{
     fs::{self, OpenOptions},
@@ -7,6 +7,7 @@ use std::{
 };
 use structopt::StructOpt;
 
+/// Create a new test target
 #[derive(Debug, StructOpt)]
 pub struct New {
     /// Name of the test target
@@ -60,9 +61,12 @@ impl New {
         }
         .trim_start();
 
-        let manifest_path = resolve(&self.manifest_path, &self.package, None)?;
-        let project_dir = manifest_path.parent().unwrap();
-        let target_dir = project_dir.join("tests").join(&self.test);
+        let package = Package::resolve(
+            self.manifest_path.as_ref().map(AsRef::as_ref),
+            self.package.as_ref().map(AsRef::as_ref),
+        )?;
+        let manifest_dir = package.manifest_dir();
+        let target_dir = manifest_dir.join("tests").join(&self.test);
 
         mkdir(&target_dir);
         write(target_dir.join("main.rs"), file);
@@ -74,7 +78,7 @@ impl New {
 
         let mut cargo_toml = OpenOptions::new()
             .append(true)
-            .open(manifest_path)
+            .open(&package.manifest_path)
             .expect("could not open Cargo.toml");
 
         cargo_toml

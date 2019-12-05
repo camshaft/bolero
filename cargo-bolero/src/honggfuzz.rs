@@ -1,4 +1,4 @@
-use crate::{Config, FuzzArgs, ShrinkArgs};
+use crate::{Config, FuzzArgs, ReduceArgs};
 use failure::Error;
 
 const FLAGS: &[&str] = &[
@@ -18,9 +18,9 @@ fn bin() -> String {
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let workdir = config.workdir()?;
-    let corpus_dir = workdir.join("corpus");
-    let crashes_dir = workdir.join("crashes");
+    let test_target = config.test_target()?;
+    let corpus_dir = test_target.corpus_dir();
+    let crashes_dir = test_target.crashes_dir();
 
     let mut args = vec![
         bin(),
@@ -44,11 +44,11 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn shrink(config: &Config, _shrink: &ShrinkArgs) -> Result<(), Error> {
+pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error> {
     let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let workdir = config.workdir()?;
-    let corpus_dir = workdir.join("corpus");
-    let crashes_dir = workdir.join("crashes");
+    let test_target = config.test_target()?;
+    let corpus_dir = test_target.corpus_dir();
+    let crashes_dir = test_target.crashes_dir();
 
     let args = vec![
         bin(),

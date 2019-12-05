@@ -1,4 +1,4 @@
-use crate::{config::Config, fuzz::FuzzArgs, shrink::ShrinkArgs};
+use crate::{config::Config, fuzz::FuzzArgs, reduce::ReduceArgs};
 use failure::Error;
 use std::str::FromStr;
 
@@ -18,11 +18,11 @@ impl Fuzzer {
         }
     }
 
-    pub fn shrink(&self, config: &Config, args: &ShrinkArgs) -> Result<(), Error> {
+    pub fn reduce(&self, config: &Config, args: &ReduceArgs) -> Result<(), Error> {
         match self {
-            Self::Libfuzzer => crate::libfuzzer::shrink(config, args),
-            Self::Afl => crate::afl::shrink(config, args),
-            Self::Honggfuzz => crate::honggfuzz::shrink(config, args),
+            Self::Libfuzzer => crate::libfuzzer::reduce(config, args),
+            Self::Afl => crate::afl::reduce(config, args),
+            Self::Honggfuzz => crate::honggfuzz::reduce(config, args),
         }
     }
 }

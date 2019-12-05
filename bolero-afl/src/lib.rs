@@ -5,6 +5,7 @@
 #[doc(hidden)]
 #[cfg(fuzzing_afl)]
 pub mod fuzzer {
+    use bolero_generator::driver::DriverMode;
     use std::{
         io::Read,
         panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
@@ -22,7 +23,7 @@ pub mod fuzzer {
     #[used]
     static DEFERED_MARKER: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 
-    pub unsafe fn fuzz<F: FnMut(&[u8])>(testfn: &mut F)
+    pub unsafe fn fuzz<F: FnMut(&[u8], Option<DriverMode>) -> bool>(testfn: &mut F) -> !
     where
         F: RefUnwindSafe,
     {
@@ -37,10 +38,10 @@ pub mod fuzzer {
 
         while __afl_persistent_loop(1000) != 0 {
             if std::io::stdin().read_to_end(&mut input).is_err() {
-                return;
+                std::process::abort();
             }
 
-            let panicked = catch_unwind(AssertUnwindSafe(|| testfn(&input))).is_err();
+            let panicked = catch_unwind(AssertUnwindSafe(|| testfn(&input, None))).is_err();
 
             if panicked {
                 std::process::abort();
@@ -48,6 +49,8 @@ pub mod fuzzer {
 
             input.clear();
         }
+
+        std::process::exit(0);
     }
 }
 
@@ -78,7 +81,7 @@ pub mod bin {
         let c_args = args
             .iter()
             .map(|arg| arg.as_ptr())
-            .chain(Some(0 as *const _)) // add a null pointer to the end
+            .chain(Some(core::ptr::null())) // add a null pointer to the end
             .collect::<Vec<_>>();
 
         afl_fuzz_main(args.len() as c_int, c_args.as_ptr());

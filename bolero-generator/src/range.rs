@@ -1,4 +1,4 @@
-use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
+use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
 macro_rules! range_generator {
     ($ty:ident, $generator:ident, $new:expr) => {
@@ -60,18 +60,18 @@ macro_rules! range_generator {
         {
             type Output = core::ops::$ty<T>;
 
-            fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-                let start = self.start.generate(rng);
-                let end = self.end.generate(rng);
-                $new(start, end)
+            fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+                let start = self.start.generate(driver)?;
+                let end = self.end.generate(driver)?;
+                Some($new(start, end))
             }
         }
 
         impl<T: TypeGenerator> TypeGenerator for core::ops::$ty<T> {
-            fn generate<R: Rng>(rng: &mut R) -> Self {
-                let start = rng.gen();
-                let end = rng.gen();
-                $new(start, end)
+            fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+                let start = driver.gen()?;
+                let end = driver.gen()?;
+                Some($new(start, end))
             }
         }
 

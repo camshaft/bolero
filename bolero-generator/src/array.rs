@@ -1,16 +1,16 @@
-use crate::{Rng, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
+use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
 impl<T> TypeGenerator for [T; 0] {
-    fn generate<R_: Rng>(_rng: &mut R_) -> Self {
-        []
+    fn generate<D_: Driver>(_driver: &mut D_) -> Option<Self> {
+        Some([])
     }
 }
 
 impl<T> ValueGenerator for [T; 0] {
     type Output = [T; 0];
 
-    fn generate<R_: Rng>(&self, _rng: &mut R_) -> Self::Output {
-        []
+    fn generate<D_: Driver>(&self, _driver: &mut D_) -> Option<Self::Output> {
+        Some([])
     }
 }
 
@@ -28,24 +28,24 @@ macro_rules! impl_array {
     };
     ($head:ident($h_index:tt), $($tail:ident($t_index:tt), )* [$($acc:ident($a_index:tt),)*]) => {
         impl<T: TypeGenerator> TypeGenerator for [T; $h_index + 1] {
-            fn generate<R_: Rng>(rng: &mut R_) -> Self {
+            fn generate<D_: Driver>(driver: &mut D_) -> Option<Self> {
                 $(
-                    let $acc = T::generate(rng);
+                    let $acc = T::generate(driver)?;
                 )*
-                let $head = T::generate(rng);
-                [$($acc, )* $head]
+                let $head = T::generate(driver)?;
+                Some([$($acc, )* $head])
             }
         }
 
         impl<G: ValueGenerator> ValueGenerator for [G; $h_index + 1] {
             type Output = [G::Output; $h_index + 1];
 
-            fn generate<R_: Rng>(&self, rng: &mut R_) -> Self::Output {
+            fn generate<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
                 $(
-                    let $acc = self[$a_index].generate(rng);
+                    let $acc = self[$a_index].generate(driver)?;
                 )*
-                let $head = self[$h_index].generate(rng);
-                [$($acc, )* $head]
+                let $head = self[$h_index].generate(driver)?;
+                Some([$($acc, )* $head])
             }
         }
 

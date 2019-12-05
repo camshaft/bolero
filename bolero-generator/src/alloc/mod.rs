@@ -5,14 +5,14 @@ pub mod boxed;
 pub mod string;
 pub mod sync;
 
-use crate::{Rng, TypeGenerator};
+use crate::{Driver, TypeGenerator};
 pub use alloc::{
     borrow::{Cow, ToOwned},
     collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque},
     vec::Vec,
 };
 
-const DEFAULT_LEN_RANGE: core::ops::RangeInclusive<usize> = 0..=32;
+const DEFAULT_LEN_RANGE: core::ops::RangeInclusive<usize> = 0..=64;
 
 impl_values_collection_generator!(BinaryHeap, BinaryHeapGenerator, DEFAULT_LEN_RANGE, [Ord]);
 impl_values_collection_generator!(BTreeSet, BTreeSetGenerator, DEFAULT_LEN_RANGE, [Ord]);
@@ -24,24 +24,27 @@ impl_key_values_collection_generator!(BTreeMap, BTreeMapGenerator, DEFAULT_LEN_R
 pub type Bytes = Vec<u8>;
 pub type BytesGenerator<L> = VecGenerator<crate::TypeValueGenerator<u8>, L>;
 
+pub type Chars = Vec<char>;
+pub type CharsGenerator<L> = VecGenerator<crate::TypeValueGenerator<char>, L>;
+
 impl<T> TypeGenerator for Cow<'static, T>
 where
     T: ToOwned + ?Sized,
     <T as ToOwned>::Owned: TypeGenerator,
 {
-    fn generate<R: Rng>(rng: &mut R) -> Self {
-        Cow::Owned(rng.gen())
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        Some(Cow::Owned(driver.gen()?))
     }
 }
 
 #[test]
 fn vec_test() {
-    let vec: Vec<u8> = generator_test!(gen::<Vec<u8>>().with().len(8usize));
+    let vec: Vec<u8> = generator_test!(gen::<Vec<u8>>().with().len(8usize)).unwrap();
     assert_eq!(vec.len(), 8);
 
     let _ = generator_test!(gen::<Vec<_>>().with().values(4u16..6));
 
-    let vec = generator_test!(gen::<Vec<u8>>().with().len(32usize));
+    let vec = generator_test!(gen::<Vec<u8>>().with().len(32usize)).unwrap();
     assert_eq!(vec.len(), 32);
 
     let _ = generator_test!({

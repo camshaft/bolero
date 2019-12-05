@@ -1,16 +1,52 @@
-use crate::{Rng, TypeGenerator, ValueGenerator};
-use core::ops::{Bound, RangeBounds};
+use crate::{driver::DriverMode, Driver, TypeGenerator, ValueGenerator};
+use core::ops::RangeBounds;
+
+pub trait BoundedValue<RangeBounds> {
+    type BoundValue;
+
+    fn is_within(&self, range: &RangeBounds) -> bool;
+    fn bind_within(self, range: &RangeBounds) -> Self;
+}
+
+#[inline(always)]
+pub(crate) fn is_within<T: PartialOrd, R: RangeBounds<T>>(value: &T, range_bounds: &R) -> bool {
+    #![allow(clippy::neg_cmp_op_on_partial_ord)]
+    use core::ops::Bound::*;
+
+    macro_rules! ensure {
+        ($value:expr) => {{
+            if !($value) {
+                return false;
+            }
+        }};
+    }
+
+    match range_bounds.start_bound() {
+        Included(start) => ensure!(start <= value),
+        Excluded(start) => ensure!(start < value),
+        Unbounded => {}
+    }
+
+    match range_bounds.end_bound() {
+        Included(end) => ensure!(value <= end),
+        Excluded(end) => ensure!(value < end),
+        Unbounded => {}
+    }
+
+    true
+}
 
 macro_rules! range_generator {
     ($ty:ident) => {
-        impl<T: TypeGenerator + BoundedValue> ValueGenerator for core::ops::$ty<T> {
+        impl<T: TypeGenerator + BoundedValue<Self>> ValueGenerator for core::ops::$ty<T> {
             type Output = T;
 
-            fn generate<R: Rng>(&self, rng: &mut R) -> Self::Output {
-                T::generate(rng).bounded(
-                    map_bound(self.start_bound(), |b| b.clone()),
-                    map_bound(self.end_bound(), |b| b.clone()),
-                )
+            fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+                if driver.mode() == DriverMode::Forced {
+                    Some(T::generate(driver)?.bind_within(self))
+                } else {
+                    T::generate(driver).filter(|value| value.is_within(self))
+                }
             }
         }
     };
@@ -22,50 +58,39 @@ range_generator!(RangeInclusive);
 range_generator!(RangeTo);
 range_generator!(RangeToInclusive);
 
-pub trait BoundedValue: Clone + Sized {
-    fn bounded(self, start: Bound<Self>, end: Bound<Self>) -> Self;
-}
-
 #[derive(Debug)]
-pub struct BoundedGenerator<G, T> {
+pub struct BoundedGenerator<G, B> {
     generator: G,
-    start: Bound<T>,
-    end: Bound<T>,
+    range_bounds: B,
 }
 
-impl<G: ValueGenerator<Output = T>, T: BoundedValue> BoundedGenerator<G, T> {
-    pub fn new<Bounds: RangeBounds<B>, B: Clone + Into<T>>(generator: G, bounds: Bounds) -> Self {
+impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundValue>>
+    BoundedGenerator<G, B>
+{
+    pub fn new(generator: G, range_bounds: B) -> Self {
         BoundedGenerator {
             generator,
-            start: map_bound(bounds.start_bound(), |b| b.clone().into()),
-            end: map_bound(bounds.end_bound(), |b| b.clone().into()),
+            range_bounds,
         }
     }
 
-    pub fn bounds<Bounds: RangeBounds<B>, B: Clone + Into<T>>(self, bounds: Bounds) -> Self {
+    pub fn bounds<NewB: RangeBounds<T>>(self, range_bounds: NewB) -> BoundedGenerator<G, NewB> {
         BoundedGenerator {
             generator: self.generator,
-            start: map_bound(bounds.start_bound(), |b| b.clone().into()),
-            end: map_bound(bounds.end_bound(), |b| b.clone().into()),
+            range_bounds,
         }
     }
 }
 
-impl<T: BoundedValue, G: ValueGenerator<Output = T>> ValueGenerator for BoundedGenerator<G, T> {
+impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundValue>>
+    ValueGenerator for BoundedGenerator<G, B>
+{
     type Output = T;
 
-    fn generate<R: Rng>(&self, rng: &mut R) -> T {
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<T> {
         self.generator
-            .generate(rng)
-            .bounded(self.start.clone(), self.end.clone())
-    }
-}
-
-fn map_bound<T, U, F: Fn(&T) -> U>(bound: Bound<&T>, map: F) -> Bound<U> {
-    match bound {
-        Bound::Unbounded => Bound::Unbounded,
-        Bound::Included(x) => Bound::Included(map(x)),
-        Bound::Excluded(x) => Bound::Excluded(map(x)),
+            .generate(driver)
+            .filter(|value| value.is_within(&self.range_bounds))
     }
 }
 
@@ -76,12 +101,11 @@ fn with_bounds_test() {
 
 #[test]
 fn bounded_u8_test() {
+    use core::ops::Bound;
     fn test_bound<Bounds: std::fmt::Debug + RangeBounds<u8>>(v: u8, bounds: Bounds) {
-        let out = v.bounded(
-            map_bound(bounds.start_bound(), |b| *b),
-            map_bound(bounds.end_bound(), |b| *b),
-        );
-        assert!(bounds.contains(&out), "{:?} not in {:?}", out, bounds);
+        assert_eq!(v.is_within(&bounds), bounds.contains(&v));
+        let bound = v.bind_within(&bounds);
+        assert!(bounds.contains(&bound), "{:?} not in {:?}", bound, bounds);
     }
 
     for v in 0u8..=255 {
@@ -96,12 +120,11 @@ fn bounded_u8_test() {
 
 #[test]
 fn bounded_i8_test() {
+    use core::ops::Bound;
     fn test_bound<Bounds: core::fmt::Debug + RangeBounds<i8>>(v: i8, bounds: Bounds) {
-        let out = v.bounded(
-            map_bound(bounds.start_bound(), |b| *b),
-            map_bound(bounds.end_bound(), |b| *b),
-        );
-        assert!(bounds.contains(&out), "{:?} not in {:?}", out, bounds);
+        assert_eq!(v.is_within(&bounds), bounds.contains(&v));
+        let bound = v.bind_within(&bounds);
+        assert!(bounds.contains(&bound), "{:?} not in {:?}", bound, bounds);
     }
 
     for v in -128i8..=127 {

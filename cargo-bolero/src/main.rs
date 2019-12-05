@@ -2,7 +2,7 @@ use crate::{
     config::Config,
     fuzz::{Fuzz, FuzzArgs},
     new::New,
-    shrink::{Shrink, ShrinkArgs},
+    reduce::{Reduce, ReduceArgs},
 };
 use failure::Error;
 use structopt::StructOpt;
@@ -15,13 +15,13 @@ mod honggfuzz;
 mod libfuzzer;
 mod manifest;
 mod new;
-mod shrink;
+mod reduce;
 
 #[derive(Debug, StructOpt)]
 #[allow(clippy::large_enum_variant)]
 enum Commands {
     Fuzz(Fuzz),
-    Shrink(Shrink),
+    Reduce(Reduce),
     New(New),
 }
 
@@ -29,7 +29,7 @@ impl Commands {
     fn exec(&self) -> Result<(), Error> {
         match self {
             Self::Fuzz(cmd) => cmd.exec(),
-            Self::Shrink(cmd) => cmd.exec(),
+            Self::Reduce(cmd) => cmd.exec(),
             Self::New(cmd) => cmd.exec(),
         }
     }

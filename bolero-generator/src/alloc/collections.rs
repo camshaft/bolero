@@ -61,19 +61,21 @@ macro_rules! impl_values_collection_generator {
         {
             type Output = $ty<V::Output>;
 
-            fn generate<R: $crate::Rng>(&self, rng: &mut R) -> Self::Output {
-                let len = $crate::ValueGenerator::generate(&self.len, rng).into();
-                Iterator::map(0..len, |_| {
-                    $crate::ValueGenerator::generate(&self.values, rng)
-                })
-                .collect()
+            fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+                let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
+                Some(
+                    Iterator::filter_map(0..len, |_| {
+                        $crate::ValueGenerator::generate(&self.values, driver)
+                    })
+                    .collect(),
+                )
             }
         }
 
         impl<V: $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGenerator for $ty<V> {
-            fn generate<R: $crate::Rng>(rng: &mut R) -> Self {
-                let len = $crate::ValueGenerator::generate(&$default_len_range, rng);
-                Iterator::map(0..len, |_| V::generate(rng)).collect()
+            fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
+                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
+                Some(Iterator::filter_map(0..len, |_| V::generate(driver)).collect())
             }
         }
 
@@ -90,22 +92,24 @@ macro_rules! impl_values_collection_generator {
         }
 
         impl<V: $crate::ValueGenerator> $crate::ValueGenerator for $ty<V>
-            $( where V::Output: Sized $(+ $params)* )?
+        $( where V::Output: Sized $(+ $params)* )?
         {
             type Output = $ty<V::Output>;
 
-            fn generate<R: $crate::Rng>(&self, rng: &mut R) -> Self::Output {
+            fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 assert!(!self.is_empty());
 
-                let len = $crate::ValueGenerator::generate(&$default_len_range, rng);
+                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
                 let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                 let generators_len = 0..generators.len();
 
-                Iterator::map(0..len, |_| {
-                    let index = $crate::ValueGenerator::generate(&generators_len, rng);
-                    $crate::ValueGenerator::generate(generators[index], rng)
-                })
-                .collect()
+                Some(
+                    Iterator::filter_map(0..len, |_| {
+                        let index = $crate::ValueGenerator::generate(&generators_len, driver)?;
+                        $crate::ValueGenerator::generate(generators[index], driver)
+                    })
+                    .collect(),
+                )
             }
         }
     };
@@ -202,26 +206,28 @@ macro_rules! impl_key_values_collection_generator {
         {
             type Output = $ty<K::Output, V::Output>;
 
-            fn generate<R: $crate::Rng>(&self, rng: &mut R) -> Self::Output {
+            fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 use $crate::ValueGenerator;
-                let len = ValueGenerator::generate(&self.len, rng).into();
-                Iterator::map(0..len, |_| {
-                    (
-                        ValueGenerator::generate(&self.keys, rng),
-                        ValueGenerator::generate(&self.values, rng),
-                    )
-                })
-                .collect()
+                let len = ValueGenerator::generate(&self.len, driver)?.into();
+                Some(
+                    Iterator::filter_map(0..len, |_| {
+                        Some((
+                            ValueGenerator::generate(&self.keys, driver)?,
+                            ValueGenerator::generate(&self.values, driver)?,
+                        ))
+                    })
+                    .collect(),
+                )
             }
         }
 
         impl<K: $crate::TypeGenerator $($( + $params)*)?, V: $crate::TypeGenerator> $crate::TypeGenerator
             for $ty<K, V>
         {
-            fn generate<R: $crate::Rng>(rng: &mut R) -> Self {
+            fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
                 use $crate::ValueGenerator;
-                let len = ValueGenerator::generate(&$default_len_range, rng);
-                Iterator::map(0..len, |_| (K::generate(rng), V::generate(rng))).collect()
+                let len = ValueGenerator::generate(&$default_len_range, driver)?;
+                Some(Iterator::filter_map(0..len, |_| Some((K::generate(driver)?, V::generate(driver)?))).collect())
             }
         }
 
@@ -249,24 +255,26 @@ macro_rules! impl_key_values_collection_generator {
         {
             type Output = $ty<K::Output, V::Output>;
 
-            fn generate<R: $crate::Rng>(&self, rng: &mut R) -> Self::Output {
+            fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 use $crate::ValueGenerator;
 
                 assert!(!self.is_empty());
 
-                let len = ValueGenerator::generate(&$default_len_range, rng);
+                let len = ValueGenerator::generate(&$default_len_range, driver)?;
                 let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                 let generators_len = 0..generators.len();
 
-                Iterator::map(0..len, |_| {
-                    let index = ValueGenerator::generate(&generators_len, rng);
-                    let (key, value) = generators[index];
-                    (
-                        ValueGenerator::generate(key, rng),
-                        ValueGenerator::generate(value, rng),
-                    )
-                })
-                .collect()
+                Some(
+                    Iterator::filter_map(0..len, |_| {
+                        let index = ValueGenerator::generate(&generators_len, driver)?;
+                        let (key, value) = generators[index];
+                        Some((
+                            ValueGenerator::generate(key, driver)?,
+                            ValueGenerator::generate(value, driver)?,
+                        ))
+                    })
+                    .collect(),
+                )
             }
         }
     };
