@@ -1,6 +1,6 @@
 [package]
 name = "cargo-bolero"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
@@ -11,8 +11,8 @@ edition = "2018"
 readme = "README.md"
 
 [dependencies]
-bolero-afl = { version = "0.3", path = "../bolero-afl", features = ["bin"] }
-bolero-honggfuzz = { version = "0.3", path = "../bolero-honggfuzz", features = ["bin"] }
+bolero-afl = { version = "0.4", path = "../bolero-afl", default-features = false, features = ["bin"] }
+bolero-honggfuzz = { version = "0.4", path = "../bolero-honggfuzz", default-features = false, features = ["bin"] }
 failure = "0.1"
 structopt = "0.3"
 tempfile = "3"

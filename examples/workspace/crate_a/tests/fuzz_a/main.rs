@@ -1,13 +1,8 @@
 use bolero::fuzz;
+use crate_a::run;
 
 fn main() {
-    fuzz!(|input| {
-        if input.len() < 3 {
-            return;
-        }
-
-        if input[0] == 0 && input[1] == 1 && input[2] == 2 {
-            panic!("you found me!");
-        }
+    fuzz!().with_type().for_each(|(a, b)| {
+        run(a, b);
     });
 }

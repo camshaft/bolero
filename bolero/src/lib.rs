@@ -1,26 +1,40 @@
-mod fuzz;
-mod test;
+cfg_if::cfg_if! {
+    if #[cfg(fuzzing_libfuzzer)] {
+        pub use bolero_libfuzzer::LibFuzzerEngine as DefaultEngine;
+    } else if #[cfg(fuzzing_afl)] {
+        pub use bolero_afl::AflEngine as DefaultEngine;
+    } else if #[cfg(fuzzing_honggfuzz)] {
+        pub use bolero_honggfuzz::HonggfuzzEngine as DefaultEngine;
+    } else if #[cfg(test)] {
+        mod test;
 
-#[doc(hidden)]
-#[cfg(fuzzing)]
-use fuzz::exec;
-
-#[doc(hidden)]
-#[cfg(not(fuzzing))]
-#[allow(unused_imports)]
-use test::exec;
+        // when testing bolero always use the RngEngine
+        pub use bolero_engine::rng::RngEngine as DefaultEngine;
+    } else {
+        mod test;
+        pub use crate::test::TestEngine as DefaultEngine;
+    }
+}
 
 /// Re-export of `bolero_generator`
 pub mod generator {
     pub use bolero_generator::{self, prelude::*};
 }
 
+#[doc(hidden)]
+pub use bolero_engine::TargetLocation;
+
+pub use bolero_engine::{rng::RngEngine, Driver, DriverMode, Engine, Test};
+
 use bolero_generator::{
     combinator::{AndThenGenerator, FilterGenerator, FilterMapGenerator, MapGenerator},
     TypeValueGenerator,
 };
 
-/// Execute fuzz tests
+/// Execute fuzz tests for a given target
+///
+/// This should be executed in a separate test target, for example
+/// `tests/my_fuzz_target/main.rs`.
 ///
 /// # Examples
 ///
@@ -28,30 +42,8 @@ use bolero_generator::{
 /// use bolero::fuzz;
 ///
 /// fn main() {
-///     fuzz!(|input| {
-///         if input.len() < 3 {
-///             return;
-///         }
-///
-///         if input[0] == 0 && input[1] == 1 && input[2] == 2 {
-///             panic!("you found me!");
-///         }
-///     });
-/// }
-/// ```
-///
-/// ```rust
-/// use bolero::fuzz;
-///
-/// fn main() {
 ///     fuzz!().for_each(|input| {
-///         if input.len() < 3 {
-///             return;
-///         }
-///
-///         if input[0] == 0 && input[1] == 1 && input[2] == 2 {
-///             panic!("you found me!");
-///         }
+///         // implement fuzz target here
 ///     });
 /// }
 /// ```
@@ -60,11 +52,11 @@ use bolero_generator::{
 /// use bolero::fuzz;
 ///
 /// fn main() {
-///     fuzz!(for (a, b) in all((gen::<u8>(), gen::<u8>())) {
-///         if a == 42 && b == 24 {
-///             panic!("you found me!");
-///         }
-///     });
+///     fuzz!()
+///         .with_type::<(u8, u16)>()
+///         .for_each(|(a, b)| {
+///             // implement fuzz target here
+///         });
 /// }
 /// ```
 ///
@@ -75,113 +67,178 @@ use bolero_generator::{
 ///     fuzz!()
 ///         .with_generator((0..100, 10..50))
 ///         .for_each(|(a, b)| {
-///             if a == 42 && b == 24 {
-///                 panic!("you found me!");
-///             }
+///             // implement fuzz target here
 ///         });
 /// }
 /// ```
+///
+/// ```rust
+/// use bolero::fuzz;
+///
+/// fn main() {
+///     fuzz!(|input| {
+///         // implement fuzz target here
+///     });
+/// }
+/// ```
+///
+/// ```rust
+/// use bolero::fuzz;
+///
+/// fn main() {
+///     fuzz!(for (a, b) in all((gen::<u8>(), gen::<u8>())) {
+///         // implement fuzz target here
+///     });
+/// }
+/// ```
+
 #[macro_export]
 macro_rules! fuzz {
-    () => {
-        $crate::fuzz(env!("CARGO_MANIFEST_DIR"), file!())
+    ($($tt:tt)*) => {
+        $crate::__bolero_parse_input!(fuzz; $($tt)*)
     };
-    (for $value:pat in gen() { $($tt:tt)* }) => {
-        $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
-    };
-    (for $value:pat in all() { $($tt:tt)* }) => {
-        $crate::fuzz!(for $value in ($crate::generator::gen()) { $($tt)* });
-    };
-    (for $value:pat in all($gen:expr) { $($tt:tt)* }) => {
-        $crate::fuzz!(for $value in ($gen) { $($tt)* });
-    };
-    (for $value:pat in each($gen:expr) { $($tt:tt)* }) => {
-        $crate::fuzz!(for $value in ($gen) { $($tt)* });
-    };
-    (for $value:pat in $gen:path { $($tt:tt)* }) => {
-        $crate::fuzz!(for $value in ($gen) { $($tt)* });
-    };
-    (for $value:pat in ($gen:expr) { $($tt:tt)* }) => {
-        $crate::fuzz!()
-            .with_generator({
-                use $crate::generator::*;
-                $gen
-            })
-            .for_each(|$value| {
-                $($tt)*
-            });
-    };
-    ($fun:path) => {
-        $crate::fuzz!(|input| { $fun(input); });
-    };
-    (|$input:ident $(: &[u8])?| $impl:expr) => {
-        $crate::fuzz!().for_each(|$input: &[u8]| {
-            $impl;
-        });
-    };
-    (|$input:ident: $ty:ty| $impl:expr) => {
-        $crate::fuzz!().with_type().for_each(|$input: $ty| {
-            $impl;
-        });
+}
+
+/// Execute property checks for a given target
+///
+/// # Examples
+///
+/// ```rust
+/// use bolero::check;
+///
+/// #[test]
+/// fn slice_check() {
+///     check!().for_each(|input: &[u8]| {
+///         // implement check target here
+///     });
+/// }
+/// ```
+///
+/// ```rust
+/// use bolero::check;
+///
+/// #[test]
+/// fn typed_check() {
+///     check!()
+///         .with_type::<(u8, u16)>()
+///         .for_each(|(a, b)| {
+///             // implement check target here
+///         });
+/// }
+/// ```
+///
+/// ```rust
+/// use bolero::check;
+///
+/// #[test]
+/// fn generator_check() {
+///     check!()
+///         .with_generator((0..100, 10..50))
+///         .for_each(|(a, b)| {
+///             // implement check target here
+///         });
+/// }
+/// ```
+///
+/// ```rust
+/// use bolero::check;
+///
+/// #[test]
+/// fn macro_slice_check() {
+///     check!(|input| {
+///         // implement check target here
+///     });
+/// }
+/// ```
+///
+/// ```rust
+/// use bolero::check;
+///
+/// #[test]
+/// fn macro_for_check() {
+///     check!(for (a, b) in all((gen::<u8>(), gen::<u8>())) {
+///         // implement check target here
+///     });
+/// }
+/// ```
+
+#[macro_export]
+macro_rules! check {
+    ($($tt:tt)*) => {
+        $crate::__bolero_parse_input!(check; $($tt)*)
     };
 }
 
 /// Configuration for a fuzz target
-pub struct FuzzTarget<G> {
-    manifest_dir: &'static str,
-    file: &'static str,
-    generator: G,
+pub struct TestTarget<Generator, Engine> {
+    generator: Generator,
+    driver_mode: Option<DriverMode>,
+    engine: Engine,
 }
 
-/// Create a fuzz target for a given file
-pub fn fuzz(manifest_dir: &'static str, file: &'static str) -> FuzzTarget<SliceGenerator> {
-    FuzzTarget::new(manifest_dir, file)
+#[doc(hidden)]
+pub fn fuzz(location: TargetLocation) -> TestTarget<SliceGenerator, DefaultEngine> {
+    // cargo-bolero needs to resolve the path of the binary
+    if std::env::var("CARGO_BOLERO_PATH").is_ok() {
+        print!("{}", std::env::args().nth(0).unwrap());
+        std::process::exit(0);
+    }
+
+    TestTarget::new(DefaultEngine::new(location))
+}
+
+#[doc(hidden)]
+pub fn check(location: TargetLocation) -> TestTarget<SliceGenerator, RngEngine> {
+    TestTarget::new(RngEngine::new(location))
 }
 
 /// Default generator for byte slices
+#[derive(Copy, Clone, Default, PartialEq)]
 pub struct SliceGenerator;
 
-impl FuzzTarget<SliceGenerator> {
-    /// Create a `FuzzTarget` for a given file
-    pub fn new(manifest_dir: &'static str, file: &'static str) -> FuzzTarget<SliceGenerator> {
+impl<Engine> TestTarget<SliceGenerator, Engine> {
+    /// Create a `TestTarget` for a given file
+    pub fn new(engine: Engine) -> TestTarget<SliceGenerator, Engine> {
         Self {
-            manifest_dir,
-            file,
+            driver_mode: None,
             generator: SliceGenerator,
+            engine,
         }
     }
 }
 
-impl<G> FuzzTarget<G> {
-    /// Set the value generator for the `FuzzTarget`
+impl<G, Engine> TestTarget<G, Engine> {
+    /// Set the value generator for the `TestTarget`
     pub fn with_generator<NewG: generator::ValueGenerator>(
         self,
         generator: NewG,
-    ) -> FuzzTarget<NewG> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    ) -> TestTarget<NewG, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator,
+            engine: self.engine,
         }
     }
 
-    /// Set the type generator for the `FuzzTarget`
-    pub fn with_type<T: generator::TypeGenerator>(self) -> FuzzTarget<TypeValueGenerator<T>> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    /// Set the type generator for the `TestTarget`
+    pub fn with_type<T: generator::TypeGenerator>(
+        self,
+    ) -> TestTarget<TypeValueGenerator<T>, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator: generator::gen(),
+            engine: self.engine,
         }
     }
 }
 
-impl<G: generator::ValueGenerator> FuzzTarget<G> {
+impl<G: generator::ValueGenerator, Engine> TestTarget<G, Engine> {
     /// Map the value of the generator
-    pub fn map<F: Fn(G::Output) -> T, T>(self, map: F) -> FuzzTarget<MapGenerator<G, F>> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    pub fn map<F: Fn(G::Output) -> T, T>(self, map: F) -> TestTarget<MapGenerator<G, F>, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator: self.generator.map(map),
+            engine: self.engine,
         }
     }
 
@@ -189,20 +246,23 @@ impl<G: generator::ValueGenerator> FuzzTarget<G> {
     pub fn and_then<F: Fn(G::Output) -> T, T: generator::ValueGenerator>(
         self,
         map: F,
-    ) -> FuzzTarget<AndThenGenerator<G, F>> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    ) -> TestTarget<AndThenGenerator<G, F>, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator: self.generator.and_then(map),
+            engine: self.engine,
         }
     }
 
     /// Filter the value of the generator
-    pub fn filter<F: Fn(&G::Output) -> bool>(self, filter: F) -> FuzzTarget<FilterGenerator<G, F>> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    pub fn filter<F: Fn(&G::Output) -> bool>(
+        self,
+        filter: F,
+    ) -> TestTarget<FilterGenerator<G, F>, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator: self.generator.filter(filter),
+            engine: self.engine,
         }
     }
 
@@ -210,102 +270,169 @@ impl<G: generator::ValueGenerator> FuzzTarget<G> {
     pub fn filter_map<F: Fn(G::Output) -> Option<T>, T>(
         self,
         filter_map: F,
-    ) -> FuzzTarget<FilterMapGenerator<G, F>> {
-        FuzzTarget {
-            manifest_dir: self.manifest_dir,
-            file: self.file,
+    ) -> TestTarget<FilterMapGenerator<G, F>, Engine> {
+        TestTarget {
+            driver_mode: self.driver_mode,
             generator: self.generator.filter_map(filter_map),
+            engine: self.engine,
+        }
+    }
+
+    /// Set the driver mode for the fuzz target
+    pub fn with_driver_mode(self, mode: DriverMode) -> Self {
+        TestTarget {
+            driver_mode: Some(mode),
+            generator: self.generator,
+            engine: self.engine,
         }
     }
 }
 
-#[cfg(not(test))]
-impl<G: std::panic::RefUnwindSafe + generator::ValueGenerator> FuzzTarget<G> {
-    /// Iterate over all of the inputs and check the `FuzzTarget`
-    pub fn for_each<F: std::panic::RefUnwindSafe + FnMut(G::Output)>(self, mut check: F) -> ! {
-        use bolero_generator::driver::FuzzDriver;
+impl<G> TestTarget<G, RngEngine> {
+    /// Set the number of iterations executed
+    pub fn with_iterations(mut self, iterations: usize) -> Self {
+        self.engine.iterations = iterations;
+        TestTarget {
+            driver_mode: self.driver_mode,
+            generator: self.generator,
+            engine: self.engine,
+        }
+    }
 
-        unsafe {
-            exec(self.manifest_dir, self.file, &mut move |input, mode| {
-                if let Some(value) = self.generator.generate(&mut FuzzDriver::new(input, mode)) {
-                    check(value);
-                    true
-                } else {
-                    false
-                }
-            });
+    /// Set the maximum length of the generated bytes
+    pub fn with_max_len(mut self, max_len: usize) -> Self {
+        self.engine.max_len = max_len;
+        TestTarget {
+            driver_mode: self.driver_mode,
+            generator: self.generator,
+            engine: self.engine,
         }
     }
 }
 
-#[cfg(test)]
-impl<G: std::panic::RefUnwindSafe + generator::ValueGenerator> FuzzTarget<G> {
-    /// Iterate over all of the inputs and check the `FuzzTarget`
-    pub fn for_each<F: std::panic::RefUnwindSafe + FnMut(G::Output)>(self, mut check: F) {
-        for _ in 0u8..100 {
-            if let Some(value) = self.generator.generate(&mut rand::thread_rng()) {
-                check(value);
-            }
+impl<G, E> TestTarget<G, E>
+where
+    G: generator::ValueGenerator,
+{
+    /// Iterate over all of the inputs and check the `TestTarget`
+    pub fn for_each<F>(mut self, test: F) -> E::Output
+    where
+        E: Engine<bolero_engine::GeneratorTest<F, G>>,
+        bolero_engine::GeneratorTest<F, G>: Test,
+    {
+        let test = bolero_engine::GeneratorTest::new(test, self.generator);
+        if let Some(mode) = self.driver_mode {
+            self.engine.set_driver_mode(mode);
         }
+        self.engine.run(test)
     }
 }
 
-#[cfg(not(test))]
-impl FuzzTarget<SliceGenerator> {
-    /// Iterate over all of the inputs and check the `FuzzTarget`
-    pub fn for_each<F: std::panic::RefUnwindSafe + FnMut(&[u8])>(self, mut check: F) -> ! {
-        unsafe {
-            exec(self.manifest_dir, self.file, &mut move |input, _mode| {
-                check(input);
-                true
-            });
+impl<E> TestTarget<SliceGenerator, E> {
+    /// Iterate over all of the inputs and check the `TestTarget`
+    pub fn for_each<T, Ret>(mut self, test: T) -> E::Output
+    where
+        E: Engine<T>,
+        T: Test + FnMut(&[u8]) -> Ret,
+    {
+        if let Some(mode) = self.driver_mode {
+            self.engine.set_driver_mode(mode);
         }
-    }
-}
-
-#[cfg(test)]
-impl FuzzTarget<SliceGenerator> {
-    /// Iterate over all of the inputs and check the `FuzzTarget`
-    pub fn for_each<F: std::panic::RefUnwindSafe + FnMut(&[u8])>(self, mut check: F) {
-        for i in 0u8..100 {
-            let input = vec![i; i as usize];
-            check(&input[..]);
-        }
+        self.engine.run(test)
     }
 }
 
 #[test]
+#[should_panic]
 fn slice_generator_test() {
-    fuzz!().for_each(|_input| {
-        // println!("{:?}", input);
+    check!().for_each(|input| {
+        assert!(input.len() > 1000);
     });
 }
 
 #[test]
+#[should_panic]
 fn type_generator_test() {
-    fuzz!().with_type().for_each(|_input: u8| {
-        // println!("{:?}", input);
+    check!().with_type().for_each(|input: u8| {
+        assert!(input < 128);
     });
 }
 
 #[test]
 fn range_generator_test() {
-    fuzz!().with_generator(0..=5).for_each(|_input: u8| {
+    check!().with_generator(0..=5).for_each(|_input: u8| {
         // println!("{:?}", input);
     });
 }
 
-mod derive_tests {
-    use bolero_generator::TypeGenerator;
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __bolero_parse_input {
+    ($target:ident;) => {
+        $crate::$target($crate::TargetLocation {
+            manifest_dir: env!("CARGO_MANIFEST_DIR"),
+            module_path: module_path!(),
+            file: file!(),
+            line: line!(),
+        })
+    };
+    ($target:ident; for $value:pat in gen() { $($tt:tt)* }) => {
+        $crate::$target!(for $value in ($crate::generator::gen()) { $($tt)* })
+    };
+    ($target:ident; for $value:pat in all() { $($tt:tt)* }) => {
+        $crate::$target!(for $value in ($crate::generator::gen()) { $($tt)* })
+    };
+    ($target:ident; for $value:pat in all($gen:expr) { $($tt:tt)* }) => {
+        $crate::$target!(for $value in ($gen) { $($tt)* })
+    };
+    ($target:ident; for $value:pat in each($gen:expr) { $($tt:tt)* }) => {
+        $crate::$target!(for $value in ($gen) { $($tt)* })
+    };
+    ($target:ident; for $value:pat in $gen:path { $($tt:tt)* }) => {
+        $crate::$target!(for $value in ($gen) { $($tt)* })
+    };
+    ($target:ident; for $value:pat in ($gen:expr) { $($tt:tt)* }) => {
+        $crate::$target!()
+            .with_generator({
+                use $crate::generator::*;
+                $gen
+            })
+            .for_each(|$value| {
+                $($tt)*
+            })
+    };
+    ($target:ident; $fun:path) => {
+        $crate::$target!(|input| { $fun(input); })
+    };
+    ($target:ident; |$input:ident $(: &[u8])?| $impl:expr) => {
+        $crate::$target!().for_each(|$input: &[u8]| {
+            $impl;
+        })
+    };
+    ($target:ident; |$input:ident: $ty:ty| $impl:expr) => {
+        $crate::$target!().with_type().for_each(|$input: $ty| {
+            $impl;
+        })
+    };
+}
 
-    #[derive(Debug, TypeGenerator)]
+#[cfg(test)]
+mod derive_tests {
+    use bolero_generator::*;
+
+    fn gen_foo() -> impl ValueGenerator<Output = u32> {
+        4..5
+    }
+
+    #[derive(Debug, PartialEq, TypeGenerator)]
     pub struct Bar {
+        #[generator(gen_foo())]
         foo: u32,
         bar: u64,
         baz: u8,
     }
 
-    #[derive(Debug, TypeGenerator)]
+    #[derive(Debug, PartialEq, TypeGenerator)]
     pub enum Operation {
         Insert {
             #[generator(1..3)]
@@ -331,8 +458,8 @@ mod derive_tests {
 
     #[test]
     fn operation_test() {
-        fuzz!().with_type().for_each(|input: Vec<Operation>| {
-            println!("{:?}", input);
+        check!().with_type().for_each(|_input: Vec<Operation>| {
+            // println!("{:?}", input);
         });
     }
 }

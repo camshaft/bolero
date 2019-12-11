@@ -8,7 +8,7 @@ value generator for testing and fuzzing
 
 ```toml
 [dependencies]
-bolero-generator = "0.3"
+bolero-generator = "0.4"
 ```
 
 ## Usage

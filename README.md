@@ -8,32 +8,25 @@ fuzz and property testing framework
 
 ```toml
 [dev-dependencies]
-bolero = "0.3"
+bolero = "0.4"
 ```
 
-`bolero` includes a test generator library, [`bolero-generator`](https://crates.io/crates/bolero-generator). This is useful for crates wishing to implement generator traits for downstream applications or libraries. It is `#![no_std]` compatible and can be included as a regular dependency.
+`bolero` includes a test generator library, [`bolero-generator`](https://crates.io/crates/bolero-generator). This is useful for crates wishing to implement generator traits for downstream applications or libraries.
 
 ```toml
 [dependencies]
-bolero-generator = "0.3"
-```
-
-`std` support can be enabled if needed:
-
-```toml
-[dependencies]
-bolero-generator = { version = "0.3", features = ["std"] }
+bolero-generator = "0.4"
 ```
 
 `bolero` also provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:
 
 ```bash
-$ cargo install bolero-cargo
+$ cargo install -f cargo-bolero
 ```
 
 ## Usage
 
-### Setup
+### Fuzzing
 
 First create a fuzz target:
 
@@ -63,8 +56,20 @@ fn main() {
 
 ```rust
 fn main() {
-    fuzz!().with_type().for_each(|(a, b, c): (u8, u8, u8)| {
+    fuzz!().with_type().for_each(|(a, b, c): (u8, u16, u32)| {
         if a == 0 && b == 1 && c == 2 {
+            panic!("you found me!");
+        }
+    });
+}
+```
+
+Value generation can be customized even further by passing a [`ValueGenerator`](https://docs.rs/bolero/latest/bolero/generator/trait.ValueGenerator.html):
+
+```rust
+fn main() {
+    fuzz!().with_generator(2..42).for_each(|value| {
+        if value == 4 {
             panic!("you found me!");
         }
     });
@@ -79,7 +84,7 @@ $ cargo bolero fuzz my_fuzz_target --fuzzer libfuzzer --sanitizer address
 
 `bolero` supports [`libfuzzer`](https://llvm.org/docs/LibFuzzer.html), [`afl`](http://lcamtuf.coredump.cx/afl/), and [`honggfuzz`](https://google.github.io/honggfuzz/) via the `fuzzer` argument.
 
-### Corpus test replay
+#### Corpus test replay
 
 After running a fuzz target, a corpus is generated (a set of inputs that trigger unique codepaths). This corpus can be now executed using the standard `cargo test` command. The corpus should either be commited to the project repository or be stored/restored from storage, like S3.
 
@@ -88,14 +93,35 @@ $ cargo test
 
      Running target/debug/deps/my_fuzz_target-9b2c2acee51634e0
 
-running 4 tests
-test corpus/3f6089c3d3533d52fe8fbc49624a9b584fe49bd7 ... ok
-test corpus/7e2e044376b5b655c8a7d1df734f00ab070c8b68 ... ok
-test corpus/85e53271e14006f0265921d02d4d736cdc580b0b ... ok
-test corpus/72d2d4ef5fc0e8e338eeb77ef1fc73b5ed96a28f ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 1007 tests
+...............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+test result: ok. 1007 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
+
+### Property Tests
+
+`bolero` also supports property tests inside of the project with the `check!` call:
+
+```rust
+#[test]
+fn my_property() {
+    bolero::check!()
+        .with_type()
+        .with_iterations(1000) // Defaults to 1000
+        .for_each(|value: u64| {
+            // implement property checks here
+        });
+}
+```
+
+A RNG engine will be used instead of a fuzzing engine in this mode.
+
+Consider the trade-offs when trying to choose between the `fuzz` or `check` modes:
+
+|         | Unit tests | Integration tests | Code coverage guided tests |     Deterministic       |  C/C++ Dependency |
+|:-------:|:----------:|:-----------------:|:--------------------------:|:-----------------------:|:-----------------:|
+|   fuzz! |      x     |         ✓         |              ✓             |     ✓ (Corpus tests)    |         ✓         |
+|  check! |      ✓     |         ✓         |              x             | - (Only with same seed) |         x         |
 
 ## Prior work
 
@@ -105,51 +131,7 @@ While `bolero` draws a lot of inspiration from the `rust-fuzz` organization, sev
 
 #### Unified interface
 
-`rust-fuzz` requires a different interface for each type of fuzzer. There is an [RFC](https://github.com/rust-fuzz/rfcs/pull/1) proposing a fix, but seemingly no progress has been made:
-
-`libfuzzer`:
-
-```rust
-#![no_main]
-
-#[macro_use]
-extern crate libfuzzer_sys;
-extern crate your_crate;
-
-fuzz_target!(|data: &[u8]| {
-    // code to fuzz goes here
-});
-```
-
-`afl`:
-
-```rust
-#[macro_use]
-extern crate afl;
-extern crate your_crate;
-
-fn main() {
-    fuzz!(|data: &[u8]| {
-        // code to fuzz goes here
-    });
-}
-```
-
-`honggfuzz`:
-
-```rust
-#[macro_use]
-extern crate honggfuzz;
-extern crate your_crate;
-
-fn main() {
-    loop {
-        fuzz!(|data: &[u8]| {
-            // code to fuzz goes here
-        });
-    }
-}
-```
+`rust-fuzz` requires a different interface for each type of fuzzer. There is an [RFC](https://github.com/rust-fuzz/rfcs/pull/1) proposing a fix, but seemingly no progress has been made.
 
 `bolero` unifies the implementation to a single interface that supports `libfuzzer`, `afl`, and `honggfuzz`:
 

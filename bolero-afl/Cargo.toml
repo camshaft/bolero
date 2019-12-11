@@ -1,6 +1,6 @@
 [package]
 name = "bolero-afl"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Cameron Bytheway <bythewc@amazon.com>"]
 description = "afl plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -11,10 +11,12 @@ edition = "2018"
 readme = "../README.md"
 
 [features]
+default = ["lib"]
 bin = []
+lib = ["bolero-engine"]
 
 [dependencies]
-bolero-generator = { version = "0.3", path = "../bolero-generator", default-features = false }
+bolero-engine = { version = "0.4", path = "../bolero-engine", optional = true }
 
 [build-dependencies]
 cc = "1.0"

@@ -29,14 +29,6 @@ test_libfuzzer:
 	    --fuzzer libfuzzer \
 	    --release
 	@cargo run \
-	    fuzz \
-	    fuzz_bytes \
-	    --manifest-path examples/basic/Cargo.toml \
-	    --runs 100000 \
-	    --fuzzer libfuzzer \
-	    --sanitizer address \
-	    --release
-	@cargo run \
 	    reduce \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -68,6 +60,7 @@ test_honggfuzz:
 publish:
 	@cd bolero-generator-derive && cargo publish
 	@cd bolero-generator && cargo publish
+	@cd bolero-engine && cargo publish
 	@cd bolero-afl && cargo publish
 	@cd bolero-honggfuzz && cargo publish
 	@cd bolero-libfuzzer && cargo publish

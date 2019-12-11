@@ -8,7 +8,7 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
     // "-Cllvm-args=-sanitizer-coverage-trace-compares",
     "-Cllvm-args=-sanitizer-coverage-trace-divs",
-    "-Cllvm-args=-sanitizer-coverage-trace-geps",
+    // "-Cllvm-args=-sanitizer-coverage-trace-geps",
     "-Clink-args=-lhfuzz",
 ];
 

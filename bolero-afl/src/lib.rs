@@ -3,13 +3,10 @@
 //! This crate should not be used directly. Instead, use `bolero`.
 
 #[doc(hidden)]
-#[cfg(fuzzing_afl)]
+#[cfg(any(test, all(feature = "lib", fuzzing_afl)))]
 pub mod fuzzer {
-    use bolero_generator::driver::DriverMode;
-    use std::{
-        io::Read,
-        panic::{self, catch_unwind, AssertUnwindSafe, RefUnwindSafe},
-    };
+    use bolero_engine::{panic, DriverMode, Engine, Never, SliceTestInput, TargetLocation, Test};
+    use std::io::Read;
 
     extern "C" {
         // from the afl-llvm-rt
@@ -23,39 +20,76 @@ pub mod fuzzer {
     #[used]
     static DEFERED_MARKER: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 
-    pub unsafe fn fuzz<F: FnMut(&[u8], Option<DriverMode>) -> bool>(testfn: &mut F) -> !
+    #[derive(Debug, Default)]
+    pub struct AflEngine {
+        driver_mode: Option<DriverMode>,
+    }
+
+    impl AflEngine {
+        pub fn new(_location: TargetLocation) -> Self {
+            Self::default()
+        }
+    }
+
+    impl<T: Test> Engine<T> for AflEngine
     where
-        F: RefUnwindSafe,
+        T::Value: core::fmt::Debug,
     {
-        panic::set_hook(Box::new(|info| {
-            println!("{}", info);
-            std::process::abort();
-        }));
+        type Output = Never;
 
-        let mut input = vec![];
-
-        __afl_manual_init();
-
-        while __afl_persistent_loop(1000) != 0 {
-            if std::io::stdin().read_to_end(&mut input).is_err() {
-                std::process::abort();
-            }
-
-            let panicked = catch_unwind(AssertUnwindSafe(|| testfn(&input, None))).is_err();
-
-            if panicked {
-                std::process::abort();
-            }
-
-            input.clear();
+        fn set_driver_mode(&mut self, mode: DriverMode) {
+            self.driver_mode = Some(mode);
         }
 
-        std::process::exit(0);
+        fn run(self, mut test: T) -> Self::Output {
+            panic::set_hook();
+
+            let mut input = AflInput::new(self.driver_mode);
+
+            unsafe {
+                __afl_manual_init();
+            }
+
+            while unsafe { __afl_persistent_loop(1000) } != 0 {
+                if test.test(&mut input.test_input()).is_err() {
+                    std::process::abort();
+                }
+            }
+
+            std::process::exit(0);
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct AflInput {
+        driver_mode: Option<DriverMode>,
+        input: Vec<u8>,
+    }
+
+    impl AflInput {
+        fn new(driver_mode: Option<DriverMode>) -> Self {
+            Self {
+                driver_mode,
+                input: vec![],
+            }
+        }
+
+        fn reset(&mut self) {
+            self.input.clear();
+            std::io::stdin()
+                .read_to_end(&mut self.input)
+                .expect("could not read next input");
+        }
+
+        fn test_input(&mut self) -> SliceTestInput {
+            self.reset();
+            SliceTestInput::new(&self.input, self.driver_mode)
+        }
     }
 }
 
 #[doc(hidden)]
-#[cfg(fuzzing_afl)]
+#[cfg(all(feature = "lib", fuzzing_afl))]
 pub use fuzzer::*;
 
 #[doc(hidden)]

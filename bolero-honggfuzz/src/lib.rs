@@ -3,48 +3,75 @@
 //! This crate should not be used directly. Instead, use `bolero`.
 
 #[doc(hidden)]
-#[cfg(fuzzing_honggfuzz)]
+#[cfg(any(test, all(feature = "lib", fuzzing_honggfuzz)))]
 pub mod fuzzer {
-    use bolero_generator::driver::DriverMode;
-    use std::{
-        mem::MaybeUninit,
-        panic::{catch_unwind, AssertUnwindSafe, RefUnwindSafe},
-        slice,
+    use bolero_engine::{
+        panic as bolero_panic, DriverMode, Engine, Never, SliceTestInput, TargetLocation, Test,
     };
+    use std::{mem::MaybeUninit, slice};
 
     extern "C" {
         fn HF_ITER(buf_ptr: *mut *const u8, len_ptr: *mut usize);
     }
 
-    pub unsafe fn fuzz<F: FnMut(&[u8], Option<DriverMode>) -> bool>(testfn: &mut F) -> !
-    where
-        F: RefUnwindSafe,
-    {
-        std::panic::set_hook(Box::new(|info| {
-            println!("{}", info);
-            std::process::abort();
-        }));
+    #[derive(Debug, Default)]
+    pub struct HonggfuzzEngine {
+        driver_mode: Option<DriverMode>,
+    }
 
-        let mut buf_ptr = MaybeUninit::<*const u8>::uninit();
-        let mut len_ptr = MaybeUninit::<usize>::uninit();
+    impl HonggfuzzEngine {
+        pub fn new(_location: TargetLocation) -> Self {
+            Self::default()
+        }
+    }
 
-        loop {
-            HF_ITER(buf_ptr.as_mut_ptr(), len_ptr.as_mut_ptr());
-            let input = slice::from_raw_parts(buf_ptr.assume_init(), len_ptr.assume_init());
-            let panicked = catch_unwind(AssertUnwindSafe(|| {
-                testfn(&input, None);
-            }))
-            .is_err();
+    impl<T: Test> Engine<T> for HonggfuzzEngine {
+        type Output = Never;
 
-            if panicked {
-                std::process::abort();
+        fn set_driver_mode(&mut self, mode: DriverMode) {
+            self.driver_mode = Some(mode);
+        }
+
+        fn run(self, mut test: T) -> Self::Output {
+            bolero_panic::set_hook();
+
+            let mut input = HonggfuzzInput::new(self.driver_mode);
+
+            loop {
+                if test.test(&mut input.test_input()).is_err() {
+                    std::process::abort();
+                }
             }
+        }
+    }
+
+    pub struct HonggfuzzInput {
+        buf_ptr: MaybeUninit<*const u8>,
+        len_ptr: MaybeUninit<usize>,
+        driver_mode: Option<DriverMode>,
+    }
+
+    impl HonggfuzzInput {
+        fn new(driver_mode: Option<DriverMode>) -> Self {
+            Self {
+                driver_mode,
+                buf_ptr: MaybeUninit::uninit(),
+                len_ptr: MaybeUninit::uninit(),
+            }
+        }
+
+        fn test_input(&mut self) -> SliceTestInput {
+            let input = unsafe {
+                HF_ITER(self.buf_ptr.as_mut_ptr(), self.len_ptr.as_mut_ptr());
+                slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init())
+            };
+            SliceTestInput::new(input, self.driver_mode)
         }
     }
 }
 
 #[doc(hidden)]
-#[cfg(fuzzing_honggfuzz)]
+#[cfg(all(feature = "lib", fuzzing_honggfuzz))]
 pub use fuzzer::*;
 
 #[doc(hidden)]

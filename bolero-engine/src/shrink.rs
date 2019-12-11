@@ -1,12 +1,14 @@
-// WIP
+use crate::{Error, Test, TestFailure, TestInput};
+use bolero_generator::driver::{DriverMode, FuzzDriver};
+use core::fmt::Debug;
 
-use std::panic::{catch_unwind, AssertUnwindSafe, RefUnwindSafe};
-
-#[derive(Debug)]
-pub struct Shrinker<F> {
+pub fn shrink<T: Test>(
+    test: &mut T,
     input: Vec<u8>,
-    len: usize,
-    testfn: F,
+    seed: Option<u64>,
+    driver_mode: Option<DriverMode>,
+) -> Option<TestFailure<T::Value>> {
+    Shrinker::new(test, input, seed, driver_mode).shrink()
 }
 
 macro_rules! ensure {
@@ -17,71 +19,69 @@ macro_rules! ensure {
     };
 }
 
-macro_rules! ensure_panics {
-    ($self:ident) => {
-        if $self.execute().is_err() {
-            return Ok(());
-        }
-    };
-}
-
 macro_rules! shrink_integer {
     ($current:ident, $check:expr) => {{
-        // TODO implement an efficient binary search
-
-        // let mut check = $check;
-        // let mut size = $current;
-        // if size == 0 {
-        //     None
-        // } else {
-        //     let mut base = None;
-        //     while size > 1 {
-        //         let half = size / 2;
-        //         let mid = base.unwrap_or(0) + half;
-        //         if check(mid) {
-        //             base = Some(mid);
-        //         };
-        //         size -= half;
-        //     }
-        //     base
-        // }
-
         let mut check = $check;
 
         let mut lowest_panic = None;
         let mut prev_value = $current;
+
+        while prev_value > 0 {
+            let next_value = prev_value / 2;
+            if check(next_value) {
+                lowest_panic = Some(next_value);
+                prev_value = next_value;
+            } else {
+                break;
+            }
+        }
+
         while let Some(next_value) = prev_value.checked_sub(1) {
             if check(next_value) {
                 lowest_panic = Some(next_value);
             }
             prev_value = next_value;
         }
+
         lowest_panic
     }};
 }
 
-impl<F: RefUnwindSafe + FnMut(&[u8]) -> bool> Shrinker<F> {
-    pub fn new(input: &[u8], testfn: F) -> Self {
+#[derive(Debug)]
+struct Shrinker<'a, T> {
+    test: &'a mut T,
+    input: Vec<u8>,
+    len: usize,
+    seed: Option<u64>,
+    driver_mode: Option<DriverMode>,
+}
+
+impl<'a, T: Test> Shrinker<'a, T> {
+    fn new(
+        test: &'a mut T,
+        input: Vec<u8>,
+        seed: Option<u64>,
+        driver_mode: Option<DriverMode>,
+    ) -> Self {
+        let len = input.len();
         Self {
-            input: input.to_vec(),
-            len: input.len(),
-            testfn,
+            input,
+            len,
+            test,
+            seed,
+            driver_mode,
         }
     }
 
-    pub fn shrink(mut self) -> Vec<u8> {
+    fn shrink(mut self) -> Option<TestFailure<T::Value>> {
+        crate::panic::set_hook();
+        crate::panic::forward_panic(false);
+        crate::panic::capture_backtrace(false);
+
         // Skip inputs that don't panic
         if self.execute().is_ok() {
-            return self.input;
+            return None;
         }
-
-        #[cfg(not(test))]
-        let panic_hook = std::panic::take_hook();
-
-        #[cfg(not(test))]
-        std::panic::set_hook(Box::new(|_| {
-            // noop
-        }));
 
         let mut was_changed = true;
         while was_changed {
@@ -97,11 +97,17 @@ impl<F: RefUnwindSafe + FnMut(&[u8]) -> bool> Shrinker<F> {
             }
         }
 
-        #[cfg(not(test))]
-        std::panic::set_hook(panic_hook);
+        crate::panic::capture_backtrace(true);
+        let error = self.execute().err().unwrap();
+        crate::panic::forward_panic(true);
 
-        self.input.truncate(self.len);
-        self.input
+        let input = self.generate_value();
+
+        Some(TestFailure {
+            seed: self.seed,
+            error,
+            input,
+        })
     }
 
     fn apply_transforms(&mut self, index: usize) -> bool {
@@ -180,7 +186,10 @@ impl<F: RefUnwindSafe + FnMut(&[u8]) -> bool> Shrinker<F> {
         let second = self.input[index + 1];
         self.input[index] = second;
         self.input[index + 1] = first;
-        ensure_panics!(self);
+
+        if self.execute().is_err() {
+            return Ok(());
+        }
 
         // revert
         self.input[index] = first;
@@ -188,8 +197,35 @@ impl<F: RefUnwindSafe + FnMut(&[u8]) -> bool> Shrinker<F> {
         Err(())
     }
 
-    fn execute(&mut self) -> Result<bool, ()> {
-        catch_unwind(AssertUnwindSafe(|| (self.testfn)(&self.input[..self.len]))).map_err(|_| ())
+    fn execute(&mut self) -> Result<bool, Error> {
+        self.test.test(&mut ShrinkInput {
+            input: &self.input[..self.len],
+            driver_mode: self.driver_mode,
+        })
+    }
+
+    fn generate_value(&mut self) -> T::Value {
+        self.test.generate_value(&mut ShrinkInput {
+            input: &self.input[..self.len],
+            driver_mode: self.driver_mode,
+        })
+    }
+}
+
+struct ShrinkInput<'a> {
+    input: &'a [u8],
+    driver_mode: Option<DriverMode>,
+}
+
+impl<'a, Output> TestInput<Output> for ShrinkInput<'a> {
+    type Driver = FuzzDriver<'a>;
+
+    fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
+        f(self.input)
+    }
+
+    fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
+        f(&mut FuzzDriver::new(self.input, self.driver_mode))
     }
 }
 
@@ -197,27 +233,17 @@ macro_rules! shrink_test {
     ($name:ident, $gen:expr, $expected:expr, $check:expr) => {
         #[test]
         fn $name() {
-            use crate::generator::{gen, rng::FuzzRng, ValueGenerator};
+            #[allow(unused_imports)]
+            use bolero_generator::{driver::DriverMode, gen, ValueGenerator};
 
-            let generator = $gen;
-            let to_value = |input: &[u8]| {
-                let mut rng = FuzzRng::new(input);
-                generator.generate(&mut rng)
-            };
+            let mut test = crate::GeneratorTest::new($check, $gen);
+            let input = [255; 1024].to_vec();
 
-            let check = $check;
+            let failure = Shrinker::new(&mut test, input, None, Some(DriverMode::Forced))
+                .shrink()
+                .unwrap();
 
-            let output = Shrinker::new(&[255; 1024][..], |input| {
-                if let Some(value) = to_value(input) {
-                    check(value);
-                    true
-                } else {
-                    false
-                }
-            })
-            .shrink();
-
-            assert_eq!(to_value(&output).unwrap(), $expected);
+            assert_eq!(failure.input, $expected);
         }
     };
 }

@@ -15,7 +15,7 @@ macro_rules! generator_test {
         for _ in 0..1000 {
             ValueGenerator::generate(&gen, driver);
         }
-        let driver = &mut rand::thread_rng();
+        let driver = &mut $crate::driver::ForcedRng::new(rand::thread_rng());
         for _ in 0..1000 {
             ValueGenerator::generate(&gen, driver);
         }

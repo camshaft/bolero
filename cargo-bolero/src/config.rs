@@ -52,7 +52,7 @@ impl Config {
         PathBuf::from(
             String::from_utf8(
                 self.cmd("test", flags, fuzzer)
-                    .env("BOLERO_INFO", "1")
+                    .env("CARGO_BOLERO_PATH", "1")
                     .output()
                     .expect("could not read info")
                     .stdout,
