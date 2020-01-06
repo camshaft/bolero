@@ -59,10 +59,17 @@ test_honggfuzz:
 
 publish:
 	@cd bolero-generator-derive && cargo publish
+	@sleep 2
 	@cd bolero-generator && cargo publish
+	@sleep 2
 	@cd bolero-engine && cargo publish
+	@sleep 2
 	@cd bolero-afl && cargo publish
+	@sleep 2
 	@cd bolero-honggfuzz && cargo publish
+	@sleep 2
 	@cd bolero-libfuzzer && cargo publish
+	@sleep 2
 	@cd cargo-bolero && cargo publish
+	@sleep 2
 	@cd bolero && cargo publish
