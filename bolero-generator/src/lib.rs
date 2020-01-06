@@ -48,6 +48,7 @@ pub mod char;
 pub mod combinator;
 pub mod driver;
 pub mod num;
+pub mod one_of;
 pub mod range;
 pub mod result;
 pub mod time;
@@ -229,6 +230,8 @@ pub fn constant<T: Clone>(value: T) -> Constant<T> {
 
 pub mod prelude {
     pub use crate::{
-        constant, gen, gen_with, TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
+        constant, gen, gen_with,
+        one_of::{one_of, OneOfExt},
+        TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
 }
