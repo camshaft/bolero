@@ -1,15 +1,34 @@
 # cargo-bolero
 
+[`cargo-bolero`](https://crates.io/crates/cargo-bolero) can be installed globally with cargo:
+
+```bash
+$ cargo install -f cargo-bolero
+```
+
+#### Linux Installation
+
+`cargo-bolero` needs a couple of libraries installed to function:
+
+##### Debian/Ubuntu
+
+```bash
+$ apt install binutils-dev libunwind-dev
+```
+
 ## fuzz
 
 ```bash
+Run a fuzzing engine for a target
+
 USAGE:
-    cargo-bolero fuzz [FLAGS] [OPTIONS] <test>
+    cargo bolero fuzz [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features
     -h, --help                   Prints help information
         --no-default-features    Do not activate the `default` feature
+        --release                Build artifacts in release mode, with optimizations
     -V, --version                Prints version information
 
 OPTIONS:
@@ -22,7 +41,7 @@ OPTIONS:
     -r, --runs <runs>                            Run the fuzzer for a specified number of runs
     -s, --sanitizer <sanitizer>...               Build with the sanitizer enabled
     -S, --seed <seed>                            Run the fuzzer with an initial seed
-        --target <target>                        Build for the target triple [default: x86_64-apple-darwin]
+        --target <target>                        Build for the target triple
     -T, --time <time>                            Run the fuzzer for a specified number of seconds
         --toolchain <toolchain>                  Use a rustup toolchain to execute cargo build
 
@@ -30,16 +49,19 @@ ARGS:
     <test>    Name of the test target
 ```
 
-## shrink
+## reduce
 
 ```bash
+Reduce the corpus of a test target with a fuzzing engine
+
 USAGE:
-    cargo-bolero shrink [FLAGS] [OPTIONS] <test>
+    cargo bolero reduce [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features
     -h, --help                   Prints help information
         --no-default-features    Do not activate the `default` feature
+        --release                Build artifacts in release mode, with optimizations
     -V, --version                Prints version information
 
 OPTIONS:
@@ -48,7 +70,7 @@ OPTIONS:
         --manifest-path <manifest-path>    Path to Cargo.toml
     -p, --package <package>                Package to run tests for
     -s, --sanitizer <sanitizer>...         Build with the sanitizer enabled
-        --target <target>                  Build for the target triple [default: x86_64-apple-darwin]
+        --target <target>                  Build for the target triple
         --toolchain <toolchain>            Use a rustup toolchain to execute cargo build
 
 ARGS:

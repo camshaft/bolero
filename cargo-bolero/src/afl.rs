@@ -9,7 +9,7 @@ const FLAGS: &[&str] = &[
 ];
 
 fn bin() -> String {
-    std::env::args().nth(0).unwrap()
+    std::env::args().next().unwrap()
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {

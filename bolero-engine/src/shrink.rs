@@ -1,6 +1,5 @@
 use crate::{Error, Test, TestFailure, TestInput};
 use bolero_generator::driver::{DriverMode, FuzzDriver};
-use core::fmt::Debug;
 
 pub fn shrink<T: Test>(
     test: &mut T,
