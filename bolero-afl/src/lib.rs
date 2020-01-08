@@ -105,6 +105,11 @@ pub mod bin {
         pub fn afl_fuzz_main(a: c_int, b: *const *const c_char) -> c_int;
     }
 
+    /// Should only be used by `cargo-bolero`
+    ///
+    /// # Safety
+    ///
+    /// Use `cargo-bolero`
     pub unsafe fn exec<Args: Iterator<Item = String>>(args: Args) {
         // create a vector of zero terminated strings
         let args = args

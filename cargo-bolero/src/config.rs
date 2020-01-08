@@ -130,6 +130,7 @@ impl Config {
             "-Ctarget-cpu=native",
             "-Cdebuginfo=2",
             "-Coverflow_checks",
+            "-Clink-dead-code",
         ]
         .iter()
         .chain(flags.iter())
@@ -140,6 +141,12 @@ impl Config {
                 .map(|sanitizer| format!("-Zsanitizer={}", sanitizer)),
         )
         .chain(std::env::var("RUSTFLAGS").ok())
+        // https://github.com/rust-lang/rust/issues/53945
+        .chain(if cfg!(target_os = "linux") {
+            Some("-Clink-arg=-fuse-ld=gold".to_string())
+        } else {
+            None
+        })
         .collect::<Vec<_>>()
         .join(" ");
 

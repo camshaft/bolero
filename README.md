@@ -24,6 +24,16 @@ bolero-generator = "0.4"
 $ cargo install -f cargo-bolero
 ```
 
+#### Linux Installation
+
+`cargo-bolero` needs a couple of libraries installed to compile:
+
+##### Debian/Ubuntu
+
+```bash
+$ apt install binutils-dev libunwind-dev
+```
+
 ## Usage
 
 ### Fuzzing

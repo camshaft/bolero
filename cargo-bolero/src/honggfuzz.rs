@@ -3,17 +3,18 @@ use failure::Error;
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_honggfuzz",
-    "-Cllvm-args=-sanitizer-coverage-level=3",
-    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
-    // "-Cllvm-args=-sanitizer-coverage-trace-compares",
-    "-Cllvm-args=-sanitizer-coverage-trace-divs",
-    // "-Cllvm-args=-sanitizer-coverage-trace-geps",
     "-Clink-args=-lhfuzz",
+    "-Cllvm-args=-sanitizer-coverage-level=4",
+    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
+    #[cfg(not(target_os = "macos"))]
+    "-Cllvm-args=-sanitizer-coverage-trace-compares",
+    "-Cllvm-args=-sanitizer-coverage-trace-divs",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc",
+    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
 ];
 
 fn bin() -> String {
-    std::env::args().nth(0).unwrap()
+    std::env::args().next().unwrap()
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {

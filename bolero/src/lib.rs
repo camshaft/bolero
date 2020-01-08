@@ -180,7 +180,7 @@ pub struct TestTarget<Generator, Engine> {
 pub fn fuzz(location: TargetLocation) -> TestTarget<SliceGenerator, DefaultEngine> {
     // cargo-bolero needs to resolve the path of the binary
     if std::env::var("CARGO_BOLERO_PATH").is_ok() {
-        print!("{}", std::env::args().nth(0).unwrap());
+        print!("{}", std::env::args().next().unwrap());
         std::process::exit(0);
     }
 
@@ -425,10 +425,13 @@ mod derive_tests {
     }
 
     #[derive(Debug, PartialEq, TypeGenerator)]
+    pub struct NewType(u64);
+
+    #[derive(Debug, PartialEq, TypeGenerator)]
     pub struct Bar {
         #[generator(gen_foo())]
         foo: u32,
-        bar: u64,
+        bar: NewType,
         baz: u8,
     }
 

@@ -86,6 +86,20 @@ fn main() {
             }
         }
 
+        if cfg!(target_os = "linux") {
+            for lib in [
+                "unwind-ptrace",
+                "unwind-generic",
+                "unwind",
+                "opcodes",
+                "bfd",
+            ]
+            .iter()
+            {
+                println!("cargo:rustc-link-lib={}", lib);
+            }
+        }
+
         return;
     }
 }

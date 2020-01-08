@@ -21,6 +21,8 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-trace-geps",
     "-Cllvm-args=-sanitizer-coverage-trace-pc",
     "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
+    #[cfg(target_os = "linux")]
+    "-Cllvm-args=-sanitizer-coverage-stack-depth",
 ];
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
