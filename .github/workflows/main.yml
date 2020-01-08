@@ -7,10 +7,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest]
         rust: [stable, beta, nightly]
 
     steps:
+    - name: Ubuntu Dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: apt install binutils-dev libunwind-dev
+    
     - uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust }}
