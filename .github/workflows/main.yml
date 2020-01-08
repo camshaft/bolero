@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macOS-latest]
         rust: [stable, beta, nightly]
 
     steps:
@@ -23,16 +23,18 @@ jobs:
     - uses: actions/checkout@master
 
     - name: Format
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       uses: actions-rs/cargo@v1
       with:
         command: fmt
         args: --all -- --check
 
-    #- name: Clippy
-    #  uses: actions-rs/cargo@v1
-    #  with:
-    #    command: clippy
-    #    args: -- -D warnings
+    - name: Clippy
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: -- -D warnings
 
     - name: Test
       run: make test
