@@ -24,11 +24,11 @@ jobs:
         command: fmt
         args: --all -- --check
 
-    - name: Clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: -- -D warnings
+    #- name: Clippy
+    #  uses: actions-rs/cargo@v1
+    #  with:
+    #    command: clippy
+    #    args: -- -D warnings
 
     - name: Test
       run: make test
