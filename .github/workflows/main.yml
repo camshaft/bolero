@@ -13,7 +13,7 @@ jobs:
     steps:
     - name: Ubuntu Dependencies
       if: matrix.os == 'ubuntu-latest'
-      run: apt install binutils-dev libunwind-dev
+      run: sudo apt-get install binutils-dev libunwind-dev
     
     - uses: hecrj/setup-rust-action@v1
       with:
