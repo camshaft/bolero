@@ -69,11 +69,14 @@ where
                         .expect("test should fail");
 
                     eprintln!("{}", failure);
+                    instrument.finish();
 
                     std::panic::resume_unwind(Box::new(failure));
                 }
             }
         }
+
+        instrument.finish();
     }
 }
 

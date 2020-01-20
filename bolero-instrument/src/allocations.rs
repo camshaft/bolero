@@ -149,6 +149,8 @@ impl<A: 'static> Instrument for AllocatorInstrument<A> {
             .reallocated_bytes
             .record_input(record.reallocated_bytes, input);
     }
+
+    fn finish(&mut self) {}
 }
 
 impl<A: 'static> fmt::Debug for AllocatorInstrument<A> {

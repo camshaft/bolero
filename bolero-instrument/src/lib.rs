@@ -22,6 +22,12 @@ pub trait Instrument {
     fn start(&mut self) -> Self::Measurement;
 
     fn record<Input: Debug>(&mut self, measurement: Self::Record, input: &Input);
+
+    fn finish(&mut self);
+
+    fn is_enabled(&self) -> bool {
+        true
+    }
 }
 
 pub trait Measurement {
@@ -37,6 +43,12 @@ impl Instrument for () {
     fn start(&mut self) -> Self::Measurement {}
 
     fn record<Input: Debug>(&mut self, _measurement: Self::Measurement, _input: &Input) {}
+
+    fn finish(&mut self) {}
+
+    fn is_enabled(&self) -> bool {
+        false
+    }
 }
 
 impl Measurement for () {
@@ -56,6 +68,14 @@ impl<A: Instrument> Instrument for (A,) {
 
     fn record<Input: Debug>(&mut self, record: Self::Record, input: &Input) {
         self.0.record(record.0, input);
+    }
+
+    fn finish(&mut self) {
+        self.0.finish();
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.0.is_enabled()
     }
 }
 
@@ -81,6 +101,15 @@ impl<A: Instrument, B: Instrument> Instrument for (A, B) {
     fn record<Input: Debug>(&mut self, record: Self::Record, input: &Input) {
         self.1.record(record.1, input);
         self.0.record(record.0, input);
+    }
+
+    fn finish(&mut self) {
+        self.0.finish();
+        self.1.finish();
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.0.is_enabled() || self.1.is_enabled()
     }
 }
 
@@ -109,6 +138,16 @@ impl<A: Instrument, B: Instrument, C: Instrument> Instrument for (A, B, C) {
         self.2.record(record.2, input);
         self.1.record(record.1, input);
         self.0.record(record.0, input);
+    }
+
+    fn finish(&mut self) {
+        self.0.finish();
+        self.1.finish();
+        self.2.finish();
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.0.is_enabled() || self.1.is_enabled() || self.2.is_enabled()
     }
 }
 

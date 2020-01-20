@@ -58,10 +58,12 @@ pub mod fuzzer {
 
             while unsafe { __afl_persistent_loop(1000) } != 0 {
                 if test.test(&mut input.test_input(), &mut instrument).is_err() {
+                    instrument.finish();
                     std::process::abort();
                 }
             }
 
+            instrument.finish();
             std::process::exit(0);
         }
     }

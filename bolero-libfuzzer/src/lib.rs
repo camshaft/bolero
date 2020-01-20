@@ -61,6 +61,7 @@ pub mod fuzzer {
                     .expect("test should fail");
 
                 eprintln!("{}", failure);
+                instrument.finish();
 
                 false
             })

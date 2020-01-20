@@ -51,6 +51,8 @@ impl Instrument for TimingInstrument {
     fn record<Input: core::fmt::Debug>(&mut self, record: Self::Record, input: &Input) {
         let _ = self.stats.record_input(record, input);
     }
+
+    fn finish(&mut self) {}
 }
 
 #[test]

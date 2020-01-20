@@ -78,6 +78,8 @@ impl Instrument for SyscallInstrument {
     fn record<Input: core::fmt::Debug>(&mut self, _: Self::Record, _input: &Input) {
         unsafe { stop() }
     }
+
+    fn finish(&mut self) {}
 }
 
 #[test]

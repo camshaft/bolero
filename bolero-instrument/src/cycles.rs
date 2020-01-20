@@ -75,6 +75,8 @@ impl Instrument for CyclesInstrument {
     fn record<Input: core::fmt::Debug>(&mut self, diff: Self::Record, input: &Input) {
         let _ = self.stats.record_input(diff, input);
     }
+
+    fn finish(&mut self) {}
 }
 
 #[derive(Clone, Copy, Debug)]
