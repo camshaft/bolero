@@ -1,8 +1,13 @@
-use bolero_engine::{rng::RngEngine, Engine, Never, SliceTestInput, TargetLocation, Test};
+use bolero_engine::{
+    rng::RngEngine, ByteSliceTestInput, Engine, Instrument, Never, TargetLocation, Test,
+};
 use bolero_generator::driver::DriverMode;
 use libtest_mimic::{run_tests, Arguments, FormatSetting, Outcome, Test as LibTest};
-use std::{io::Read, path::PathBuf};
+use std::{io::Read, panic::RefUnwindSafe, path::PathBuf};
 
+/// Engine implementation which mimics Rust's default test
+/// harness. By default, the test inputs will include any present
+/// `corpus` and `crashes` files, as well as generating
 #[derive(Debug)]
 pub struct TestEngine {
     location: TargetLocation,
@@ -18,18 +23,23 @@ impl TestEngine {
         }
     }
 
-    fn sub_dir(&self, name: &str) -> PathBuf {
+    fn sub_dir(&self, dirs: &[&str]) -> PathBuf {
         let mut fuzz_target_path = self
             .location
             .abs_path()
             .expect("could not resolve target location");
         fuzz_target_path.pop();
-        fuzz_target_path.push(name);
+        for dir in dirs.iter() {
+            fuzz_target_path.push(dir);
+        }
         fuzz_target_path
     }
 
-    fn file_tests(&self, sub_dir: &'static str) -> impl Iterator<Item = LibTest<TestData>> {
-        std::fs::read_dir(self.sub_dir(sub_dir))
+    fn file_tests(
+        &self,
+        sub_dirs: &'static [&'static str],
+    ) -> impl Iterator<Item = LibTest<TestData>> {
+        std::fs::read_dir(self.sub_dir(sub_dirs))
             .ok()
             .into_iter()
             .map(move |dir| {
@@ -40,7 +50,7 @@ impl TestEngine {
                     .map(move |path| LibTest {
                         name: format!(
                             "{}/{}",
-                            sub_dir,
+                            sub_dirs.join("/"),
                             path.file_stem().unwrap().to_str().unwrap()
                         ),
                         kind: "".into(),
@@ -63,24 +73,27 @@ where
         self.driver_mode = Some(mode);
     }
 
-    fn run(self, mut test: T) -> Self::Output {
+    fn run<I: Instrument + RefUnwindSafe>(self, mut test: T, mut instrument: I) -> Self::Output {
         bolero_engine::panic::set_hook();
+        bolero_engine::panic::forward_panic(false);
 
         let driver_mode = self.driver_mode;
         let mut input = vec![];
         let testfn = &mut |data: &TestData| {
-            bolero_engine::panic::forward_panic(false);
             input.clear();
             data.read_into(&mut input);
 
-            test.test(&mut SliceTestInput::new(&input, driver_mode))
-                .map_err(|_| {
-                    let failure = test
-                        .shrink(input.clone(), data.seed(), driver_mode)
-                        .expect("test should fail");
+            test.test(
+                &mut ByteSliceTestInput::new(&input, driver_mode),
+                &mut instrument,
+            )
+            .map_err(|_| {
+                let failure = test
+                    .shrink(input.clone(), data.seed(), driver_mode)
+                    .expect("test should fail");
 
-                    format!("{:#}", failure)
-                })
+                format!("{:#}", failure)
+            })
         };
 
         // `run_tests` only accepts `Fn` instead of `FnMut`
@@ -95,8 +108,11 @@ where
 
         let mut entries = vec![];
 
-        entries.extend(self.file_tests("corpus"));
-        entries.extend(self.file_tests("crashes"));
+        entries.extend(self.file_tests(&["corpus"]));
+        entries.extend(self.file_tests(&["crashes"]));
+        entries.extend(self.file_tests(&["afl_state", "hangs"]));
+        entries.extend(self.file_tests(&["afl_state", "queue"]));
+        entries.extend(self.file_tests(&["afl_state", "crashes"]));
 
         #[cfg(feature = "rand")]
         {
@@ -131,15 +147,20 @@ where
             arguments.format = Some(FormatSetting::Terse);
         }
 
-        run_tests(&arguments, entries, |config| {
-            let testfn = unsafe { (TESTFN.as_mut().expect("uninitialized test function")) };
+        let result = run_tests(&arguments, entries, |config| {
+            let testfn = unsafe { TESTFN.as_mut().expect("uninitialized test function") };
             if let Err(err) = testfn(&config.data) {
                 Outcome::Failed { msg: Some(err) }
             } else {
                 Outcome::Passed
             }
-        })
-        .exit();
+        });
+
+        instrument.finish();
+
+        bolero_engine::panic::forward_panic(true);
+
+        result.exit();
     }
 }
 

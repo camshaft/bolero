@@ -202,10 +202,13 @@ impl<'a, T: Test> Shrinker<'a, T> {
     }
 
     fn execute(&mut self) -> Result<bool, Error> {
-        self.test.test(&mut ShrinkInput {
-            input: &self.input[..self.len],
-            driver_mode: self.driver_mode,
-        })
+        self.test.test(
+            &mut ShrinkInput {
+                input: &self.input[..self.len],
+                driver_mode: self.driver_mode,
+            },
+            &mut (),
+        )
     }
 
     fn generate_value(&mut self) -> T::Value {
@@ -240,7 +243,7 @@ macro_rules! shrink_test {
             #[allow(unused_imports)]
             use bolero_generator::{driver::DriverMode, gen, ValueGenerator};
 
-            let mut test = crate::GeneratorTest::new($check, $gen);
+            let mut test = crate::ClonedGeneratorTest::new($check, $gen);
             let input = [255; 1024].to_vec();
 
             let failure = Shrinker::new(&mut test, input, None, Some(DriverMode::Forced))

@@ -5,8 +5,10 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_afl)))]
 pub mod fuzzer {
-    use bolero_engine::{panic, DriverMode, Engine, Never, SliceTestInput, TargetLocation, Test};
-    use std::io::Read;
+    use bolero_engine::{
+        panic, DriverMode, Engine, Instrument, Never, SliceTestInput, TargetLocation, Test,
+    };
+    use std::{io::Read, panic::RefUnwindSafe};
 
     extern "C" {
         // from the afl-llvm-rt
@@ -41,7 +43,11 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
-        fn run(self, mut test: T) -> Self::Output {
+        fn run<I: Instrument + RefUnwindSafe>(
+            self,
+            mut test: T,
+            mut instrument: I,
+        ) -> Self::Output {
             panic::set_hook();
 
             let mut input = AflInput::new(self.driver_mode);
@@ -51,7 +57,7 @@ pub mod fuzzer {
             }
 
             while unsafe { __afl_persistent_loop(1000) } != 0 {
-                if test.test(&mut input.test_input()).is_err() {
+                if test.test(&mut input.test_input(), &mut instrument).is_err() {
                     std::process::abort();
                 }
             }

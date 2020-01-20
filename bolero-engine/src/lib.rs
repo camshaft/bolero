@@ -2,6 +2,7 @@ pub use bolero_generator::{
     driver::{Driver, DriverMode},
     TypeGenerator, ValueGenerator,
 };
+pub use bolero_instrument::{self as instrument, Instrument, Measurement};
 pub use failure::Error;
 
 pub mod panic;
@@ -23,11 +24,12 @@ pub use target_location::TargetLocation;
 mod test_result;
 pub use test_result::*;
 
-pub trait Engine<T: Test> {
+pub trait Engine<T: Test>: Sized {
     type Output;
 
     fn set_driver_mode(&mut self, mode: DriverMode);
-    fn run(self, test: T) -> Self::Output;
+    fn run<I: Instrument + std::panic::RefUnwindSafe>(self, test: T, instrument: I)
+        -> Self::Output;
 }
 
 // TODO change this to `!` when stabilized

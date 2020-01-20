@@ -1,6 +1,6 @@
 [package]
 name = "bolero"
-version = "0.4.2"
+version = "0.4.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "fuzz and property testing framework"
 homepage = "https://github.com/camshaft/bolero"

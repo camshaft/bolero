@@ -5,7 +5,9 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
-    use bolero_engine::{panic, DriverMode, Engine, Never, SliceTestInput, TargetLocation, Test};
+    use bolero_engine::{
+        panic, DriverMode, Engine, Instrument, Never, SliceTestInput, TargetLocation, Test,
+    };
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
@@ -39,14 +41,18 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
-        fn run(self, mut test: T) -> Self::Output {
+        fn run<I: Instrument + std::panic::RefUnwindSafe>(
+            self,
+            mut test: T,
+            mut instrument: I,
+        ) -> Self::Output {
             panic::set_hook();
 
             let driver_mode = self.driver_mode;
 
-            let run_one_test = &mut |slice: &[u8]| -> bool {
+            start(&mut |slice: &[u8]| -> bool {
                 let mut input = SliceTestInput::new(slice, driver_mode);
-                if test.test(&mut input).is_ok() {
+                if test.test(&mut input, &mut instrument).is_ok() {
                     return true;
                 }
 
@@ -57,32 +63,34 @@ pub mod fuzzer {
                 eprintln!("{}", failure);
 
                 false
-            };
-
-            unsafe {
-                TESTFN = Some(std::mem::transmute(
-                    run_one_test as &mut dyn FnMut(&[u8]) -> bool,
-                ));
-            }
-
-            // create a vector of zero terminated strings
-            let args = std::env::args()
-                .map(|arg| CString::new(arg).unwrap())
-                .collect::<Vec<_>>();
-
-            // convert the strings to raw pointers
-            let c_args = args
-                .iter()
-                .map(|arg| arg.as_ptr())
-                .chain(Some(core::ptr::null())) // add a null pointer to the end
-                .collect::<Vec<_>>();
-
-            unsafe {
-                LLVMFuzzerStartTest(args.len() as c_int, c_args.as_ptr());
-            }
-
-            std::process::exit(0);
+            })
         }
+    }
+
+    fn start<F: FnMut(&[u8]) -> bool>(run_one_test: &mut F) -> Never {
+        unsafe {
+            TESTFN = Some(std::mem::transmute(
+                run_one_test as &mut dyn FnMut(&[u8]) -> bool,
+            ));
+        }
+
+        // create a vector of zero terminated strings
+        let args = std::env::args()
+            .map(|arg| CString::new(arg).unwrap())
+            .collect::<Vec<_>>();
+
+        // convert the strings to raw pointers
+        let c_args = args
+            .iter()
+            .map(|arg| arg.as_ptr())
+            .chain(Some(core::ptr::null())) // add a null pointer to the end
+            .collect::<Vec<_>>();
+
+        unsafe {
+            LLVMFuzzerStartTest(args.len() as c_int, c_args.as_ptr());
+        }
+
+        std::process::exit(0);
     }
 
     #[doc(hidden)]

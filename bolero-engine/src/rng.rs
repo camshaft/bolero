@@ -1,7 +1,9 @@
 use crate::{panic, Engine, SliceTestInput, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
+use bolero_instrument::Instrument;
 use core::{fmt::Debug, mem::replace};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use std::panic::RefUnwindSafe;
 
 #[derive(Copy, Clone, PartialEq)]
 pub struct RngEngine {
@@ -42,14 +44,14 @@ where
         self.driver_mode = Some(mode);
     }
 
-    fn run(self, mut test: T) -> Self::Output {
+    fn run<I: Instrument + RefUnwindSafe>(self, mut test: T, mut instrument: I) -> Self::Output {
         panic::set_hook();
 
         let mut state = RngState::new(self.seed, self.max_len, self.driver_mode);
 
         let mut count = 0;
         while count < self.iterations {
-            match test.test(&mut state.next_input()) {
+            match test.test(&mut state.next_input(), &mut instrument) {
                 Ok(true) => {
                     count += 1;
                     continue;

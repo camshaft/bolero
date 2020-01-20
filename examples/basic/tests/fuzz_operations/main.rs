@@ -16,7 +16,7 @@ fn main() {
             let mut subject: ArrayVec<[_; 32]> = ArrayVec::new();
             let mut oracle = LinkedList::new();
 
-            for operation in operations {
+            for operation in operations.iter() {
                 match operation {
                     Operation::Push(value) => {
                         subject.push(value);
