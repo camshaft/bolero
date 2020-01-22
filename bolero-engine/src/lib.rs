@@ -32,4 +32,4 @@ pub trait Engine<T: Test> {
 
 // TODO change this to `!` when stabilized
 #[doc(hidden)]
-pub enum Never {}
+pub type Never = ();

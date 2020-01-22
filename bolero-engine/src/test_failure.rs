@@ -17,7 +17,7 @@ impl<Input: Debug> Display for TestFailure<Input> {
         if let Some(seed) = &self.seed {
             writeln!(f, "BOLERO_RANDOM_SEED={}\n", seed)?;
         }
-        writeln!(f, "Input: \n{:?}\n", self.input)?;
+        writeln!(f, "Input: \n{:#?}\n", self.input)?;
         writeln!(f, "Error: \n{}", self.error)?;
 
         if f.alternate() {

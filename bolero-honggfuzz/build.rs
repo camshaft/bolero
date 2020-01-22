@@ -49,7 +49,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
         .status()
         .unwrap();
 
-    return out_dir;
+    out_dir
 }
 
 fn main() {

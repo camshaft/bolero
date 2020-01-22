@@ -82,8 +82,9 @@ impl<'a, T: Test> Shrinker<'a, T> {
             return None;
         }
 
-        let mut was_changed = true;
-        while was_changed {
+        let mut was_changed;
+        // put a limit on the number of shrink iterations
+        for _ in 0..1000 {
             was_changed = self.apply_truncation().is_ok();
 
             for index in 0..self.len {
@@ -93,6 +94,10 @@ impl<'a, T: Test> Shrinker<'a, T> {
                 }
 
                 was_changed |= self.apply_transforms(index);
+            }
+
+            if !was_changed {
+                break;
             }
         }
 

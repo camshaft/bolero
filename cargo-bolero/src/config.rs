@@ -1,6 +1,7 @@
 use crate::{exec, manifest::TestTarget, DEFAULT_TARGET};
+use core::hash::{Hash, Hasher};
 use failure::Error;
-use std::{path::PathBuf, process::Command};
+use std::{collections::hash_map::DefaultHasher, path::PathBuf, process::Command};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -43,6 +44,10 @@ pub struct Config {
     /// Use a rustup toolchain to execute cargo build
     #[structopt(long = "toolchain")]
     toolchain: Option<String>,
+
+    /// Directory for all generated artifacts
+    #[structopt(long = "target_dir")]
+    target_dir: Option<String>,
 }
 
 impl Config {
@@ -149,6 +154,15 @@ impl Config {
         })
         .collect::<Vec<_>>()
         .join(" ");
+
+        if let Some(value) = self.target_dir.as_ref() {
+            cmd.arg("--target-dir").arg(value);
+        } else {
+            let mut hasher = DefaultHasher::new();
+            rustflags.hash(&mut hasher);
+            cmd.arg("--target-dir")
+                .arg(format!("target/fuzz/build_{:x}", hasher.finish()));
+        }
 
         cmd.env("RUSTFLAGS", rustflags)
             .env("BOLERO_FUZZER", fuzzer)

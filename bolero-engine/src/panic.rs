@@ -72,8 +72,8 @@ impl PanicError {
     }
 }
 
-pub fn catch<F: RefUnwindSafe + FnMut() -> Output, Output>(fun: &mut F) -> Result<Output, Error> {
-    catch_unwind(AssertUnwindSafe(|| (fun)())).map_err(|err| {
+pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, Error> {
+    catch_unwind(AssertUnwindSafe(fun)).map_err(|err| {
         if let Some(err) = fetch_panic() {
             return err.into();
         }

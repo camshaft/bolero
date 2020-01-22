@@ -1,4 +1,7 @@
-use crate::{DriverMode, Error, IntoTestResult, TestFailure, TestInput, ValueGenerator};
+use crate::{
+    test_input::SliceDebug, DriverMode, Error, IntoTestResult, TestFailure, TestInput,
+    ValueGenerator,
+};
 use std::panic::RefUnwindSafe;
 
 pub trait Test: Sized {
@@ -20,17 +23,17 @@ impl<F: RefUnwindSafe + FnMut(&[u8]) -> Ret, Ret> Test for F
 where
     Ret: IntoTestResult,
 {
-    type Value = Vec<u8>;
+    type Value = SliceDebug<Vec<u8>>;
 
     fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
         input.with_slice(&mut |slice| {
-            crate::panic::catch(&mut || (self)(slice))?.into_test_result()?;
+            crate::panic::catch(|| (self)(slice))?.into_test_result()?;
             Ok(true)
         })
     }
 
     fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
-        input.with_slice(&mut |slice| slice.to_owned())
+        input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
 }
 
@@ -55,13 +58,12 @@ where
 
     fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
         input.with_driver(&mut |driver| {
-            crate::panic::catch(&mut || {
-                if let Some(value) = self.gen.generate(driver) {
-                    (self.fun)(value).into_test_result().map(|_| true)
-                } else {
-                    Ok(false)
-                }
-            })?
+            if let Some(value) = self.gen.generate(driver) {
+                let fun = &mut self.fun;
+                crate::panic::catch(move || (fun)(value).into_test_result().map(|_| true))?
+            } else {
+                Ok(false)
+            }
         })
     }
 

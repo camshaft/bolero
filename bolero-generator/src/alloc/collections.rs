@@ -67,15 +67,22 @@ macro_rules! impl_values_collection_generator {
                     Iterator::filter_map(0..len, |_| {
                         $crate::ValueGenerator::generate(&self.values, driver)
                     })
-                    .collect(),
-                )
+                    .collect()
+                ).filter(|value: &Self::Output| {
+                    value.len() == len
+                })
             }
         }
 
         impl<V: $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGenerator for $ty<V> {
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
                 let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
-                Some(Iterator::filter_map(0..len, |_| V::generate(driver)).collect())
+                Some(
+                    Iterator::filter_map(0..len, |_| V::generate(driver)).collect()
+                )
+                .filter(|value: &Self| {
+                    value.len() == len
+                })
             }
         }
 
@@ -110,6 +117,9 @@ macro_rules! impl_values_collection_generator {
                     })
                     .collect(),
                 )
+                .filter(|value: &Self::Output| {
+                    value.len() == len
+                })
             }
         }
     };
@@ -218,6 +228,9 @@ macro_rules! impl_key_values_collection_generator {
                     })
                     .collect(),
                 )
+                .filter(|value: &Self::Output| {
+                    value.len() == len
+                })
             }
         }
 
@@ -227,7 +240,14 @@ macro_rules! impl_key_values_collection_generator {
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
                 use $crate::ValueGenerator;
                 let len = ValueGenerator::generate(&$default_len_range, driver)?;
-                Some(Iterator::filter_map(0..len, |_| Some((K::generate(driver)?, V::generate(driver)?))).collect())
+                Some(
+                    Iterator::filter_map(0..len, |_|
+                        Some((K::generate(driver)?, V::generate(driver)?))
+                    ).collect()
+                )
+                .filter(|value: &Self| {
+                    value.len() == len
+                })
             }
         }
 
@@ -275,6 +295,9 @@ macro_rules! impl_key_values_collection_generator {
                     })
                     .collect(),
                 )
+                .filter(|value: &Self::Output| {
+                    value.len() == len
+                })
             }
         }
     };

@@ -425,7 +425,7 @@ mod derive_tests {
     }
 
     #[derive(Debug, PartialEq, TypeGenerator)]
-    pub struct NewType(u64);
+    pub struct NewType(#[generator(4..10)] u64);
 
     #[derive(Debug, PartialEq, TypeGenerator)]
     pub struct Bar {
