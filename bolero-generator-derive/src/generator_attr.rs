@@ -11,19 +11,18 @@ pub struct GeneratorAttr {
 impl ToTokens for GeneratorAttr {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         if let Some(generator) = self.generator.as_ref() {
-            let span = generator.span();
-            tokens.extend(quote_spanned!(span=> {
-                use bolero_generator::prelude::*;
-                let generator = #generator;
-                ValueGenerator::generate(&generator, __driver)?
-            }));
+            tokens.extend(quote!(#generator));
         } else {
-            tokens.extend(quote!(__driver.gen()?));
+            tokens.extend(quote!(bolero_generator::gen()));
         }
     }
 }
 
 impl GeneratorAttr {
+    pub fn value_generate(&self) -> GeneratorAttrValue {
+        GeneratorAttrValue(self)
+    }
+
     pub fn from_attrs<'a, I: Iterator<Item = &'a Attribute>>(attributes: I) -> Self {
         for attr in attributes {
             if attr.path.is_ident("generator") {
@@ -62,7 +61,11 @@ impl GeneratorAttr {
                 }
 
                 // #[generator(...)]
-                let generator = meta.nested.first().unwrap().to_token_stream();
+                let generator = meta
+                    .nested
+                    .first()
+                    .expect("length already checked above")
+                    .to_token_stream();
                 Ok(Self {
                     generator: Some(generator),
                 })
@@ -71,9 +74,10 @@ impl GeneratorAttr {
                 generator: Some(meta.lit.to_token_stream()),
             }),
             Err(error) => {
-                if let Ok(range) = attr.parse_args::<Expr>() {
+                // last effort to make it work
+                if let Ok(expr) = attr.parse_args::<Expr>() {
                     return Ok(Self {
-                        generator: Some(range.to_token_stream()),
+                        generator: Some(expr.to_token_stream()),
                     });
                 }
 
@@ -98,14 +102,21 @@ fn parse_code_hack(meta: &MetaList) -> Result<Option<TokenStream2>, Error> {
                 continue;
             }
             if let Lit::Str(lit) = &meta.lit {
-                let span = lit.span();
-                let value: TokenStream2 = lit
-                    .value()
-                    .parse()
-                    .map_err(|err| Error::new(span, format!("{:?}", err)))?;
-                return Ok(Some(quote_spanned!(span=> #value)));
+                return Ok(Some(lit.parse()?));
             }
         };
     }
     Ok(None)
+}
+
+pub struct GeneratorAttrValue<'a>(&'a GeneratorAttr);
+
+impl ToTokens for GeneratorAttrValue<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let generator = self.0;
+        let span = generator.span();
+        tokens.extend(quote_spanned!(span=>
+            bolero_generator::ValueGenerator::generate(&(#generator), __bolero_driver)?
+        ))
+    }
 }

@@ -10,13 +10,13 @@ use core::{
 };
 
 trait NumBindWithin {
-    fn bind_within<R: RangeBounds<Self>>(self, range_bounds: &R) -> Self;
+    fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R);
 }
 
 macro_rules! impl_unsigned_bounded_integer {
     ($ty:ident) => {
         impl NumBindWithin for $ty {
-            fn bind_within<R: RangeBounds<Self>>(self, range_bounds: &R) -> Self {
+            fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R) {
                 use core::ops::Bound::*;
 
                 let start = match range_bounds.start_bound() {
@@ -33,7 +33,7 @@ macro_rules! impl_unsigned_bounded_integer {
 
                 let steps = (end - start).saturating_add(1);
                 let values_per_step = core::$ty::MAX / steps;
-                core::cmp::min(start.saturating_add(self / values_per_step), end)
+                *self = core::cmp::min(start.saturating_add(*self / values_per_step), end);
             }
         }
 
@@ -52,7 +52,7 @@ macro_rules! impl_bounded_integer {
             }
 
             #[inline(always)]
-            fn bind_within(self, range_bounds: &R) -> Self {
+            fn bind_within(&mut self, range_bounds: &R) {
                 NumBindWithin::bind_within(self, range_bounds)
             }
         }
@@ -134,7 +134,7 @@ macro_rules! impl_signed_integer {
 
         impl NumBindWithin for $ty {
             #[inline]
-            fn bind_within<R: RangeBounds<Self>>(self, range_bounds: &R) -> Self {
+            fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R) {
                 use core::ops::Bound::*;
 
                 let to_unsigned = |value: $ty| {
@@ -173,7 +173,9 @@ macro_rules! impl_signed_integer {
                     Unbounded => Unbounded,
                 };
 
-                from_unsigned(NumBindWithin::bind_within(to_unsigned(self), &(start, end)))
+                let mut unsigned = to_unsigned(*self);
+                NumBindWithin::bind_within(&mut unsigned, &(start, end));
+                *self = from_unsigned(unsigned);
             }
         }
 
@@ -257,7 +259,7 @@ macro_rules! impl_non_zero_integer {
             }
 
             #[inline(always)]
-            fn bind_within(self, range_bounds: &R) -> Self {
+            fn bind_within(&mut self, range_bounds: &R) {
                 use core::ops::Bound::*;
 
                 let start = match range_bounds.start_bound() {
@@ -276,9 +278,10 @@ macro_rules! impl_non_zero_integer {
 
                 // try a few times before giving up
                 for _ in 0..=3 {
-                    if let Some(value) = Self::new(NumBindWithin::bind_within(inner, &(start, end)))
-                    {
-                        return value;
+                    NumBindWithin::bind_within(&mut inner, &(start, end));
+                    if let Some(value) = Self::new(inner) {
+                        *self = value;
+                        return;
                     } else {
                         inner = inner.wrapping_add(1);
                     }

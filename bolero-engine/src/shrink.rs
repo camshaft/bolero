@@ -1,4 +1,4 @@
-use crate::{Error, Test, TestFailure, TestInput};
+use crate::{panic, Error, Test, TestFailure, TestInput};
 use bolero_generator::driver::{DriverMode, FuzzDriver};
 
 pub fn shrink<T: Test>(
@@ -73,12 +73,13 @@ impl<'a, T: Test> Shrinker<'a, T> {
     }
 
     fn shrink(mut self) -> Option<TestFailure<T::Value>> {
-        crate::panic::set_hook();
-        crate::panic::forward_panic(false);
-        crate::panic::capture_backtrace(false);
+        panic::set_hook();
+        panic::forward_panic(false);
+        panic::capture_backtrace(false);
 
         // Skip inputs that don't panic
         if self.execute().is_ok() {
+            panic::forward_panic(true);
             return None;
         }
 
@@ -101,9 +102,10 @@ impl<'a, T: Test> Shrinker<'a, T> {
             }
         }
 
-        crate::panic::capture_backtrace(true);
+        panic::capture_backtrace(true);
         let error = self.execute().err().unwrap();
-        crate::panic::forward_panic(true);
+        panic::capture_backtrace(false);
+        panic::forward_panic(true);
 
         let input = self.generate_value();
 

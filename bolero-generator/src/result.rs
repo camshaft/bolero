@@ -103,15 +103,42 @@ macro_rules! impl_either {
                     $ty::$B(self.b.generate(driver)?)
                 })
             }
+
+            fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+                #[allow(clippy::redundant_pattern_matching)]
+                let prev_selection = match value {
+                    $ty::$A(_) => true,
+                    $ty::$B(_) => false,
+                };
+
+                let mut new_selection = prev_selection;
+                self.selector.mutate(driver, &mut new_selection)?;
+
+                if prev_selection == new_selection {
+                    match value {
+                        $ty::$A(value) => self.a.mutate(driver, value),
+                        $ty::$B(value) => self.b.mutate(driver, value),
+                    }
+                } else {
+                    if new_selection {
+                        *value = $ty::$A(self.a.generate(driver)?);
+                    } else {
+                        *value = $ty::$B(self.b.generate(driver)?);
+                    }
+                    Some(())
+                }
+            }
         }
 
         impl<$A: TypeGenerator, $B: TypeGenerator> TypeGenerator for $ty<$A, $B> {
+            #[inline]
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                if driver.gen()? {
-                    Some($ty::$A(driver.gen()?))
-                } else {
-                    Some($ty::$B(driver.gen()?))
-                }
+                crate::gen_with::<Self>().generate(driver)
+            }
+
+            #[inline]
+            fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+                crate::gen_with::<Self>().mutate(driver, self)
             }
         }
 
@@ -206,15 +233,38 @@ impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
             None
         })
     }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        let prev_selection = value.is_some();
+
+        let mut new_selection = prev_selection;
+        self.selector.mutate(driver, &mut new_selection)?;
+
+        if prev_selection == new_selection {
+            match value {
+                Some(value) => self.value.mutate(driver, value),
+                None => Some(()),
+            }
+        } else {
+            if new_selection {
+                *value = Some(self.value.generate(driver)?);
+            } else {
+                *value = None;
+            }
+            Some(())
+        }
+    }
 }
 
 impl<V: TypeGenerator> TypeGenerator for Option<V> {
+    #[inline]
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(if driver.gen()? {
-            Some(driver.gen()?)
-        } else {
-            None
-        })
+        crate::gen_with::<Self>().generate(driver)
+    }
+
+    #[inline]
+    fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+        crate::gen_with::<Self>().mutate(driver, self)
     }
 }
 
@@ -227,4 +277,14 @@ impl<V: TypeGenerator> TypeGeneratorWithParams for Option<V> {
             selector: Default::default(),
         }
     }
+}
+
+#[test]
+fn result_test() {
+    let _ = generator_mutate_test!(gen::<Result<u8, u8>>());
+}
+
+#[test]
+fn option_test() {
+    let _ = generator_mutate_test!(gen::<Option<u8>>());
 }

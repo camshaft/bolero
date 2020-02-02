@@ -142,19 +142,24 @@ where
     }
 }
 
-pub struct BorrowedGeneratorTest<F, G> {
+pub struct BorrowedGeneratorTest<F, G, V> {
     fun: F,
     gen: G,
+    value: Option<V>,
 }
 
-impl<F, G> BorrowedGeneratorTest<F, G> {
+impl<F, G, V> BorrowedGeneratorTest<F, G, V> {
     pub fn new(fun: F, gen: G) -> Self {
-        Self { fun, gen }
+        Self {
+            fun,
+            gen,
+            value: None,
+        }
     }
 }
 
 impl<F: RefUnwindSafe + FnMut(&G::Output) -> Ret, G: RefUnwindSafe + ValueGenerator, Ret> Test
-    for BorrowedGeneratorTest<F, G>
+    for BorrowedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoTestResult,
     G::Output: RefUnwindSafe + core::fmt::Debug,
@@ -167,22 +172,33 @@ where
         instrument: &mut I,
     ) -> Result<bool, Error> {
         input.with_driver(&mut |driver| {
-            if let Some(value) = self.gen.generate(driver) {
-                crate::panic::catch(|| {
-                    let measurement = instrument.start();
-                    let res = (self.fun)(&value);
-                    let record = measurement.stop();
-                    match res.into_test_result() {
-                        Ok(()) => {
-                            instrument.record(record, &value);
-                            Ok(true)
-                        }
-                        Err(err) => Err(err),
-                    }
-                })?
+            let fun = &mut self.fun;
+
+            let value = if let Some(value) = self.value.as_mut() {
+                if self.gen.mutate(driver, value).is_some() {
+                    value
+                } else {
+                    return Ok(false);
+                }
+            } else if let Some(value) = self.gen.generate(driver) {
+                self.value = Some(value);
+                self.value.as_ref().unwrap()
             } else {
-                Ok(false)
-            }
+                return Ok(false);
+            };
+
+            crate::panic::catch(|| {
+                let measurement = instrument.start();
+                let res = (fun)(value);
+                let record = measurement.stop();
+                match res.into_test_result() {
+                    Ok(()) => {
+                        instrument.record(record, value);
+                        Ok(true)
+                    }
+                    Err(err) => Err(err),
+                }
+            })?
         })
     }
 
@@ -191,19 +207,24 @@ where
     }
 }
 
-pub struct ClonedGeneratorTest<F, G> {
+pub struct ClonedGeneratorTest<F, G, V> {
     fun: F,
     gen: G,
+    value: Option<V>,
 }
 
-impl<F, G> ClonedGeneratorTest<F, G> {
+impl<F, G, V> ClonedGeneratorTest<F, G, V> {
     pub fn new(fun: F, gen: G) -> Self {
-        Self { fun, gen }
+        Self {
+            fun,
+            gen,
+            value: None,
+        }
     }
 }
 
 impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: RefUnwindSafe + ValueGenerator, Ret> Test
-    for ClonedGeneratorTest<F, G>
+    for ClonedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoTestResult,
     G::Output: RefUnwindSafe + core::fmt::Debug + Clone,
@@ -216,33 +237,35 @@ where
         instrument: &mut I,
     ) -> Result<bool, Error> {
         input.with_driver(&mut |driver| {
-            if let Some(value) = self.gen.generate(driver) {
-                if instrument.is_enabled() {
-                    crate::panic::catch(|| {
-                        let input = value.clone();
-                        let measurement = instrument.start();
-                        let res = (self.fun)(input);
-                        let record = measurement.stop();
-                        match res.into_test_result() {
-                            Ok(()) => {
-                                instrument.record(record, &value);
-                                Ok(true)
-                            }
-                            Err(err) => Err(err),
-                        }
-                    })?
+            let fun = &mut self.fun;
+
+            let value = if let Some(value) = self.value.as_mut() {
+                if self.gen.mutate(driver, value).is_some() {
+                    value
                 } else {
-                    crate::panic::catch(|| {
-                        let res = (self.fun)(value);
-                        match res.into_test_result() {
-                            Ok(()) => Ok(true),
-                            Err(err) => Err(err),
-                        }
-                    })?
+                    return Ok(false);
                 }
+            } else if let Some(value) = self.gen.generate(driver) {
+                self.value = Some(value);
+                self.value.as_ref().unwrap()
             } else {
-                Ok(false)
-            }
+                return Ok(false);
+            };
+
+            let input = value.clone();
+
+            crate::panic::catch(|| {
+                let measurement = instrument.start();
+                let res = (fun)(input);
+                let record = measurement.stop();
+                match res.into_test_result() {
+                    Ok(()) => {
+                        instrument.record(record, &value);
+                        Ok(true)
+                    }
+                    Err(err) => Err(err),
+                }
+            })?
         })
     }
 

@@ -66,14 +66,24 @@ where
         let nanos = self.nanos.generate(driver)?;
         Some(Duration::new(seconds, nanos))
     }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Duration) -> Option<()> {
+        let mut seconds = value.as_secs();
+        self.seconds.mutate(driver, &mut seconds)?;
+        let mut nanos = value.subsec_nanos();
+        self.nanos.mutate(driver, &mut nanos)?;
+        *value = Duration::new(seconds, nanos);
+        Some(())
+    }
 }
 
 impl TypeGenerator for Duration {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(
-            driver.gen()?,
-            VALID_NANOS_RANGE.generate(driver)?,
-        ))
+        Self::gen_with().generate(driver)
+    }
+
+    fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+        Self::gen_with().mutate(driver, self)
     }
 }
 

@@ -5,7 +5,7 @@ pub trait BoundedValue<RangeBounds> {
     type BoundValue;
 
     fn is_within(&self, range: &RangeBounds) -> bool;
-    fn bind_within(self, range: &RangeBounds) -> Self;
+    fn bind_within(&mut self, range: &RangeBounds);
 }
 
 #[inline(always)]
@@ -43,9 +43,26 @@ macro_rules! range_generator {
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 if driver.mode() == DriverMode::Forced {
-                    Some(T::generate(driver)?.bind_within(self))
+                    let mut value = T::generate(driver)?;
+                    value.bind_within(self);
+                    Some(value)
                 } else {
                     T::generate(driver).filter(|value| value.is_within(self))
+                }
+            }
+
+            fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+                if driver.mode() == DriverMode::Forced {
+                    T::mutate(value, driver)?;
+                    value.bind_within(self);
+                    Some(())
+                } else {
+                    T::mutate(value, driver)?;
+                    if value.is_within(self) {
+                        Some(())
+                    } else {
+                        None
+                    }
                 }
             }
         }
@@ -96,16 +113,16 @@ impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundV
 
 #[test]
 fn with_bounds_test() {
-    let _ = generator_test!(gen::<u8>().with().bounds(0..32));
+    let _ = generator_mutate_test!(gen::<u8>().with().bounds(0..32));
 }
 
 #[test]
 fn bounded_u8_test() {
     use core::ops::Bound;
-    fn test_bound<Bounds: std::fmt::Debug + RangeBounds<u8>>(v: u8, bounds: Bounds) {
+    fn test_bound<Bounds: std::fmt::Debug + RangeBounds<u8>>(mut v: u8, bounds: Bounds) {
         assert_eq!(v.is_within(&bounds), bounds.contains(&v));
-        let bound = v.bind_within(&bounds);
-        assert!(bounds.contains(&bound), "{:?} not in {:?}", bound, bounds);
+        v.bind_within(&bounds);
+        assert!(bounds.contains(&v), "{:?} not in {:?}", v, bounds);
     }
 
     for v in 0u8..=255 {
@@ -121,10 +138,10 @@ fn bounded_u8_test() {
 #[test]
 fn bounded_i8_test() {
     use core::ops::Bound;
-    fn test_bound<Bounds: core::fmt::Debug + RangeBounds<i8>>(v: i8, bounds: Bounds) {
+    fn test_bound<Bounds: core::fmt::Debug + RangeBounds<i8>>(mut v: i8, bounds: Bounds) {
         assert_eq!(v.is_within(&bounds), bounds.contains(&v));
-        let bound = v.bind_within(&bounds);
-        assert!(bounds.contains(&bound), "{:?} not in {:?}", bound, bounds);
+        v.bind_within(&bounds);
+        assert!(bounds.contains(&v), "{:?} not in {:?}", v, bounds);
     }
 
     for v in -128i8..=127 {

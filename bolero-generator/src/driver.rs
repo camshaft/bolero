@@ -49,6 +49,14 @@ impl<'a> FuzzDriver<'a> {
 
         driver
     }
+
+    pub fn new_direct(input: &'a [u8]) -> Self {
+        Self::new(input, Some(DriverMode::Direct))
+    }
+
+    pub fn new_forced(input: &'a [u8]) -> Self {
+        Self::new(input, Some(DriverMode::Forced))
+    }
 }
 
 impl<'a> Driver for FuzzDriver<'a> {

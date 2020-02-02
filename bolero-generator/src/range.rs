@@ -93,10 +93,20 @@ range_generator!(RangeInclusive, RangeInclusiveGenerator, |start, end| start
     ..=end);
 
 #[test]
-fn range_test() {
+fn range_type_test() {
     use core::ops::Range;
 
-    let _ = generator_test!(gen::<Range<usize>>());
-    let _ = generator_test!(gen::<Range<usize>>().with().start(4..6).end(6..10));
-    let _ = generator_test!(0usize..10);
+    let _ = generator_mutate_test!(gen::<Range<usize>>());
+}
+
+#[test]
+fn range_with_test() {
+    use core::ops::Range;
+
+    let _ = generator_mutate_test!(gen::<Range<usize>>().with().start(4..6).end(6..10));
+}
+
+#[test]
+fn range_gen_test() {
+    let _ = generator_mutate_test!(0usize..10);
 }

@@ -7,7 +7,7 @@ use std::{env, process::Command};
     target_os = "openbsd",
     target_os = "netbsd"
 )))]
-const MAKE_COMMAND: &'static str = "make";
+const MAKE_COMMAND: &str = "make";
 #[cfg(any(
     target_os = "freebsd",
     target_os = "dragonfly",
@@ -15,7 +15,7 @@ const MAKE_COMMAND: &'static str = "make";
     target_os = "openbsd",
     target_os = "netbsd"
 ))]
-const MAKE_COMMAND: &'static str = "gmake";
+const MAKE_COMMAND: &str = "gmake";
 
 fn build(target: &str, file: &str, lib: &str) -> String {
     let out_dir = env::var("OUT_DIR").unwrap();
