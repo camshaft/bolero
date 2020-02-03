@@ -6,4 +6,4 @@ src = "src"
 title = "Bolero Book"
 
 [build]
-build-dir = "../target/doc/bolero/book"
+build-dir = "../target/book"

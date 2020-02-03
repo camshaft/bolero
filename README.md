@@ -9,7 +9,7 @@ fuzz and property testing framework
 
 ## Book
 
-A copy of the Bolero Book can be found here: https://docs.rs/bolero/latest/bolero/book/index.html
+A copy of the Bolero Book can be found here: http://camshaft.github.io/bolero
 
 ## Installation
 
