@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - Bolero Book</title>
+        <title>Getting Started - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="getting-started.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="expanded "><a href="features/index.html"><strong aria-hidden="true">3.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="features/cargo-integration.html"><strong aria-hidden="true">3.1.</strong> Cargo Test Integration</a></li><li class="expanded "><a href="features/corpus-replay.html"><strong aria-hidden="true">3.2.</strong> Corpus Replay</a></li><li class="expanded "><a href="features/input-shrinking.html"><strong aria-hidden="true">3.3.</strong> Input Shrinking</a></li><li class="expanded "><a href="features/unified-fuzzing-interface.html"><strong aria-hidden="true">3.4.</strong> Unified Fuzzing Interface</a></li><li class="expanded "><a href="features/unit-testing.html"><strong aria-hidden="true">3.5.</strong> Unit/Property Testing</a></li><li class="expanded "><a href="features/structural-testing.html"><strong aria-hidden="true">3.6.</strong> Structural Testing</a></li><li class="expanded "><a href="features/rust-stable.html"><strong aria-hidden="true">3.7.</strong> Works on Rust Stable</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="getting-started.html" class="active"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="expanded "><a href="features/index.html"><strong aria-hidden="true">3.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="features/cargo-integration.html"><strong aria-hidden="true">3.1.</strong> Cargo Test Integration</a></li><li class="expanded "><a href="features/corpus-replay.html"><strong aria-hidden="true">3.2.</strong> Corpus Replay</a></li><li class="expanded "><a href="features/input-shrinking.html"><strong aria-hidden="true">3.3.</strong> Input Shrinking</a></li><li class="expanded "><a href="features/unified-fuzzing-interface.html"><strong aria-hidden="true">3.4.</strong> Unified Fuzzing Interface</a></li><li class="expanded "><a href="features/unit-testing.html"><strong aria-hidden="true">3.5.</strong> Unit/Property Testing</a></li><li class="expanded "><a href="features/structural-testing.html"><strong aria-hidden="true">3.6.</strong> Structural Testing</a></li><li class="expanded "><a href="features/rust-stable.html"><strong aria-hidden="true">3.7.</strong> Works on Rust Stable</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,37 +148,62 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#introduction" id="introduction">Introduction</a></h1>
-<p>Bolero is a fuzzing and property testing framework for Rust programs.</p>
-<p>From <a href="https://en.wikipedia.org/wiki/Fuzzing">Wikipedia</a>, fuzzing is described as:</p>
-<blockquote>
-<p>Fuzzing or fuzz testing is an automated software testing technique that involves providing invalid, unexpected, or random data as inputs to a computer program. The program is then monitored for exceptions such as crashes, failing built-in code assertions, or potential memory leaks.</p>
-</blockquote>
-<h2><a class="header" href="#example-test" id="example-test">Example test</a></h2>
+                        <h1><a class="header" href="#getting-started" id="getting-started">Getting Started</a></h1>
+<p>First create a fuzz target:</p>
+<pre><code class="language-bash">$ cargo bolero new my_fuzz_target
+</code></pre>
+<p>This will create a new directory in <code>tests/my_fuzz_target</code>, along with a file located at <code>tests/my_fuzz_target/main.rs</code>. It will look something like this:</p>
 <pre><pre class="playpen"><code class="language-rust">use bolero::fuzz;
 
 fn main() {
+    fuzz!().for_each(|input: &amp;[u8]| {
+        // TODO implement checks
+        let _ = input;
+    });
+}
+
+</code></pre></pre>
+<p><code>bolero</code> supports structural testing via the same macro. More information is available in <a href="https://crates.io/crates/bolero-generator">bolero-generator</a>:</p>
+<pre><pre class="playpen"><code class="language-rust">fn main() {
     fuzz!()
         .with_type()
         .cloned()
-        .for_each(|(a, b)| {
-            add(a, b);
-        })
-}
-
-fn add(a: u8, b: u8) -&gt; u8 {
-    a + b
+        .for_each(|(a, b, c): (u8, u16, u32)| {
+            if a == 0 &amp;&amp; b == 1 &amp;&amp; c == 2 {
+                panic!(&quot;you found me!&quot;);
+            }
+        });
 }
 </code></pre></pre>
+<p>Value generation can be customized even further by passing a <a href="https://docs.rs/bolero/latest/bolero/generator/trait.ValueGenerator.html"><code>ValueGenerator</code></a>:</p>
+<pre><pre class="playpen"><code class="language-rust">fn main() {
+    fuzz!()
+        .with_generator(2..42)
+        .cloned()
+        .for_each(|value| {
+            if value == 4 {
+                panic!(&quot;you found me!&quot;);
+            }
+        });
+}
+</code></pre></pre>
+<p>The fuzz target can now be executed:</p>
+<pre><code class="language-bash">$ cargo bolero fuzz my_fuzz_target --fuzzer libfuzzer --sanitizer address
+</code></pre>
+<p><code>bolero</code> supports <a href="https://llvm.org/docs/LibFuzzer.html"><code>libfuzzer</code></a>, <a href="http://lcamtuf.coredump.cx/afl/"><code>afl</code></a>, and <a href="https://google.github.io/honggfuzz/"><code>honggfuzz</code></a> via the <code>fuzzer</code> argument.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="library-installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
-                            <a rel="next" href="cli-installation.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="features/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -190,9 +215,13 @@ fn add(a: u8, b: u8) -&gt; u8 {
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a href="library-installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
                 
-                    <a href="cli-installation.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a href="features/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
