@@ -13,6 +13,11 @@ use syn::{
     FieldsUnnamed, Generics, Ident, WhereClause,
 };
 
+/// Derive the an implementation of `TypeGenerator` for the given type.
+///
+/// The `#[generator(my_custom_generator())]` attribute can be used
+/// to customize how fields are generated. If no generator is specified,
+/// the `TypeGenerator` implementation will be used.
 #[proc_macro_derive(TypeGenerator, attributes(generator))]
 pub fn derive_type_generator(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

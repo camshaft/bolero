@@ -10,8 +10,14 @@ enum Operation {
 }
 
 fn main() {
+    let len = if std::env::var("SHOULD_PANIC").is_ok() {
+        50
+    } else {
+        32
+    };
+
     fuzz!()
-        .with_generator(gen::<Vec<Operation>>().with().len(0usize..=32))
+        .with_generator(gen::<Vec<Operation>>().with().len(0usize..=len))
         .for_each(|operations| {
             let mut subject: ArrayVec<[_; 32]> = ArrayVec::new();
             let mut oracle = LinkedList::new();

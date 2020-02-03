@@ -6,7 +6,7 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_honggfuzz)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic as bolero_panic, DriverMode, Engine, Instrument, Never, SliceTestInput,
+        panic as bolero_panic, ByteSliceTestInput, DriverMode, Engine, Instrument, Never,
         TargetLocation, Test,
     };
     use std::{mem::MaybeUninit, panic::RefUnwindSafe, slice};
@@ -66,12 +66,12 @@ pub mod fuzzer {
             }
         }
 
-        fn test_input(&mut self) -> SliceTestInput {
+        fn test_input(&mut self) -> ByteSliceTestInput {
             let input = unsafe {
                 HF_ITER(self.buf_ptr.as_mut_ptr(), self.len_ptr.as_mut_ptr());
                 slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init())
             };
-            SliceTestInput::new(input, self.driver_mode)
+            ByteSliceTestInput::new(input, self.driver_mode)
         }
     }
 }

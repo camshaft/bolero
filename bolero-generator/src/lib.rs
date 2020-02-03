@@ -64,8 +64,11 @@ pub trait TypeGenerator: Sized {
 /// Generate a value with a parameterized generator
 pub trait ValueGenerator: Sized {
     type Output;
+
+    /// Generates a value with the given driver
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output>;
 
+    /// Mutates an existing value with the given driver
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
         *value = self.generate(driver)?;
         Some(())
@@ -237,11 +240,6 @@ impl<T: Clone> ValueGenerator for Constant<T> {
     fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {
         Some(self.value.clone())
     }
-
-    fn mutate<D: Driver>(&self, _driver: &mut D, value: &mut T) -> Option<()> {
-        *value = self.value.clone();
-        Some(())
-    }
 }
 
 /// Always generate the same value
@@ -253,7 +251,7 @@ pub fn constant<T: Clone>(value: T) -> Constant<T> {
 pub mod prelude {
     pub use crate::{
         constant, gen, gen_with,
-        one_of::{one_of, OneOfExt},
+        one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
         TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
 }

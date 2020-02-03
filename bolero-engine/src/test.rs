@@ -1,20 +1,27 @@
 use crate::{
-    test_input::SliceDebug, DriverMode, Error, Instrument, IntoTestResult, Measurement,
+    panic, test_input::SliceDebug, DriverMode, Error, Instrument, IntoTestResult, Measurement,
     TestFailure, TestInput, ValueGenerator,
 };
 use std::panic::RefUnwindSafe;
 
+/// Trait for defining a test case
 pub trait Test: Sized {
+    /// The input value for the test case
     type Value;
 
+    /// Execute one test with the given input
     fn test<T: TestInput<Result<bool, Error>>, I: Instrument + RefUnwindSafe>(
         &mut self,
         input: &mut T,
         instrument: &mut I,
     ) -> Result<bool, Error>;
 
+    /// Generate a value for the given input.
+    ///
+    /// Note: this is used for printing the value related to a test failure
     fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value;
 
+    /// Shrink the input to a simpler form
     fn shrink(
         &mut self,
         input: Vec<u8>,
@@ -37,7 +44,7 @@ where
         instrument: &mut I,
     ) -> Result<bool, Error> {
         input.with_slice(&mut |slice| {
-            crate::panic::catch(|| {
+            panic::catch(|| {
                 let measurement = instrument.start();
                 let res = (self)(slice);
                 let record = measurement.stop();
@@ -79,7 +86,7 @@ where
         instrument: &mut I,
     ) -> Result<bool, Error> {
         input.with_slice(&mut |slice| {
-            crate::panic::catch(|| {
+            panic::catch(|| {
                 let measurement = instrument.start();
                 let res = (self.fun)(slice);
                 let record = measurement.stop();
@@ -121,7 +128,7 @@ where
         instrument: &mut I,
     ) -> Result<bool, Error> {
         input.with_slice(&mut |slice| {
-            crate::panic::catch(|| {
+            panic::catch(|| {
                 let input = slice.to_vec();
                 let measurement = instrument.start();
                 let res = (self.fun)(input);
@@ -140,6 +147,24 @@ where
     fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
+}
+
+/// Lazily generates a new value for the given driver
+macro_rules! generate_value {
+    ($self:ident, $driver:ident) => {{
+        if let Some(value) = $self.value.as_mut() {
+            if $self.gen.mutate($driver, value).is_some() {
+                value
+            } else {
+                return Ok(false);
+            }
+        } else if let Some(value) = $self.gen.generate($driver) {
+            $self.value = Some(value);
+            $self.value.as_ref().unwrap()
+        } else {
+            return Ok(false);
+        }
+    }};
 }
 
 pub struct BorrowedGeneratorTest<F, G, V> {
@@ -174,20 +199,9 @@ where
         input.with_driver(&mut |driver| {
             let fun = &mut self.fun;
 
-            let value = if let Some(value) = self.value.as_mut() {
-                if self.gen.mutate(driver, value).is_some() {
-                    value
-                } else {
-                    return Ok(false);
-                }
-            } else if let Some(value) = self.gen.generate(driver) {
-                self.value = Some(value);
-                self.value.as_ref().unwrap()
-            } else {
-                return Ok(false);
-            };
+            let value = generate_value!(self, driver);
 
-            crate::panic::catch(|| {
+            panic::catch(|| {
                 let measurement = instrument.start();
                 let res = (fun)(value);
                 let record = measurement.stop();
@@ -239,22 +253,11 @@ where
         input.with_driver(&mut |driver| {
             let fun = &mut self.fun;
 
-            let value = if let Some(value) = self.value.as_mut() {
-                if self.gen.mutate(driver, value).is_some() {
-                    value
-                } else {
-                    return Ok(false);
-                }
-            } else if let Some(value) = self.gen.generate(driver) {
-                self.value = Some(value);
-                self.value.as_ref().unwrap()
-            } else {
-                return Ok(false);
-            };
+            let value = generate_value!(self, driver);
 
             let input = value.clone();
 
-            crate::panic::catch(|| {
+            panic::catch(|| {
                 let measurement = instrument.start();
                 let res = (fun)(input);
                 let record = measurement.stop();

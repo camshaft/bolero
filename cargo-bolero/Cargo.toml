@@ -10,11 +10,29 @@ license = "MIT"
 edition = "2018"
 readme = "README.md"
 
+[features]
+default = ["afl", "honggfuzz"]
+afl = ["bolero-afl"]
+honggfuzz = ["bolero-honggfuzz"]
+
 [dependencies]
-bolero-afl = { version = "0.4", path = "../bolero-afl", default-features = false, features = ["bin"] }
-bolero-honggfuzz = { version = "0.4", path = "../bolero-honggfuzz", default-features = false, features = ["bin"] }
+bolero-afl = { version = "0.4", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
+bolero-honggfuzz = { version = "0.4", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
 failure = "0.1"
 structopt = "0.3"
 tempfile = "3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+bolero = { version = "0.4", path = "../bolero" }
+
+[[test]]
+name = "fuzz_bytes"
+path = "tests/fuzz_bytes/main.rs"
+harness = false
+
+[[test]]
+name = "fuzz_generator"
+path = "tests/fuzz_generator/main.rs"
+harness = false

@@ -1,6 +1,7 @@
 pub use ::failure::{Error, Fail};
 use core::fmt::{Debug, Display};
 
+/// Contains information about a test failure
 #[derive(Debug)]
 pub struct TestFailure<Input> {
     pub error: Error,

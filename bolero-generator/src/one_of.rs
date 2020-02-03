@@ -30,15 +30,19 @@ impl<O: OneValueOfGenerator> ValueGenerator for OneValueOf<O> {
     }
 }
 
+/// Extensions for picking a generator from a set of generators
 pub trait OneOfExt {
     type Generator;
 
+    /// Pick a generator for the provided set of generators
     fn one_of(self) -> OneOf<Self::Generator>;
 }
 
+/// Extensions for picking a value from a set of values
 pub trait OneValueOfExt {
     type Generator;
 
+    /// Pick a value for the provided set of values
     fn one_value_of(self) -> OneValueOf<Self::Generator>;
 }
 
@@ -221,11 +225,13 @@ impl_selectors!(
 );
 
 #[inline]
+/// Pick a generator for the provided set of generators
 pub fn one_of<O: OneOfGenerator>(options: O) -> OneOf<O> {
     OneOf(options)
 }
 
 #[inline]
+/// Pick a value for the provided set of values
 pub fn one_value_of<O: OneValueOfGenerator>(options: O) -> OneValueOf<O> {
     OneValueOf(options)
 }

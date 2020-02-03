@@ -1,10 +1,18 @@
 use std::path::{Path, PathBuf};
 
+/// Information about the location of a test target
 #[derive(Clone, Copy, Debug)]
 pub struct TargetLocation {
+    /// Absolute path to the directory of the test target Cargo.toml manifest
     pub manifest_dir: &'static str,
+
+    /// Full module name of the test target
     pub module_path: &'static str,
+
+    /// Absolute path to the test target
     pub file: &'static str,
+
+    /// The line number at which the test target is defined
     pub line: u32,
 }
 

@@ -6,7 +6,7 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_afl)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic, DriverMode, Engine, Instrument, Never, SliceTestInput, TargetLocation, Test,
+        panic, ByteSliceTestInput, DriverMode, Engine, Instrument, Never, TargetLocation, Test,
     };
     use std::{io::Read, panic::RefUnwindSafe};
 
@@ -89,9 +89,9 @@ pub mod fuzzer {
                 .expect("could not read next input");
         }
 
-        fn test_input(&mut self) -> SliceTestInput {
+        fn test_input(&mut self) -> ByteSliceTestInput {
             self.reset();
-            SliceTestInput::new(&self.input, self.driver_mode)
+            ByteSliceTestInput::new(&self.input, self.driver_mode)
         }
     }
 }

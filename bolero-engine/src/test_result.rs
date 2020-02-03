@@ -1,5 +1,6 @@
 use failure::{bail, Error};
 
+/// Trait that turns the test return value into a `Result`
 pub trait IntoTestResult {
     fn into_test_result(self) -> Result<(), Error>;
 }

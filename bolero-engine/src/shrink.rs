@@ -1,6 +1,7 @@
 use crate::{panic, Error, Test, TestFailure, TestInput};
-use bolero_generator::driver::{DriverMode, FuzzDriver};
+use bolero_generator::driver::{ByteSliceDriver, DriverMode};
 
+/// Shrink the input to a simpler form
 pub fn shrink<T: Test>(
     test: &mut T,
     input: Vec<u8>,
@@ -227,14 +228,14 @@ struct ShrinkInput<'a> {
 }
 
 impl<'a, Output> TestInput<Output> for ShrinkInput<'a> {
-    type Driver = FuzzDriver<'a>;
+    type Driver = ByteSliceDriver<'a>;
 
     fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
         f(self.input)
     }
 
     fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
-        f(&mut FuzzDriver::new(self.input, self.driver_mode))
+        f(&mut ByteSliceDriver::new(self.input, self.driver_mode))
     }
 }
 

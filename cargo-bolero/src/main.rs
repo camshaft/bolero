@@ -7,10 +7,12 @@ use crate::{
 use failure::Error;
 use structopt::StructOpt;
 
+#[cfg(feature = "afl")]
 mod afl;
 mod config;
 mod fuzz;
 mod fuzzer;
+#[cfg(feature = "honggfuzz")]
 mod honggfuzz;
 mod libfuzzer;
 mod manifest;

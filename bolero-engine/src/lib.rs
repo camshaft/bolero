@@ -24,6 +24,7 @@ pub use target_location::TargetLocation;
 mod test_result;
 pub use test_result::*;
 
+/// Trait for defining an engine that executes a test
 pub trait Engine<T: Test>: Sized {
     type Output;
 

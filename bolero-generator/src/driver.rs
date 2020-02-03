@@ -1,13 +1,21 @@
 use crate::TypeGenerator;
 use rand_core::RngCore;
 
+/// Trait for driving the generation of a value
+///
+/// In fuzzing engine, this is typically backed by
+/// a byte slice, but other drivers can be used instead, e.g.
+/// an RNG implementation.
 pub trait Driver: Sized {
+    /// Generate a value with type `T`
     fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
         T::generate(self)
     }
 
+    /// Return the mode set for the driver
     fn mode(&self) -> DriverMode;
 
+    /// Fill the target bytes with the driver state
     fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()>;
 }
 
@@ -24,12 +32,12 @@ pub enum DriverMode {
 }
 
 #[derive(Debug)]
-pub struct FuzzDriver<'a> {
+pub struct ByteSliceDriver<'a> {
     mode: DriverMode,
     input: &'a [u8],
 }
 
-impl<'a> FuzzDriver<'a> {
+impl<'a> ByteSliceDriver<'a> {
     pub fn new(input: &'a [u8], mode: Option<DriverMode>) -> Self {
         let randomized = mode.is_none();
 
@@ -59,7 +67,7 @@ impl<'a> FuzzDriver<'a> {
     }
 }
 
-impl<'a> Driver for FuzzDriver<'a> {
+impl<'a> Driver for ByteSliceDriver<'a> {
     fn mode(&self) -> DriverMode {
         self.mode
     }

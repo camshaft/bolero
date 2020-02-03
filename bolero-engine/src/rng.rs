@@ -1,10 +1,15 @@
-use crate::{panic, Engine, SliceTestInput, TargetLocation, Test};
+use crate::{panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
 use bolero_instrument::Instrument;
 use core::{fmt::Debug, mem::replace};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::panic::RefUnwindSafe;
 
+/// Test engine implementation using a RNG.
+///
+/// The inputs will only be derived from the `seed` field.
+/// As such, the quality of the inputs may not be high
+/// enough to find edge cases.
 #[derive(Copy, Clone, PartialEq)]
 pub struct RngEngine {
     pub iterations: usize,
@@ -29,8 +34,50 @@ impl Default for RngEngine {
 }
 
 impl RngEngine {
-    pub fn new(_location: TargetLocation) -> Self {
+    /// Create a new `RngEngine`
+    pub fn new(location: TargetLocation) -> Self {
+        let _ = location;
         Self::default()
+    }
+
+    /// Set the number of test iterations
+    pub fn with_iterations(self, iterations: usize) -> Self {
+        Self {
+            iterations,
+            max_len: self.max_len,
+            seed: self.seed,
+            driver_mode: self.driver_mode,
+        }
+    }
+
+    /// Set the maximum length of a test input
+    pub fn with_max_len(self, max_len: usize) -> Self {
+        Self {
+            iterations: self.iterations,
+            max_len,
+            seed: self.seed,
+            driver_mode: self.driver_mode,
+        }
+    }
+
+    /// Set the seed for the RNG implementation
+    pub fn with_seed(self, seed: u64) -> Self {
+        Self {
+            iterations: self.iterations,
+            max_len: self.max_len,
+            seed,
+            driver_mode: self.driver_mode,
+        }
+    }
+
+    /// Set the driver mode for the engine
+    pub fn with_driver_mode(self, driver_mode: DriverMode) -> Self {
+        Self {
+            iterations: self.iterations,
+            max_len: self.max_len,
+            seed: self.seed,
+            driver_mode: Some(driver_mode),
+        }
     }
 }
 
@@ -97,12 +144,12 @@ impl RngState {
         }
     }
 
-    fn next_input(&mut self) -> SliceTestInput {
+    fn next_input(&mut self) -> ByteSliceTestInput {
         let len = self.rng.gen_range(0, self.max_len);
         self.buffer.clear();
         self.buffer.resize(len, 0);
         self.rng.fill_bytes(&mut self.buffer);
-        SliceTestInput::new(&self.buffer, Some(self.driver_mode))
+        ByteSliceTestInput::new(&self.buffer, Some(self.driver_mode))
     }
 }
 

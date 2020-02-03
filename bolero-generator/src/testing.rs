@@ -2,7 +2,7 @@
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ForcedRng, FuzzDriver},
+            driver::{ByteSliceDriver, ForcedRng},
             *,
         };
         let gen = $gen;
@@ -18,16 +18,16 @@ macro_rules! generator_test {
 
         for input in inputs.iter() {
             if let Some(mut value) =
-                ValueGenerator::generate(&gen, &mut FuzzDriver::new_direct(input))
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
             {
-                ValueGenerator::mutate(&gen, &mut FuzzDriver::new_direct(input), &mut value);
+                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut value);
             }
         }
         for input in inputs.iter() {
             if let Some(mut value) =
-                ValueGenerator::generate(&gen, &mut FuzzDriver::new_forced(input))
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_forced(input))
             {
-                ValueGenerator::mutate(&gen, &mut FuzzDriver::new_forced(input), &mut value);
+                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_forced(input), &mut value);
             }
         }
 
@@ -39,7 +39,7 @@ macro_rules! generator_test {
 macro_rules! generator_mutate_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ForcedRng, FuzzDriver},
+            driver::{ByteSliceDriver, ForcedRng},
             *,
         };
         let gen = $gen;
@@ -54,10 +54,11 @@ macro_rules! generator_mutate_test {
             .unwrap();
 
         for input in inputs.iter() {
-            if let Some(value) = ValueGenerator::generate(&gen, &mut FuzzDriver::new_direct(input))
+            if let Some(value) =
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
             {
                 let mut mutated = value.clone();
-                ValueGenerator::mutate(&gen, &mut FuzzDriver::new_direct(input), &mut mutated);
+                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut mutated);
                 assert_eq!(
                     value, mutated,
                     "a mutation with the same input should produce the original"
@@ -65,10 +66,11 @@ macro_rules! generator_mutate_test {
             }
         }
         for input in inputs.iter() {
-            if let Some(value) = ValueGenerator::generate(&gen, &mut FuzzDriver::new_forced(input))
+            if let Some(value) =
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_forced(input))
             {
                 let mut mutated = value.clone();
-                ValueGenerator::mutate(&gen, &mut FuzzDriver::new_forced(input), &mut mutated);
+                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_forced(input), &mut mutated);
                 assert_eq!(
                     value, mutated,
                     "a mutation with the same input should produce the original"
