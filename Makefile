@@ -57,7 +57,10 @@ test_honggfuzz:
 	    --fuzzer honggfuzz \
 	    --release
 
-publish:
+book:
+	@mdbook build book
+
+publish: book
 	@cd bolero-generator-derive && cargo publish
 	@sleep 10
 	@cd bolero-generator && cargo publish
@@ -73,3 +76,5 @@ publish:
 	@cd cargo-bolero && cargo publish
 	@sleep 10
 	@cd bolero && cargo publish
+
+.PHONY: book
