@@ -1,6 +1,6 @@
 # bolero
 
-[![Build Status](https://github.com/camshaft/bolero/workflows/Continuous+integration/badge.svg)](https://github.com/camshaft/bolero/actions?workflow=Continuous+integration)
+[![Build Status](https://github.com/camshaft/bolero/workflows/ci/badge.svg)](https://github.com/camshaft/bolero/actions?workflow=ci)
 [![Latest version](https://img.shields.io/crates/v/bolero.svg)](https://crates.io/crates/bolero)
 [![Documentation](https://docs.rs/bolero/badge.svg)](https://docs.rs/bolero)
 [![License](https://img.shields.io/crates/l/bolero.svg)](https://github.com/camshaft/bolero/blob/master/LICENSE)
