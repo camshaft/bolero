@@ -9,7 +9,10 @@ jobs:
   build-deploy:
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
 
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
@@ -18,9 +21,9 @@ jobs:
 
       - run: mdbook build book
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v2
-        env:
-          ACTIONS_DEPLOY_KEY: ${{ secrets.BOOK_SECRET }}
-          PUBLISH_BRANCH: gh-pages
-          PUBLISH_DIR: ./target/book
+      - name: Build and Deploy
+        uses: JamesIves/github-pages-deploy-action@releases/v3
+        with:
+          ACCESS_TOKEN: ${{ secrets.BOOK_SECRET }}
+          BRANCH: gh-pages
+          FOLDER: target/book
