@@ -1,0 +1,9 @@
+[book]
+authors = ["Cameron Bytheway"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Bolero Book"
+
+[build]
+build-dir = "../target/doc/bolero/book"
