@@ -1,9 +1,12 @@
 cfg_if::cfg_if! {
     if #[cfg(fuzzing_libfuzzer)] {
+        /// The default engine used when defining a test target
         pub use bolero_libfuzzer::LibFuzzerEngine as DefaultEngine;
     } else if #[cfg(fuzzing_afl)] {
+        /// The default engine used when defining a test target
         pub use bolero_afl::AflEngine as DefaultEngine;
     } else if #[cfg(fuzzing_honggfuzz)] {
+        /// The default engine used when defining a test target
         pub use bolero_honggfuzz::HonggfuzzEngine as DefaultEngine;
     } else if #[cfg(test)] {
         mod test;
@@ -12,11 +15,13 @@ cfg_if::cfg_if! {
         pub use bolero_engine::rng::RngEngine as DefaultEngine;
     } else {
         mod test;
+
+        /// The default engine used when defining a test target
         pub use crate::test::TestEngine as DefaultEngine;
     }
 }
 
-/// Re-export of `bolero_generator`
+/// Re-export of [`bolero_generator`]
 pub mod generator {
     pub use bolero_generator::{self, prelude::*};
 }
@@ -30,6 +35,7 @@ use bolero_generator::{
     combinator::{AndThenGenerator, FilterGenerator, FilterMapGenerator, MapGenerator},
     TypeValueGenerator,
 };
+use core::fmt::Debug;
 
 /// Execute fuzz tests for a given target
 ///
@@ -38,15 +44,27 @@ use bolero_generator::{
 ///
 /// # Examples
 ///
+/// By default, `input` is a `&[u8]`.
+///
+/// This mode is generally used when testing an implementation that
+/// handles raw bytes, e.g. a parser.
+///
 /// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
 ///     fuzz!().for_each(|input| {
-///         // implement fuzz target here
+///         // implement checks here
 ///     });
 /// }
 /// ```
+///
+/// Calling `with_type::<Type>()` will generate random values of `Type`
+/// to be tested. `Type` is required to implement [`generator::TypeGenerator`]
+/// in order to use this method.
+///
+/// This mode is used for testing an implementation that requires
+/// structured input.
 ///
 /// ```rust
 /// use bolero::fuzz;
@@ -55,10 +73,19 @@ use bolero_generator::{
 ///     fuzz!()
 ///         .with_type::<(u8, u16)>()
 ///         .for_each(|(a, b)| {
-///             // implement fuzz target here
+///             // implement checks here
 ///         });
 /// }
 /// ```
+///
+/// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
+/// which implements [`generator::ValueGenerator`], to generate input
+/// values of type `Generator::Output`.
+///
+/// This mode is used for testing an implementation that requires
+/// structured input with specific constraints applied to the type.
+/// In the following example, we are only interested in generating
+/// two values, one being between 0 and 100, the other: 10 and 50.
 ///
 /// ```rust
 /// use bolero::fuzz;
@@ -67,27 +94,25 @@ use bolero_generator::{
 ///     fuzz!()
 ///         .with_generator((0..100, 10..50))
 ///         .for_each(|(a, b)| {
-///             // implement fuzz target here
+///             // implement checks here
 ///         });
 /// }
 /// ```
+///
+/// For compatibility purposes, `bolero` also supports the same interface as
+/// [rust-fuzz/afl.rs](https://github.com/rust-fuzz/afl.rs). This usage
+/// has a few downsides:
+///
+/// * The test cannot be configured
+/// * The test code will be contained inside a macro which can trip up
+///   some editors and IDEs.
 ///
 /// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
 ///     fuzz!(|input| {
-///         // implement fuzz target here
-///     });
-/// }
-/// ```
-///
-/// ```rust
-/// use bolero::fuzz;
-///
-/// fn main() {
-///     fuzz!(for (a, b) in all((gen::<u8>(), gen::<u8>())) {
-///         // implement fuzz target here
+///         // implement checks here
 ///     });
 /// }
 /// ```
@@ -103,61 +128,71 @@ macro_rules! fuzz {
 ///
 /// # Examples
 ///
-/// ```rust
-/// use bolero::check;
+/// By default, `input` is a `&[u8]`.
 ///
+/// This mode is generally used when testing an implementation that
+/// handles raw bytes, e.g. a parser.
+///
+/// ```rust
 /// #[test]
-/// fn slice_check() {
-///     check!().for_each(|input: &[u8]| {
-///         // implement check target here
+/// fn bytes_test() {
+///     bolero::check!().for_each(|input| {
+///         // implement checks here
 ///     });
 /// }
 /// ```
 ///
-/// ```rust
-/// use bolero::check;
+/// Calling `with_type::<Type>()` will generate random values of `Type`
+/// to be tested. `Type` is required to implement [`generator::TypeGenerator`]
+/// in order to use this method.
 ///
+/// This mode is used for testing an implementation that requires
+/// structured input.
+///
+/// ```rust
 /// #[test]
-/// fn typed_check() {
-///     check!()
+/// fn type_generator_test() {
+///     bolero::check!()
 ///         .with_type::<(u8, u16)>()
 ///         .for_each(|(a, b)| {
-///             // implement check target here
+///             // implement checks here
 ///         });
 /// }
 /// ```
 ///
-/// ```rust
-/// use bolero::check;
+/// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
+/// which implements [`generator::ValueGenerator`], to generate input
+/// values of type `Generator::Output`.
 ///
+/// This mode is used for testing an implementation that requires
+/// structured input with specific constraints applied to the type.
+/// In the following example, we are only interested in generating
+/// two values, one being between 0 and 100, the other: 10 and 50.
+///
+/// ```rust
 /// #[test]
-/// fn generator_check() {
-///     check!()
+/// fn value_generator_test() {
+///     bolero::check!()
 ///         .with_generator((0..100, 10..50))
 ///         .for_each(|(a, b)| {
-///             // implement check target here
+///             // implement checks here
 ///         });
 /// }
 /// ```
 ///
-/// ```rust
-/// use bolero::check;
+/// For compatibility purposes, `bolero` also supports the same interface as
+/// [rust-fuzz/afl.rs](https://github.com/rust-fuzz/afl.rs). This usage
+/// has a few downsides:
 ///
-/// #[test]
-/// fn macro_slice_check() {
-///     check!(|input| {
-///         // implement check target here
-///     });
-/// }
-/// ```
+/// * The test cannot be configured
+/// * The test code will be contained inside a macro which can trip up
+///   some editors and IDEs.
 ///
 /// ```rust
-/// use bolero::check;
-///
 /// #[test]
-/// fn macro_for_check() {
-///     check!(for (a, b) in all((gen::<u8>(), gen::<u8>())) {
-///         // implement check target here
+/// fn compatibility_test() {
+///     bolero::check!(|input| {
+///         // implement checks here
 ///     });
 /// }
 /// ```
@@ -169,7 +204,7 @@ macro_rules! check {
     };
 }
 
-/// Configuration for a fuzz target
+/// Configuration for a test target
 pub struct TestTarget<Generator, Engine> {
     generator: Generator,
     driver_mode: Option<DriverMode>,
@@ -177,7 +212,7 @@ pub struct TestTarget<Generator, Engine> {
 }
 
 #[doc(hidden)]
-pub fn fuzz(location: TargetLocation) -> TestTarget<SliceGenerator, DefaultEngine> {
+pub fn fuzz(location: TargetLocation) -> TestTarget<ByteSliceGenerator, DefaultEngine> {
     // cargo-bolero needs to resolve the path of the binary
     if std::env::var("CARGO_BOLERO_PATH").is_ok() {
         print!("{}", std::env::args().next().unwrap());
@@ -188,20 +223,20 @@ pub fn fuzz(location: TargetLocation) -> TestTarget<SliceGenerator, DefaultEngin
 }
 
 #[doc(hidden)]
-pub fn check(location: TargetLocation) -> TestTarget<SliceGenerator, RngEngine> {
+pub fn check(location: TargetLocation) -> TestTarget<ByteSliceGenerator, RngEngine> {
     TestTarget::new(RngEngine::new(location))
 }
 
 /// Default generator for byte slices
 #[derive(Copy, Clone, Default, PartialEq)]
-pub struct SliceGenerator;
+pub struct ByteSliceGenerator;
 
-impl<Engine> TestTarget<SliceGenerator, Engine> {
-    /// Create a `TestTarget` for a given file
-    pub fn new(engine: Engine) -> TestTarget<SliceGenerator, Engine> {
+impl<Engine> TestTarget<ByteSliceGenerator, Engine> {
+    /// Create a `TestTarget` with the given `Engine`
+    pub fn new(engine: Engine) -> TestTarget<ByteSliceGenerator, Engine> {
         Self {
             driver_mode: None,
-            generator: SliceGenerator,
+            generator: ByteSliceGenerator,
             engine,
         }
     }
@@ -209,10 +244,20 @@ impl<Engine> TestTarget<SliceGenerator, Engine> {
 
 impl<G, Engine> TestTarget<G, Engine> {
     /// Set the value generator for the `TestTarget`
-    pub fn with_generator<NewG: generator::ValueGenerator>(
+    ///
+    /// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
+    /// which implements [`generator::ValueGenerator`], to generate input
+    /// values of type `Generator::Output`.
+    ///
+    /// This mode is used for testing an implementation that requires
+    /// structured input with specific constraints applied to the type.
+    pub fn with_generator<Generator: generator::ValueGenerator>(
         self,
-        generator: NewG,
-    ) -> TestTarget<NewG, Engine> {
+        generator: Generator,
+    ) -> TestTarget<Generator, Engine>
+    where
+        Generator::Output: Debug,
+    {
         TestTarget {
             driver_mode: self.driver_mode,
             generator,
@@ -221,7 +266,14 @@ impl<G, Engine> TestTarget<G, Engine> {
     }
 
     /// Set the type generator for the `TestTarget`
-    pub fn with_type<T: generator::TypeGenerator>(
+    ///
+    /// Calling `with_type::<Type>()` will generate random values of `Type`
+    /// to be tested. `Type` is required to implement [`generator::TypeGenerator`]
+    /// in order to use this method.
+    ///
+    /// This mode is used for testing an implementation that requires
+    /// structured input.
+    pub fn with_type<T: Debug + generator::TypeGenerator>(
         self,
     ) -> TestTarget<TypeValueGenerator<T>, Engine> {
         TestTarget {
@@ -234,7 +286,10 @@ impl<G, Engine> TestTarget<G, Engine> {
 
 impl<G: generator::ValueGenerator, Engine> TestTarget<G, Engine> {
     /// Map the value of the generator
-    pub fn map<F: Fn(G::Output) -> T, T>(self, map: F) -> TestTarget<MapGenerator<G, F>, Engine> {
+    pub fn map<F: Fn(G::Output) -> T, T: Debug>(
+        self,
+        map: F,
+    ) -> TestTarget<MapGenerator<G, F>, Engine> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator.map(map),
@@ -246,7 +301,10 @@ impl<G: generator::ValueGenerator, Engine> TestTarget<G, Engine> {
     pub fn and_then<F: Fn(G::Output) -> T, T: generator::ValueGenerator>(
         self,
         map: F,
-    ) -> TestTarget<AndThenGenerator<G, F>, Engine> {
+    ) -> TestTarget<AndThenGenerator<G, F>, Engine>
+    where
+        T::Output: Debug,
+    {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator.and_then(map),
@@ -328,7 +386,7 @@ where
     }
 }
 
-impl<E> TestTarget<SliceGenerator, E> {
+impl<E> TestTarget<ByteSliceGenerator, E> {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<T, Ret>(mut self, test: T) -> E::Output
     where
@@ -414,55 +472,4 @@ macro_rules! __bolero_parse_input {
             $impl;
         })
     };
-}
-
-#[cfg(test)]
-mod derive_tests {
-    use bolero_generator::*;
-
-    fn gen_foo() -> impl ValueGenerator<Output = u32> {
-        4..5
-    }
-
-    #[derive(Debug, PartialEq, TypeGenerator)]
-    pub struct NewType(#[generator(4..10)] u64);
-
-    #[derive(Debug, PartialEq, TypeGenerator)]
-    pub struct Bar {
-        #[generator(gen_foo())]
-        foo: u32,
-        bar: NewType,
-        baz: u8,
-    }
-
-    #[derive(Debug, PartialEq, TypeGenerator)]
-    pub enum Operation {
-        Insert {
-            #[generator(1..3)]
-            index: usize,
-            value: u32,
-        },
-        Remove {
-            #[generator(4..6)]
-            index: usize,
-        },
-        Bar(Bar),
-        // Foo(Foo),
-        Other(#[generator(42..53)] usize),
-        Clear,
-    }
-
-    #[derive(TypeGenerator)]
-    pub union Foo {
-        foo: u32,
-        bar: u64,
-        baz: u8,
-    }
-
-    #[test]
-    fn operation_test() {
-        check!().with_type().for_each(|_input: Vec<Operation>| {
-            // println!("{:?}", input);
-        });
-    }
 }
