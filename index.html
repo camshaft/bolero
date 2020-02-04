@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="getting-started.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="expanded "><a href="features/index.html"><strong aria-hidden="true">3.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="features/cargo-integration.html"><strong aria-hidden="true">3.1.</strong> Cargo Test Integration</a></li><li class="expanded "><a href="features/corpus-replay.html"><strong aria-hidden="true">3.2.</strong> Corpus Replay</a></li><li class="expanded "><a href="features/input-shrinking.html"><strong aria-hidden="true">3.3.</strong> Input Shrinking</a></li><li class="expanded "><a href="features/unified-fuzzing-interface.html"><strong aria-hidden="true">3.4.</strong> Unified Fuzzing Interface</a></li><li class="expanded "><a href="features/unit-testing.html"><strong aria-hidden="true">3.5.</strong> Unit/Property Testing</a></li><li class="expanded "><a href="features/structural-testing.html"><strong aria-hidden="true">3.6.</strong> Structural Testing</a></li><li class="expanded "><a href="features/rust-stable.html"><strong aria-hidden="true">3.7.</strong> Works on Rust Stable</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -154,22 +154,7 @@
 <blockquote>
 <p>Fuzzing or fuzz testing is an automated software testing technique that involves providing invalid, unexpected, or random data as inputs to a computer program. The program is then monitored for exceptions such as crashes, failing built-in code assertions, or potential memory leaks.</p>
 </blockquote>
-<h2><a class="header" href="#example-test" id="example-test">Example test</a></h2>
-<pre><pre class="playpen"><code class="language-rust">use bolero::fuzz;
-
-fn main() {
-    fuzz!()
-        .with_type()
-        .cloned()
-        .for_each(|(a, b)| {
-            add(a, b);
-        })
-}
-
-fn add(a: u8, b: u8) -&gt; u8 {
-    a + b
-}
-</code></pre></pre>
+<p><code>bolero</code>'s goal is to make implementing high-quality tests as painless and approachable as possible.</p>
 
                     </main>
 

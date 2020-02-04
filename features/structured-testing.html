@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Unit Testing - Bolero Book</title>
+        <title>Structured Testing - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html" class="active"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html" class="active"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,47 +148,115 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#unit-testing" id="unit-testing">Unit Testing</a></h1>
-<p><code>bolero</code> also supports unit tests inside of the project with the <code>check!</code> call:</p>
+                        <h1><a class="header" href="#structured-testing" id="structured-testing">Structured Testing</a></h1>
+<p>In addition to generating random byte slices, <code>bolero</code> supports generating well-formed types, with the <a href="https://docs.rs/bolero-generator/"><code>bolero-generator</code></a> crate.</p>
+<h2><a class="header" href="#operation-example" id="operation-example">Operation Example</a></h2>
+<p>Let's supposes we've implemented a <code>MySet</code> data structure. It has 3 operations:</p>
+<ul>
+<li><code>insert(value)</code> - inserts an value into the set</li>
+<li><code>remove(value)</code> - removes an value from the set</li>
+<li><code>clear()</code> - removes all values from the set</li>
+</ul>
+<p>The operations can easily be modeled as an <code>enum</code>:</p>
 <pre><pre class="playpen"><code class="language-rust">
 <span class="boring">#![allow(unused_variables)]
 </span><span class="boring">fn main() {
-</span>#[test]
-fn my_unit_test() {
-    bolero::check!()
-        .with_type()
-        .cloned()
-        .with_iterations(100) // Defaults to 1000
-        .for_each(|value: u64| {
-            // implement checks here
-        });
+</span>use bolero::generator::TypeGenerator;
+
+#[derive(Debug, TypeGenerator)]
+enum Operation {
+    Insert(u64),
+    Remove(u64),
+    Clear,
 }
 <span class="boring">}
 </span></code></pre></pre>
-<p>A RNG engine will be used instead of a fuzzing engine in this mode. This means the inputs
-will not be guided by any instrumentation (coverage, profiling, etc) and instead will be
-completely random. This can be OK for quickly checking various random inputs, but will have a harder
-time finding tricky edge cases.</p>
-<p>Also note that tests may pass on one execution and fail the next because randomized inputs
-will not all trigger the same codepaths.</p>
-<p>Consider the trade-offs when choosing between the <code>fuzz</code> or <code>check</code> modes:</p>
-<table><thead><tr><th align="center"></th><th align="center">Unit tests</th><th align="center">Integration tests</th><th align="center">Code coverage guided tests</th><th align="center">C/C++ Dependency</th></tr></thead><tbody>
-<tr><td align="center">fuzz!</td><td align="center">x</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td></tr>
-<tr><td align="center">check!</td><td align="center">✓</td><td align="center">✓</td><td align="center">x</td><td align="center">x</td></tr>
-</tbody></table>
+<p>Note that we've added <code>TypeGenerator</code> to the list of derives. This enables <code>bolero</code> to generate random values for <code>Operation</code>. We can combine that with a <code>Vec&lt;Operation&gt;</code> and get a list of operations to perform on our <code>MySet</code> data structure.</p>
+<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+use my_set::MySet;
+
+#[derive(Debug, TypeGenerator)]
+enum Operation {
+    Insert(u64),
+    Remove(u64),
+    Clear,
+}
+
+fn main() {
+    fuzz!()
+        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
+        .for_each(|operations| {
+            let mut set = MySet::new();
+
+            for operation in operations.iter() {
+                match operation {
+                    Operation::Insert(value) =&gt; {
+                        set.insert(value);
+                    }
+                    Operation::Remove(value) =&gt; {
+                        set.remove(value);
+                    }
+                    Operation::Clear =&gt; {
+                        set.clear();
+                    }
+                }
+            }
+        })
+}
+</code></pre></pre>
+<p>This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
+<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+use my_set::MySet;
+use std::collections::HashSet;
+
+#[derive(Debug, TypeGenerator)]
+enum Operation {
+    Insert(u64),
+    Remove(u64),
+    Clear,
+}
+
+fn main() {
+    fuzz!()
+        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
+        .for_each(|operations| {
+            let mut set = MySet::new();
+            let mut oracle = HashSet::new();
+
+            for operation in operations.iter() {
+                match operation {
+                    Operation::Insert(value) =&gt; {
+                        set.insert(value);
+                        oracle.insert(value);
+                    }
+                    Operation::Remove(value) =&gt; {
+                        set.remove(value);
+                        oracle.remove(value);
+                    }
+                    Operation::Clear =&gt; {
+                        set.clear();
+                        oracle.clear();
+                    }
+                }
+            }
+
+            assert!(set.iter().eq(oracle.iter()));
+        })
+}
+</code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../features/unified-interface.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../features/rust-stable.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
                         
-                            <a rel="next" href="../tutorials/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../features/unified-interface.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -200,13 +268,13 @@ will not all trigger the same codepaths.</p>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="../features/unified-interface.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a href="../features/rust-stable.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
-                    <a href="../tutorials/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a href="../features/unified-interface.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

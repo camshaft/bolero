@@ -3,9 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Bolero Book</title>
-        
-        <meta name="robots" content="noindex" />
+        <title>Fibonacci - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -13,21 +11,21 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
         
@@ -37,7 +35,7 @@
     <body>
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
-            var path_to_root = "";
+            var path_to_root = "../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
         </script>
 
@@ -83,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html" class="active"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -118,7 +116,7 @@
                         <h1 class="menu-title">Bolero Book</h1>
 
                         <div class="right-buttons">
-                            <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <a href="../print.html" title="Print this book" aria-label="Print this book">
                                 <i id="print-button" class="fa fa-print"></i>
                             </a>
                             
@@ -150,364 +148,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#introduction" id="introduction">Introduction</a></h1>
-<p>Bolero is a fuzzing and property testing framework for Rust programs.</p>
-<p>From <a href="https://en.wikipedia.org/wiki/Fuzzing">Wikipedia</a>, fuzzing is described as:</p>
-<blockquote>
-<p>Fuzzing or fuzz testing is an automated software testing technique that involves providing invalid, unexpected, or random data as inputs to a computer program. The program is then monitored for exceptions such as crashes, failing built-in code assertions, or potential memory leaks.</p>
-</blockquote>
-<p><code>bolero</code>'s goal is to make implementing high-quality tests as painless and approachable as possible.</p>
-<h1><a class="header" href="#cli-installation" id="cli-installation">CLI Installation</a></h1>
-<p><code>bolero</code> provides a CLI program to execute fuzz tests, <a href="https://crates.io/crates/cargo-bolero"><code>cargo-bolero</code></a>. It can be installed globally with cargo:</p>
-<pre><code class="language-bash">$ cargo install cargo-bolero -f
-</code></pre>
-<h2><a class="header" href="#linux-installation" id="linux-installation">Linux Installation</a></h2>
-<p><code>cargo-bolero</code> needs a couple of libraries installed to compile. If these libraries aren't
-available the requirement can be relaxed by executing <code>cargo install cargo-bolero --no-default-features -f</code></p>
-<h3><a class="header" href="#debianubuntu" id="debianubuntu">Debian/Ubuntu</a></h3>
-<pre><code class="language-bash">$ sudo apt install binutils-dev libunwind-dev
-</code></pre>
-<h1><a class="header" href="#library-installation" id="library-installation">Library Installation</a></h1>
-<p><code>bolero</code> is on <code>crates.io</code> and can be added to a project's dev dependencies like so:</p>
-<pre><code class="language-toml">[dev-dependencies]
-bolero = &quot;0.4&quot;
-</code></pre>
-<h2><a class="header" href="#structured-test-generation" id="structured-test-generation">Structured Test Generation</a></h2>
-<p>If your crate wishes to implement structured test generation on public data structures, <code>bolero-generator</code> can be added to the main dependencies:</p>
-<pre><code class="language-toml">[dependencies]
-bolero-generator = &quot;0.4&quot;
-</code></pre>
-<p>The derive attribute can now be used:</p>
-<pre><pre class="playpen"><code class="language-rust">
-<span class="boring">#![allow(unused_variables)]
-</span><span class="boring">fn main() {
-</span>#[derive(Debug, bolero_generator::TypeGenerator)]
-pub struct Coord3d {
-    x: u64,
-    y: u64,
-    z: u64,
-}
-<span class="boring">}
-</span></code></pre></pre>
-<h1><a class="header" href="#features" id="features">Features</a></h1>
-<p>Bolero has several features that make testing easy:</p>
-<ul>
-<li><a href="features/./corpus-replay.html">Corpus Replay</a></li>
-<li><a href="features/./input-shrinking.html">Input Shrinking</a></li>
-<li><a href="features/./rust-stable.html">Works on Rust Stable</a></li>
-<li><a href="features/./structured-testing.html">Structured Testing</a></li>
-<li><a href="features/./unified-interface.html">Unified Interface</a></li>
-<li><a href="features/./unit-testing.html">Unit Testing</a></li>
-</ul>
-<h1><a class="header" href="#corpus-replay" id="corpus-replay">Corpus Replay</a></h1>
-<p>After fuzzing a test target, a corpus is generated. A corpus is a set of inputs that trigger unique codepaths. This corpus can be now executed using the standard <code>cargo test</code> command. The corpus should either be commited to the project repository or be stored/restored from storage, like S3.</p>
-<pre><code class="language-bash">$ cargo test
-
-     Running target/debug/deps/my_fuzz_target-9b2c2acee51634e0
-
-running 1007 tests
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...............................................................................
-...........................................................
-test result: ok. 1007 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre>
-<h1><a class="header" href="#input-shrinking" id="input-shrinking">Input Shrinking</a></h1>
-<p><code>bolero</code> supports input shrinking for all of the provided testing engines.</p>
-<h2><a class="header" href="#what-is-it" id="what-is-it">What is it?</a></h2>
-<p>From <a href="https://propertesting.com/book_shrinking.html">PropEr Testing</a>:</p>
-<blockquote>
-<p>Shrinking is the mechanism by which a property-based testing framework can be told how to simplify failure cases enough to let it figure out exactly what the minimal reproducible case is.</p>
-<p>Sometimes the input required to find a failure can be fairly large or complex. Finding the initial failing case may have required hundreds of attempts, and it may contain vast amounts of irrelevant information. The framework will then attempt to reduce that data set through shrinking. It generally does so by transforming all the generators used and trying to bring them back towards their own zero point.</p>
-</blockquote>
-<h2><a class="header" href="#example" id="example">Example</a></h2>
-<p>Let's suppose we're testing a <code>MySet</code> data structure:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
-use my_set::MySet;
-
-#[derive(Debug, TypeGenerator)]
-enum Operation {
-    Insert(u64),
-    Remove(u64),
-    Clear,
-}
-
-fn main() {
-    fuzz!()
-        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
-        .for_each(|operations| {
-            let mut set = MySet::new();
-
-            for operation in operations.iter() {
-                match operation {
-                    Operation::Insert(value) =&gt; {
-                        set.insert(value);
-                    }
-                    Operation::Remove(value) =&gt; {
-                        set.remove(value);
-                    }
-                    Operation::Clear =&gt; {
-                        set.clear();
-                    }
-                }
-            }
-        })
-}
-</code></pre></pre>
-<p>Assume there's hypothetical scenario in which adding 16 elements to <code>MySet</code> causes a panic. Without shrinking, the randomly-generated inputs can be difficult to interpret:</p>
-<pre><code>======================== Test Failure ========================
-
-Input:
-[
-    Insert(9693583160302274182),
-    Insert(15890536247564076678),
-    Clear,
-    Insert(15914819332679195868),
-    Insert(9717884937115065564),
-    Insert(15914645609842007260),
-    Insert(18446738425238052060),
-    Remove(15912577393975689024),
-    Insert(15338377272073444572),
-    Insert(15914838024242123988),
-    Insert(11228695243045262548),
-    Insert(11212726789901900955),
-    Insert(11212726789901884315),
-    Insert(11212726789901884316),
-    Insert(11212726789901884317),
-    Insert(11212726789901884318),
-    Insert(11212726789901884319),
-    Insert(11212726789901884311),
-    Insert(11212726789901884312),
-    Insert(11212726789901884313),
-    Insert(11212726789901884314),
-    Insert(9727500806739001343),
-    Insert(9693583160302274182),
-    Insert(9693583160302274182),
-    Insert(5714873654208093419),
-    Remove(5714873654208057167),
-    Remove(16717362667219255119),
-    Insert(9726366166670698728),
-    Insert(9727642152175306374),
-    Remove(18446181099529437184),
-    Insert(18446744073709551615),
-    Insert(15336116641675083775),
-    Remove(11212726789901884372),
-    Insert(11212726789901884315),
-    Insert(11212666079612935067)
-]
-
-Error:
-panicked at 'internal assertion', src/lib.rs:16:17
-</code></pre>
-<p>After shrinking the input, it becomes more obvious how to trigger the bug:</p>
-<pre><code>======================== Test Failure ========================
-
-Input:
-[
-    Insert(0),
-    Insert(1),
-    Insert(2),
-    Insert(3),
-    Insert(4),
-    Insert(5),
-    Insert(6),
-    Insert(7),
-    Insert(8),
-    Insert(9),
-    Insert(10),
-    Insert(11),
-    Insert(12),
-    Insert(13),
-    Insert(14),
-    Insert(15),
-]
-
-Error:
-panicked at 'internal assertion', src/lib.rs:16:17
-</code></pre>
-<h1><a class="header" href="#works-on-rust-stable" id="works-on-rust-stable">Works on Rust Stable</a></h1>
-<p><code>bolero</code> does not require nightly to execute test targets:</p>
-<pre><code class="language-bash"># does not require nightly
-$ cargo bolero fuzz my_fuzz_target
-</code></pre>
-<h2><a class="header" href="#sanitizer-support" id="sanitizer-support">Sanitizer support</a></h2>
-<p>Using a sanitizer will improve the number of edge cases caught by the test. As such, the preference should be towards using them. Unfortunately, sanitizers require Rust nightly to compile.</p>
-<p><code>cargo-bolero</code> will use <code>rustup run nightly cargo</code> instead to execute the test target:</p>
-<pre><code class="language-bash"># uses rustup to execute, even if we're using stable by default
-$ cargo bolero fuzz --sanitizer address my_fuzz_target
-</code></pre>
-<p>If a specific version of nightly is required, the <code>--toolchain</code> argument can be used:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --sanitizer address --toolchain nightly-2020-01-01 my_fuzz_target
-</code></pre>
-<h1><a class="header" href="#structured-testing" id="structured-testing">Structured Testing</a></h1>
-<p>In addition to generating random byte slices, <code>bolero</code> supports generating well-formed types, with the <a href="https://docs.rs/bolero-generator/"><code>bolero-generator</code></a> crate.</p>
-<h2><a class="header" href="#operation-example" id="operation-example">Operation Example</a></h2>
-<p>Let's supposes we've implemented a <code>MySet</code> data structure. It has 3 operations:</p>
-<ul>
-<li><code>insert(value)</code> - inserts an value into the set</li>
-<li><code>remove(value)</code> - removes an value from the set</li>
-<li><code>clear()</code> - removes all values from the set</li>
-</ul>
-<p>The operations can easily be modeled as an <code>enum</code>:</p>
-<pre><pre class="playpen"><code class="language-rust">
-<span class="boring">#![allow(unused_variables)]
-</span><span class="boring">fn main() {
-</span>use bolero::generator::TypeGenerator;
-
-#[derive(Debug, TypeGenerator)]
-enum Operation {
-    Insert(u64),
-    Remove(u64),
-    Clear,
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>Note that we've added <code>TypeGenerator</code> to the list of derives. This enables <code>bolero</code> to generate random values for <code>Operation</code>. We can combine that with a <code>Vec&lt;Operation&gt;</code> and get a list of operations to perform on our <code>MySet</code> data structure.</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
-use my_set::MySet;
-
-#[derive(Debug, TypeGenerator)]
-enum Operation {
-    Insert(u64),
-    Remove(u64),
-    Clear,
-}
-
-fn main() {
-    fuzz!()
-        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
-        .for_each(|operations| {
-            let mut set = MySet::new();
-
-            for operation in operations.iter() {
-                match operation {
-                    Operation::Insert(value) =&gt; {
-                        set.insert(value);
-                    }
-                    Operation::Remove(value) =&gt; {
-                        set.remove(value);
-                    }
-                    Operation::Clear =&gt; {
-                        set.clear();
-                    }
-                }
-            }
-        })
-}
-</code></pre></pre>
-<p>This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
-use my_set::MySet;
-use std::collections::HashSet;
-
-#[derive(Debug, TypeGenerator)]
-enum Operation {
-    Insert(u64),
-    Remove(u64),
-    Clear,
-}
-
-fn main() {
-    fuzz!()
-        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
-        .for_each(|operations| {
-            let mut set = MySet::new();
-            let mut oracle = HashSet::new();
-
-            for operation in operations.iter() {
-                match operation {
-                    Operation::Insert(value) =&gt; {
-                        set.insert(value);
-                        oracle.insert(value);
-                    }
-                    Operation::Remove(value) =&gt; {
-                        set.remove(value);
-                        oracle.remove(value);
-                    }
-                    Operation::Clear =&gt; {
-                        set.clear();
-                        oracle.clear();
-                    }
-                }
-            }
-
-            assert!(set.iter().eq(oracle.iter()));
-        })
-}
-</code></pre></pre>
-<h1><a class="header" href="#unified-interface" id="unified-interface">Unified Interface</a></h1>
-<p>Using the interface provided by <code>bolero</code>, a single test target can execute under several different engines.</p>
-<h2><a class="header" href="#libfuzzer" id="libfuzzer">LibFuzzer</a></h2>
-<ul>
-<li><a href="https://llvm.org/docs/LibFuzzer.html">LibFuzzer documentation</a></li>
-</ul>
-<p>LibFuzzer is an in-process, coverage-guided, evolutionary fuzzing engine.</p>
-<p>LibFuzzer is linked with the library under test, and feeds fuzzed inputs to the library via a specific fuzzing entrypoint (aka “target function”); the fuzzer then tracks which areas of the code are reached, and generates mutations on the corpus of input data in order to maximize the code coverage.</p>
-<p>The <code>libfuzzer</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer libfuzzer my_fuzz_target
-</code></pre>
-<p>Currently, it is also the default engine when fuzzing:</p>
-<pre><code class="language-bash"># will use --fuzzer libfuzzer
-$ cargo bolero fuzz my_fuzz_target
-</code></pre>
-<h2><a class="header" href="#afl" id="afl">AFL</a></h2>
-<ul>
-<li><a href="http://lcamtuf.coredump.cx/afl/">AFL documentation</a></li>
-</ul>
-<p>American fuzzy lop is a security-oriented fuzzer that employs a novel type of compile-time instrumentation and genetic algorithms to automatically discover clean, interesting test cases that trigger new internal states in the targeted binary. This substantially improves the functional coverage for the fuzzed code. The compact synthesized corpora produced by the tool are also useful for seeding other, more labor- or resource-intensive testing regimes down the road.</p>
-<p>The <code>afl</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer afl my_fuzz_target
-</code></pre>
-<h2><a class="header" href="#honggfuzz" id="honggfuzz">Honggfuzz</a></h2>
-<ul>
-<li><a href="https://google.github.io/honggfuzz/">Honggfuzz documentation</a></li>
-</ul>
-<p>Honggfuzz is a security oriented fuzzer with powerful analysis options. Supports evolutionary, feedback-driven fuzzing based on code coverage (software- and hardware-based)</p>
-<p>The <code>honggfuzz</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer honggfuzz my_fuzz_target
-</code></pre>
-<h1><a class="header" href="#unit-testing" id="unit-testing">Unit Testing</a></h1>
-<p><code>bolero</code> also supports unit tests inside of the project with the <code>check!</code> call:</p>
-<pre><pre class="playpen"><code class="language-rust">
-<span class="boring">#![allow(unused_variables)]
-</span><span class="boring">fn main() {
-</span>#[test]
-fn my_unit_test() {
-    bolero::check!()
-        .with_type()
-        .cloned()
-        .with_iterations(100) // Defaults to 1000
-        .for_each(|value: u64| {
-            // implement checks here
-        });
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>A RNG engine will be used instead of a fuzzing engine in this mode. This means the inputs
-will not be guided by any instrumentation (coverage, profiling, etc) and instead will be
-completely random. This can be OK for quickly checking various random inputs, but will have a harder
-time finding tricky edge cases.</p>
-<p>Also note that tests may pass on one execution and fail the next because randomized inputs
-will not all trigger the same codepaths.</p>
-<p>Consider the trade-offs when choosing between the <code>fuzz</code> or <code>check</code> modes:</p>
-<table><thead><tr><th align="center"></th><th align="center">Unit tests</th><th align="center">Integration tests</th><th align="center">Code coverage guided tests</th><th align="center">C/C++ Dependency</th></tr></thead><tbody>
-<tr><td align="center">fuzz!</td><td align="center">x</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td></tr>
-<tr><td align="center">check!</td><td align="center">✓</td><td align="center">✓</td><td align="center">x</td><td align="center">x</td></tr>
-</tbody></table>
-<h1><a class="header" href="#tutorials" id="tutorials">Tutorials</a></h1>
-<ul>
-<li><a href="tutorials/./fibonacci.html">Fibonacci</a></li>
-</ul>
-<h1><a class="header" href="#fibonacci" id="fibonacci">Fibonacci</a></h1>
+                        <h1><a class="header" href="#fibonacci" id="fibonacci">Fibonacci</a></h1>
 <p>In this tutorial, we want to arrive at a bug-free fibonacci implementation. Let's start with a basic setup:</p>
 <pre><code class="language-bash">$ cargo new --lib my_fibonacci
 </code></pre>
@@ -789,6 +430,10 @@ test result: ok. 1022 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="../tutorials/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
 
@@ -798,6 +443,10 @@ test result: ok. 1022 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a href="../tutorials/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
                 
 
                 
@@ -820,26 +469,18 @@ test result: ok. 1022 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
         
 
         
-        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
         
 
-        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
         
 
-        
-        
-        <script type="text/javascript">
-        window.addEventListener('load', function() {
-            window.setTimeout(window.print, 100);
-        });
-        </script>
-        
         
 
     </body>

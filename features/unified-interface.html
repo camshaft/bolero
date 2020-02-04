@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Unit Testing - Bolero Book</title>
+        <title>Unified Interface - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html" class="active"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html" class="active"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,47 +148,50 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#unit-testing" id="unit-testing">Unit Testing</a></h1>
-<p><code>bolero</code> also supports unit tests inside of the project with the <code>check!</code> call:</p>
-<pre><pre class="playpen"><code class="language-rust">
-<span class="boring">#![allow(unused_variables)]
-</span><span class="boring">fn main() {
-</span>#[test]
-fn my_unit_test() {
-    bolero::check!()
-        .with_type()
-        .cloned()
-        .with_iterations(100) // Defaults to 1000
-        .for_each(|value: u64| {
-            // implement checks here
-        });
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>A RNG engine will be used instead of a fuzzing engine in this mode. This means the inputs
-will not be guided by any instrumentation (coverage, profiling, etc) and instead will be
-completely random. This can be OK for quickly checking various random inputs, but will have a harder
-time finding tricky edge cases.</p>
-<p>Also note that tests may pass on one execution and fail the next because randomized inputs
-will not all trigger the same codepaths.</p>
-<p>Consider the trade-offs when choosing between the <code>fuzz</code> or <code>check</code> modes:</p>
-<table><thead><tr><th align="center"></th><th align="center">Unit tests</th><th align="center">Integration tests</th><th align="center">Code coverage guided tests</th><th align="center">C/C++ Dependency</th></tr></thead><tbody>
-<tr><td align="center">fuzz!</td><td align="center">x</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td></tr>
-<tr><td align="center">check!</td><td align="center">✓</td><td align="center">✓</td><td align="center">x</td><td align="center">x</td></tr>
-</tbody></table>
+                        <h1><a class="header" href="#unified-interface" id="unified-interface">Unified Interface</a></h1>
+<p>Using the interface provided by <code>bolero</code>, a single test target can execute under several different engines.</p>
+<h2><a class="header" href="#libfuzzer" id="libfuzzer">LibFuzzer</a></h2>
+<ul>
+<li><a href="https://llvm.org/docs/LibFuzzer.html">LibFuzzer documentation</a></li>
+</ul>
+<p>LibFuzzer is an in-process, coverage-guided, evolutionary fuzzing engine.</p>
+<p>LibFuzzer is linked with the library under test, and feeds fuzzed inputs to the library via a specific fuzzing entrypoint (aka “target function”); the fuzzer then tracks which areas of the code are reached, and generates mutations on the corpus of input data in order to maximize the code coverage.</p>
+<p>The <code>libfuzzer</code> engine can be selected like so:</p>
+<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer libfuzzer my_fuzz_target
+</code></pre>
+<p>Currently, it is also the default engine when fuzzing:</p>
+<pre><code class="language-bash"># will use --fuzzer libfuzzer
+$ cargo bolero fuzz my_fuzz_target
+</code></pre>
+<h2><a class="header" href="#afl" id="afl">AFL</a></h2>
+<ul>
+<li><a href="http://lcamtuf.coredump.cx/afl/">AFL documentation</a></li>
+</ul>
+<p>American fuzzy lop is a security-oriented fuzzer that employs a novel type of compile-time instrumentation and genetic algorithms to automatically discover clean, interesting test cases that trigger new internal states in the targeted binary. This substantially improves the functional coverage for the fuzzed code. The compact synthesized corpora produced by the tool are also useful for seeding other, more labor- or resource-intensive testing regimes down the road.</p>
+<p>The <code>afl</code> engine can be selected like so:</p>
+<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer afl my_fuzz_target
+</code></pre>
+<h2><a class="header" href="#honggfuzz" id="honggfuzz">Honggfuzz</a></h2>
+<ul>
+<li><a href="https://google.github.io/honggfuzz/">Honggfuzz documentation</a></li>
+</ul>
+<p>Honggfuzz is a security oriented fuzzer with powerful analysis options. Supports evolutionary, feedback-driven fuzzing based on code coverage (software- and hardware-based)</p>
+<p>The <code>honggfuzz</code> engine can be selected like so:</p>
+<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer honggfuzz my_fuzz_target
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../features/unified-interface.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../features/structured-testing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
                         
-                            <a rel="next" href="../tutorials/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../features/unit-testing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -200,13 +203,13 @@ will not all trigger the same codepaths.</p>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="../features/unified-interface.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a href="../features/structured-testing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
-                    <a href="../tutorials/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a href="../features/unit-testing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
