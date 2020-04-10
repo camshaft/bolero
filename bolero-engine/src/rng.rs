@@ -96,14 +96,32 @@ where
 
         let mut state = RngState::new(self.seed, self.max_len, self.driver_mode);
 
-        let mut count = 0;
-        while count < self.iterations {
+        let mut valid = 0;
+        let mut invalid = 0;
+        while valid < self.iterations {
             match test.test(&mut state.next_input(), &mut instrument) {
                 Ok(true) => {
-                    count += 1;
+                    valid += 1;
                     continue;
                 }
                 Ok(false) => {
+                    invalid += 1;
+                    if invalid > self.iterations * 2 {
+                        panic!(
+                            concat!(
+                                "Test input could not be satisfied after {} iterations:\n",
+                                "         valid: {}\n",
+                                "       invalid: {}\n",
+                                "  target count: {}\n",
+                                "\n",
+                                "Try reconfiguring the input generator to produce more valid inputs",
+                            ),
+                            valid + invalid,
+                            valid,
+                            invalid,
+                            self.iterations
+                        );
+                    }
                     continue;
                 }
                 Err(_) => {

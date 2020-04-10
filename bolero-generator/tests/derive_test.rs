@@ -18,8 +18,8 @@ pub struct Struct {
     #[generator(gen_foo())]
     field_a: u32,
 
-    #[generator(_code = "gen()")]
-    field_b: NewType,
+    #[generator(Vec::gen().with().len(1usize..5))]
+    field_b: Vec<NewType>,
 
     #[generator(_code = "gen::<u8>().with()")]
     field_c: u8,
@@ -33,7 +33,7 @@ pub enum Enum {
         value: u32,
     },
     Remove {
-        #[generator(4..6)]
+        #[generator(usize::gen().with().bounds(4..6))]
         index: usize,
     },
     Struct(Struct, Struct),
