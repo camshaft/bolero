@@ -6,7 +6,7 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic, ByteSliceTestInput, DriverMode, Engine, Instrument, Never, TargetLocation, Test,
+        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
     };
     use std::{
         ffi::CString,
@@ -41,18 +41,14 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
-        fn run<I: Instrument + std::panic::RefUnwindSafe>(
-            self,
-            mut test: T,
-            mut instrument: I,
-        ) -> Self::Output {
+        fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
 
             let driver_mode = self.driver_mode;
 
             start(&mut |slice: &[u8]| -> bool {
                 let mut input = ByteSliceTestInput::new(slice, driver_mode);
-                if test.test(&mut input, &mut instrument).is_ok() {
+                if test.test(&mut input).is_ok() {
                     return true;
                 }
 
@@ -61,7 +57,6 @@ pub mod fuzzer {
                     .expect("test should fail");
 
                 eprintln!("{}", failure);
-                instrument.finish();
 
                 false
             })

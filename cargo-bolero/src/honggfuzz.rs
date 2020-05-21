@@ -14,7 +14,10 @@ const FLAGS: &[&str] = &[
 ];
 
 fn bin() -> String {
-    std::env::args().next().unwrap()
+    std::env::current_exe()
+        .expect("valid current_exe")
+        .display()
+        .to_string()
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {

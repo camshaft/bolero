@@ -26,9 +26,6 @@ pub mod generator {
     pub use bolero_generator::{self, prelude::*};
 }
 
-/// Re-export of `bolero_instrument`
-pub use bolero_engine::instrument;
-
 #[doc(hidden)]
 pub use bolero_engine::TargetLocation;
 
@@ -39,8 +36,6 @@ use bolero_generator::{
     TypeValueGenerator,
 };
 use core::{fmt::Debug, marker::PhantomData};
-use instrument::Instrument;
-use std::panic::RefUnwindSafe;
 
 /// Execute fuzz tests for a given target
 ///
@@ -210,11 +205,10 @@ macro_rules! check {
 }
 
 /// Configuration for a test target
-pub struct TestTarget<Generator, Engine, Instrument, InputOwnership> {
+pub struct TestTarget<Generator, Engine, InputOwnership> {
     generator: Generator,
     driver_mode: Option<DriverMode>,
     engine: Engine,
-    instrument: Instrument,
     input_ownership: PhantomData<InputOwnership>,
 }
 
@@ -227,48 +221,45 @@ pub struct BorrowedInput;
 pub struct ClonedInput;
 
 #[doc(hidden)]
-pub fn fuzz<Instrument: RefUnwindSafe>(
+pub fn fuzz(
     location: TargetLocation,
-    instrument: Instrument,
-) -> TestTarget<ByteSliceGenerator, DefaultEngine, Instrument, BorrowedInput> {
+) -> TestTarget<ByteSliceGenerator, DefaultEngine, BorrowedInput> {
     // cargo-bolero needs to resolve the path of the binary
     if std::env::var("CARGO_BOLERO_PATH").is_ok() {
-        print!("{}", std::env::args().next().unwrap());
+        print!(
+            "{}",
+            std::env::current_exe()
+                .expect("valid current_exe")
+                .display()
+        );
         std::process::exit(0);
     }
 
-    TestTarget::new(DefaultEngine::new(location), instrument)
+    TestTarget::new(DefaultEngine::new(location))
 }
 
 #[doc(hidden)]
-pub fn check<Instrument: RefUnwindSafe>(
-    location: TargetLocation,
-    instrument: Instrument,
-) -> TestTarget<ByteSliceGenerator, RngEngine, Instrument, BorrowedInput> {
-    TestTarget::new(RngEngine::new(location), instrument)
+pub fn check(location: TargetLocation) -> TestTarget<ByteSliceGenerator, RngEngine, BorrowedInput> {
+    TestTarget::new(RngEngine::new(location))
 }
 
 /// Default generator for byte slices
 #[derive(Copy, Clone, Default, PartialEq)]
 pub struct ByteSliceGenerator;
 
-impl<Engine, Instrument> TestTarget<ByteSliceGenerator, Engine, Instrument, BorrowedInput> {
+impl<Engine> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
     /// Create a `TestTarget` with the given `Engine`
-    pub fn new(
-        engine: Engine,
-        instrument: Instrument,
-    ) -> TestTarget<ByteSliceGenerator, Engine, Instrument, BorrowedInput> {
+    pub fn new(engine: Engine) -> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
         Self {
             driver_mode: None,
             generator: ByteSliceGenerator,
             engine,
-            instrument,
             input_ownership: PhantomData,
         }
     }
 }
 
-impl<G, Engine, Instrument, InputOwnership> TestTarget<G, Engine, Instrument, InputOwnership> {
+impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     /// Set the value generator for the `TestTarget`
     ///
     /// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
@@ -280,7 +271,7 @@ impl<G, Engine, Instrument, InputOwnership> TestTarget<G, Engine, Instrument, In
     pub fn with_generator<Generator: generator::ValueGenerator>(
         self,
         generator: Generator,
-    ) -> TestTarget<Generator, Engine, Instrument, InputOwnership>
+    ) -> TestTarget<Generator, Engine, InputOwnership>
     where
         Generator::Output: Debug,
     {
@@ -288,7 +279,6 @@ impl<G, Engine, Instrument, InputOwnership> TestTarget<G, Engine, Instrument, In
             driver_mode: self.driver_mode,
             generator,
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -303,30 +293,26 @@ impl<G, Engine, Instrument, InputOwnership> TestTarget<G, Engine, Instrument, In
     /// structured input.
     pub fn with_type<T: Debug + generator::TypeGenerator>(
         self,
-    ) -> TestTarget<TypeValueGenerator<T>, Engine, Instrument, InputOwnership> {
+    ) -> TestTarget<TypeValueGenerator<T>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: generator::gen(),
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
 }
 
-impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
-    TestTarget<G, Engine, Instrument, InputOwnership>
-{
+impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     /// Map the value of the generator
     pub fn map<F: Fn(G::Output) -> T, T: Debug>(
         self,
         map: F,
-    ) -> TestTarget<MapGenerator<G, F>, Engine, Instrument, InputOwnership> {
+    ) -> TestTarget<MapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator.map(map),
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -335,7 +321,7 @@ impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
     pub fn and_then<F: Fn(G::Output) -> T, T: generator::ValueGenerator>(
         self,
         map: F,
-    ) -> TestTarget<AndThenGenerator<G, F>, Engine, Instrument, InputOwnership>
+    ) -> TestTarget<AndThenGenerator<G, F>, Engine, InputOwnership>
     where
         T::Output: Debug,
     {
@@ -343,7 +329,6 @@ impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
             driver_mode: self.driver_mode,
             generator: self.generator.and_then(map),
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -352,12 +337,11 @@ impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
     pub fn filter<F: Fn(&G::Output) -> bool>(
         self,
         filter: F,
-    ) -> TestTarget<FilterGenerator<G, F>, Engine, Instrument, InputOwnership> {
+    ) -> TestTarget<FilterGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator.filter(filter),
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -366,12 +350,11 @@ impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
     pub fn filter_map<F: Fn(G::Output) -> Option<T>, T>(
         self,
         filter_map: F,
-    ) -> TestTarget<FilterMapGenerator<G, F>, Engine, Instrument, InputOwnership> {
+    ) -> TestTarget<FilterMapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator.filter_map(filter_map),
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -382,13 +365,12 @@ impl<G: generator::ValueGenerator, Engine, Instrument, InputOwnership>
             driver_mode: Some(mode),
             generator: self.generator,
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
 }
 
-impl<G, Instrument, InputOwnership> TestTarget<G, RngEngine, Instrument, InputOwnership> {
+impl<G, InputOwnership> TestTarget<G, RngEngine, InputOwnership> {
     /// Set the number of iterations executed
     pub fn with_iterations(mut self, iterations: usize) -> Self {
         self.engine.iterations = iterations;
@@ -396,7 +378,6 @@ impl<G, Instrument, InputOwnership> TestTarget<G, RngEngine, Instrument, InputOw
             driver_mode: self.driver_mode,
             generator: self.generator,
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
@@ -408,49 +389,30 @@ impl<G, Instrument, InputOwnership> TestTarget<G, RngEngine, Instrument, InputOw
             driver_mode: self.driver_mode,
             generator: self.generator,
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: self.input_ownership,
         }
     }
 }
 
-impl<G, Engine, Instrument> TestTarget<G, Engine, Instrument, BorrowedInput> {
+impl<G, Engine> TestTarget<G, Engine, BorrowedInput> {
     /// Use a cloned value for the test input
     ///
     /// Cloning the test inputs will force a call to [`Clone::clone`]
     /// on each input value, and therefore, will be less
     /// efficient than using a reference.
-    pub fn cloned(self) -> TestTarget<G, Engine, Instrument, ClonedInput> {
+    pub fn cloned(self) -> TestTarget<G, Engine, ClonedInput> {
         TestTarget {
             driver_mode: self.driver_mode,
             generator: self.generator,
             engine: self.engine,
-            instrument: self.instrument,
             input_ownership: PhantomData,
         }
     }
 }
 
-impl<G, Engine, I, InputOwnership> TestTarget<G, Engine, I, InputOwnership> {
-    /// Set the instrument for the test target
-    pub fn with_instrument<NewInstrument: Instrument>(
-        self,
-        instrument: NewInstrument,
-    ) -> TestTarget<G, Engine, NewInstrument, InputOwnership> {
-        TestTarget {
-            driver_mode: self.driver_mode,
-            generator: self.generator,
-            engine: self.engine,
-            instrument,
-            input_ownership: PhantomData,
-        }
-    }
-}
-
-impl<G, E, I> TestTarget<G, E, I, BorrowedInput>
+impl<G, E> TestTarget<G, E, BorrowedInput>
 where
     G: generator::ValueGenerator,
-    I: Instrument + RefUnwindSafe,
 {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<F>(mut self, test: F) -> E::Output
@@ -462,14 +424,13 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
-        self.engine.run(test, self.instrument)
+        self.engine.run(test)
     }
 }
 
-impl<G, E, I> TestTarget<G, E, I, ClonedInput>
+impl<G, E> TestTarget<G, E, ClonedInput>
 where
     G: generator::ValueGenerator,
-    I: Instrument + RefUnwindSafe,
 {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<F>(mut self, test: F) -> E::Output
@@ -481,14 +442,11 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
-        self.engine.run(test, self.instrument)
+        self.engine.run(test)
     }
 }
 
-impl<E, I> TestTarget<ByteSliceGenerator, E, I, BorrowedInput>
-where
-    I: Instrument + RefUnwindSafe,
-{
+impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<T>(mut self, test: T) -> E::Output
     where
@@ -499,14 +457,11 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
-        self.engine.run(test, self.instrument)
+        self.engine.run(test)
     }
 }
 
-impl<E, I> TestTarget<ByteSliceGenerator, E, I, ClonedInput>
-where
-    I: Instrument + RefUnwindSafe,
-{
+impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<T>(mut self, test: T) -> E::Output
     where
@@ -517,7 +472,7 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
-        self.engine.run(test, self.instrument)
+        self.engine.run(test)
     }
 }
 
@@ -566,20 +521,12 @@ fn range_generator_cloned_test() {
 #[macro_export]
 macro_rules! __bolero_parse_input {
     ($target:ident;) => {{
-        let instrument = (
-            #[cfg(bolero_instrument_timing)]
-            $crate::instrument::timing::TimingInstrument::default(),
-        );
-
-        $crate::$target(
-            $crate::TargetLocation {
-                manifest_dir: env!("CARGO_MANIFEST_DIR"),
-                module_path: module_path!(),
-                file: file!(),
-                line: line!(),
-            },
-            instrument,
-        )
+        $crate::$target($crate::TargetLocation {
+            manifest_dir: env!("CARGO_MANIFEST_DIR"),
+            module_path: module_path!(),
+            file: file!(),
+            line: line!(),
+        })
     }};
     ($target:ident; $fun:path) => {
         $crate::$target!(|input| { $fun(input) })

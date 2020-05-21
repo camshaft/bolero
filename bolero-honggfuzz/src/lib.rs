@@ -6,10 +6,9 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_honggfuzz)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic as bolero_panic, ByteSliceTestInput, DriverMode, Engine, Instrument, Never,
-        TargetLocation, Test,
+        panic as bolero_panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
     };
-    use std::{mem::MaybeUninit, panic::RefUnwindSafe, slice};
+    use std::{mem::MaybeUninit, slice};
 
     extern "C" {
         fn HF_ITER(buf_ptr: *mut *const u8, len_ptr: *mut usize);
@@ -33,18 +32,13 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
-        fn run<I: Instrument + RefUnwindSafe>(
-            self,
-            mut test: T,
-            mut instrument: I,
-        ) -> Self::Output {
+        fn run(self, mut test: T) -> Self::Output {
             bolero_panic::set_hook();
 
             let mut input = HonggfuzzInput::new(self.driver_mode);
 
             loop {
-                if test.test(&mut input.test_input(), &mut instrument).is_err() {
-                    instrument.finish();
+                if test.test(&mut input.test_input()).is_err() {
                     std::process::abort();
                 }
             }

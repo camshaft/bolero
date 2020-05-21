@@ -205,13 +205,10 @@ impl<'a, T: Test> Shrinker<'a, T> {
     }
 
     fn execute(&mut self) -> Result<bool, Error> {
-        self.test.test(
-            &mut ShrinkInput {
-                input: &self.input[..self.len],
-                driver_mode: self.driver_mode,
-            },
-            &mut (),
-        )
+        self.test.test(&mut ShrinkInput {
+            input: &self.input[..self.len],
+            driver_mode: self.driver_mode,
+        })
     }
 
     fn generate_value(&mut self) -> T::Value {

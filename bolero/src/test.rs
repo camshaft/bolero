@@ -1,9 +1,7 @@
-use bolero_engine::{
-    rng::RngEngine, ByteSliceTestInput, Engine, Instrument, Never, TargetLocation, Test,
-};
+use bolero_engine::{rng::RngEngine, ByteSliceTestInput, Engine, Never, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
 use libtest_mimic::{run_tests, Arguments, FormatSetting, Outcome, Test as LibTest};
-use std::{io::Read, panic::RefUnwindSafe, path::PathBuf};
+use std::{io::Read, path::PathBuf};
 
 /// Engine implementation which mimics Rust's default test
 /// harness. By default, the test inputs will include any present
@@ -73,7 +71,7 @@ where
         self.driver_mode = Some(mode);
     }
 
-    fn run<I: Instrument + RefUnwindSafe>(self, mut test: T, mut instrument: I) -> Self::Output {
+    fn run(self, mut test: T) -> Self::Output {
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
@@ -83,17 +81,14 @@ where
             input.clear();
             data.read_into(&mut input);
 
-            test.test(
-                &mut ByteSliceTestInput::new(&input, driver_mode),
-                &mut instrument,
-            )
-            .map_err(|_| {
-                let failure = test
-                    .shrink(input.clone(), data.seed(), driver_mode)
-                    .expect("test should fail");
+            test.test(&mut ByteSliceTestInput::new(&input, driver_mode))
+                .map_err(|_| {
+                    let failure = test
+                        .shrink(input.clone(), data.seed(), driver_mode)
+                        .expect("test should fail");
 
-                format!("{:#}", failure)
-            })
+                    format!("{:#}", failure)
+                })
         };
 
         // `run_tests` only accepts `Fn` instead of `FnMut`
@@ -155,8 +150,6 @@ where
                 Outcome::Passed
             }
         });
-
-        instrument.finish();
 
         bolero_engine::panic::forward_panic(true);
 

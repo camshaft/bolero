@@ -1,9 +1,7 @@
 use crate::{panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
-use bolero_instrument::Instrument;
 use core::{fmt::Debug, mem::replace};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use std::panic::RefUnwindSafe;
 
 /// Test engine implementation using a RNG.
 ///
@@ -91,7 +89,7 @@ where
         self.driver_mode = Some(mode);
     }
 
-    fn run<I: Instrument + RefUnwindSafe>(self, mut test: T, mut instrument: I) -> Self::Output {
+    fn run(self, mut test: T) -> Self::Output {
         panic::set_hook();
 
         let mut state = RngState::new(self.seed, self.max_len, self.driver_mode);
@@ -99,7 +97,7 @@ where
         let mut valid = 0;
         let mut invalid = 0;
         while valid < self.iterations {
-            match test.test(&mut state.next_input(), &mut instrument) {
+            match test.test(&mut state.next_input()) {
                 Ok(true) => {
                     valid += 1;
                     continue;
@@ -134,14 +132,11 @@ where
                         .expect("test should fail");
 
                     eprintln!("{}", failure);
-                    instrument.finish();
 
                     std::panic::resume_unwind(Box::new(failure));
                 }
             }
         }
-
-        instrument.finish();
     }
 }
 
