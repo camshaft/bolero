@@ -1,6 +1,6 @@
 use crate::{exec, manifest::TestTarget, DEFAULT_TARGET};
+use anyhow::Result;
 use core::hash::{Hash, Hasher};
-use failure::Error;
 use std::{collections::hash_map::DefaultHasher, path::PathBuf, process::Command};
 use structopt::StructOpt;
 
@@ -66,7 +66,7 @@ impl Config {
         )
     }
 
-    pub fn test_target(&self) -> Result<TestTarget, Error> {
+    pub fn test_target(&self) -> Result<TestTarget> {
         TestTarget::resolve(
             self.manifest_path.as_ref().map(AsRef::as_ref),
             self.package.as_ref().map(AsRef::as_ref),

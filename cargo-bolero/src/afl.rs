@@ -1,5 +1,5 @@
 use crate::{Config, FuzzArgs, ReduceArgs};
-use failure::Error;
+use anyhow::Result;
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_afl",
@@ -15,7 +15,7 @@ fn bin() -> String {
         .to_string()
 }
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
+pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
     let bin_path = config.bin_path(FLAGS, "afl");
     let test_target = config.test_target()?;
     let corpus_dir = test_target.corpus_dir();
@@ -43,6 +43,6 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn reduce(_config: &Config, _shrink: &ReduceArgs) -> Result<(), Error> {
-    unimplemented!()
+pub(crate) fn reduce(_config: &Config, _shrink: &ReduceArgs) -> Result<()> {
+    todo!()
 }

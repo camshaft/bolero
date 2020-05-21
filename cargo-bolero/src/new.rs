@@ -1,5 +1,5 @@
 use crate::manifest::Package;
-use failure::Error;
+use anyhow::Result;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -30,7 +30,7 @@ const BYTES_FILE: &str = include_str!("../tests/fuzz_bytes/main.rs");
 const GENERATOR_FILE: &str = include_str!("../tests/fuzz_generator/main.rs");
 
 impl New {
-    pub fn exec(&self) -> Result<(), Error> {
+    pub fn exec(&self) -> Result<()> {
         let file = if self.generator {
             GENERATOR_FILE
         } else {

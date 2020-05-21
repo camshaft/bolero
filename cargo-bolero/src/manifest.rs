@@ -1,4 +1,4 @@
-use failure::{bail, ensure, format_err, Error};
+use anyhow::{anyhow, bail, ensure, Result};
 use serde::Deserialize;
 use std::{
     io::Write,
@@ -12,7 +12,7 @@ struct Metadata {
 }
 
 impl Metadata {
-    fn from_manifest_path(manifest_path: Option<&str>) -> Result<Self, Error> {
+    fn from_manifest_path(manifest_path: Option<&str>) -> Result<Self> {
         let mut cmd = Command::new("cargo");
 
         cmd.arg("metadata")
@@ -38,14 +38,14 @@ impl Metadata {
         Ok(metadata)
     }
 
-    fn resolve_package(&self, package_name: Option<&str>) -> Result<&Package, Error> {
+    fn resolve_package(&self, package_name: Option<&str>) -> Result<&Package> {
         ensure!(!self.packages.is_empty(), "Not in cargo project");
 
         if let Some(package_name) = package_name.as_ref() {
             self.packages
                 .iter()
                 .find(|package| &package.name == package_name)
-                .ok_or_else(|| format_err!("Could not resolve package {:?}", package_name))
+                .ok_or_else(|| anyhow!("Could not resolve package {:?}", package_name))
         } else if self.packages.len() == 1 {
             Ok(&self.packages[0])
         } else {
@@ -54,15 +54,11 @@ impl Metadata {
             self.packages
                 .iter()
                 .find(|pkg| current_dir.ends_with(Path::new(&pkg.manifest_path).parent().unwrap()))
-                .ok_or_else(|| format_err!("A package name must be supplied in a workspace"))
+                .ok_or_else(|| anyhow!("A package name must be supplied in a workspace"))
         }
     }
 
-    fn resolve_target(
-        &self,
-        package_name: Option<&str>,
-        target_name: &str,
-    ) -> Result<TestTarget, Error> {
+    fn resolve_target(&self, package_name: Option<&str>, target_name: &str) -> Result<TestTarget> {
         ensure!(!self.packages.is_empty(), "Not in cargo project");
 
         if let Ok(package) = self.resolve_package(package_name) {
@@ -102,7 +98,7 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn resolve(manifest_path: Option<&str>, package: Option<&str>) -> Result<Self, Error> {
+    pub fn resolve(manifest_path: Option<&str>, package: Option<&str>) -> Result<Self> {
         Metadata::from_manifest_path(manifest_path)?
             .resolve_package(package)
             .map(|package| package.clone())
@@ -114,7 +110,7 @@ impl Package {
         path
     }
 
-    fn resolve_target(&self, target_name: &str) -> Result<TestTarget, Error> {
+    fn resolve_target(&self, target_name: &str) -> Result<TestTarget> {
         self.targets
             .iter()
             .find_map(|target| {
@@ -124,7 +120,7 @@ impl Package {
                     None
                 }
             })
-            .ok_or_else(|| format_err!("Could not resolve target {:?}", target_name))
+            .ok_or_else(|| anyhow!("Could not resolve target {:?}", target_name))
     }
 }
 
@@ -159,7 +155,7 @@ impl TestTarget {
         manifest_path: Option<&str>,
         package: Option<&str>,
         test: &str,
-    ) -> Result<TestTarget, Error> {
+    ) -> Result<TestTarget> {
         Metadata::from_manifest_path(manifest_path)?.resolve_target(package, test)
     }
 
@@ -172,6 +168,12 @@ impl TestTarget {
     pub fn corpus_dir(&self) -> PathBuf {
         let mut workdir = self.workdir();
         workdir.push("corpus");
+        workdir
+    }
+
+    pub fn temp_dir(&self) -> PathBuf {
+        let mut workdir = self.workdir();
+        workdir.push("_temp");
         workdir
     }
 

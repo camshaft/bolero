@@ -1,9 +1,10 @@
+use anyhow::Error;
+use backtrace::Backtrace;
 use core::{
     cell::RefCell,
     fmt::{Debug, Display},
     panic::PanicInfo,
 };
-use failure::{Backtrace, Error, Fail};
 use lazy_static::lazy_static;
 use std::{
     panic::{catch_unwind, AssertUnwindSafe, RefUnwindSafe},
@@ -43,11 +44,7 @@ pub struct PanicError {
     thread_name: Option<String>,
 }
 
-impl Fail for PanicError {
-    fn backtrace(&self) -> Option<&Backtrace> {
-        self.backtrace.as_ref()
-    }
-}
+impl std::error::Error for PanicError {}
 
 impl Display for PanicError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

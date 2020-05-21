@@ -4,7 +4,7 @@ use crate::{
     new::New,
     reduce::{Reduce, ReduceArgs},
 };
-use failure::Error;
+use anyhow::Result;
 use structopt::StructOpt;
 
 #[cfg(feature = "afl")]
@@ -28,7 +28,7 @@ enum Commands {
 }
 
 impl Commands {
-    fn exec(&self) -> Result<(), Error> {
+    fn exec(&self) -> Result<()> {
         match self {
             Self::Fuzz(cmd) => cmd.exec(),
             Self::Reduce(cmd) => cmd.exec(),

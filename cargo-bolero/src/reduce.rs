@@ -1,5 +1,5 @@
 use crate::{config::Config, fuzzer::Fuzzer};
-use failure::Error;
+use anyhow::Result;
 use structopt::StructOpt;
 
 /// Reduce the corpus of a test target with a fuzzing engine
@@ -17,7 +17,7 @@ pub struct Reduce {
 }
 
 impl Reduce {
-    pub fn exec(&self) -> Result<(), Error> {
+    pub fn exec(&self) -> Result<()> {
         self.fuzzer.reduce(&self.config, &self.args)
     }
 }

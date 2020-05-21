@@ -1,5 +1,5 @@
 use crate::{exec, Config, FuzzArgs, ReduceArgs};
-use failure::Error;
+use anyhow::Result;
 use std::fs;
 
 macro_rules! optional_arg {
@@ -25,7 +25,7 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-stack-depth",
 ];
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
+pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
     let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
     let test_target = config.test_target()?;
     let corpus_dir = test_target.corpus_dir();
@@ -50,13 +50,12 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error> {
+pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
     let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
     let test_target = config.test_target()?;
     let corpus_dir = test_target.corpus_dir();
+    let tmp_corpus = test_target.temp_dir();
 
-    let tmp = tempfile::tempdir().expect("could not create tmpdir");
-    let tmp_corpus = tmp.path().join("corpus");
     fs::create_dir(&tmp_corpus).unwrap();
 
     cmd.arg(&tmp_corpus)
@@ -65,12 +64,10 @@ pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error>
         .arg("-merge=1")
         .arg("-reduce_inputs=1");
 
-    let status = exec(cmd);
+    exec(cmd).exit_on_error();
 
-    fs::remove_dir_all(&corpus_dir).unwrap();
-    fs::rename(&tmp_corpus, &corpus_dir).unwrap();
-
-    status.exit_on_error();
+    fs::remove_dir_all(&corpus_dir)?;
+    fs::rename(&tmp_corpus, &corpus_dir)?;
 
     Ok(())
 }

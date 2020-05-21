@@ -1,5 +1,5 @@
 use crate::{config::Config, fuzz::FuzzArgs, reduce::ReduceArgs};
-use failure::Error;
+use anyhow::Error;
 use std::str::FromStr;
 
 #[derive(Debug)]

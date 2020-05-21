@@ -1,5 +1,5 @@
 use crate::{config::Config, fuzzer::Fuzzer};
-use failure::Error;
+use anyhow::Result;
 use structopt::StructOpt;
 
 /// Run a fuzzing engine for a target
@@ -40,7 +40,7 @@ pub struct FuzzArgs {
 }
 
 impl Fuzz {
-    pub fn exec(&self) -> Result<(), Error> {
+    pub fn exec(&self) -> Result<()> {
         self.fuzzer.fuzz(&self.config, &self.args)
     }
 }

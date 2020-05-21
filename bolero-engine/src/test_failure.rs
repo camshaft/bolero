@@ -1,4 +1,4 @@
-pub use ::failure::{Error, Fail};
+use anyhow::Error;
 use core::fmt::{Debug, Display};
 
 /// Contains information about a test failure
@@ -41,8 +41,4 @@ impl<Input: Debug> Display for TestFailure<Input> {
     }
 }
 
-impl<Input: 'static + Debug + Send + Sync> Fail for TestFailure<Input> {
-    fn cause(&self) -> Option<&dyn Fail> {
-        Some(self.error.as_fail())
-    }
-}
+impl<Input: Debug> std::error::Error for TestFailure<Input> {}

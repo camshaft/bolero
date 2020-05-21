@@ -1,8 +1,8 @@
+pub use anyhow::Error;
 pub use bolero_generator::{
     driver::{Driver, DriverMode},
     TypeGenerator, ValueGenerator,
 };
-pub use failure::Error;
 
 pub mod panic;
 pub mod rng;
