@@ -1,4 +1,4 @@
-use crate::{panic, Error, Test, TestFailure, TestInput};
+use crate::{panic, panic::PanicError, Test, TestFailure, TestInput};
 use bolero_generator::driver::{ByteSliceDriver, DriverMode};
 
 /// Shrink the input to a simpler form
@@ -204,7 +204,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
         Err(())
     }
 
-    fn execute(&mut self) -> Result<bool, Error> {
+    fn execute(&mut self) -> Result<bool, PanicError> {
         self.test.test(&mut ShrinkInput {
             input: &self.input[..self.len],
             driver_mode: self.driver_mode,

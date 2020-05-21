@@ -1,6 +1,6 @@
 use crate::{
-    panic, test_input::SliceDebug, DriverMode, Error, IntoTestResult, TestFailure, TestInput,
-    ValueGenerator,
+    panic, panic::PanicError, test_input::SliceDebug, DriverMode, IntoTestResult, TestFailure,
+    TestInput, ValueGenerator,
 };
 use std::panic::RefUnwindSafe;
 
@@ -10,7 +10,10 @@ pub trait Test: Sized {
     type Value;
 
     /// Execute one test with the given input
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error>;
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError>;
 
     /// Generate a value for the given input.
     ///
@@ -34,7 +37,10 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError> {
         input.with_slice(&mut |slice| {
             panic::catch(|| {
                 let res = (self)(slice);
@@ -67,7 +73,10 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError> {
         input.with_slice(&mut |slice| {
             panic::catch(|| {
                 let res = (self.fun)(slice);
@@ -100,7 +109,10 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError> {
         input.with_slice(&mut |slice| {
             panic::catch(|| {
                 let input = slice.to_vec();
@@ -160,7 +172,10 @@ where
 {
     type Value = G::Output;
 
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError> {
         input.with_driver(&mut |driver| {
             let fun = &mut self.fun;
 
@@ -205,7 +220,10 @@ where
 {
     type Value = G::Output;
 
-    fn test<T: TestInput<Result<bool, Error>>>(&mut self, input: &mut T) -> Result<bool, Error> {
+    fn test<T: TestInput<Result<bool, PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, PanicError> {
         input.with_driver(&mut |driver| {
             let fun = &mut self.fun;
 

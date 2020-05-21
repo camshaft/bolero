@@ -1,4 +1,3 @@
-use anyhow::Error;
 use backtrace::Backtrace;
 use core::{
     cell::RefCell,
@@ -25,8 +24,7 @@ lazy_static! {
         let prev_hook = std::panic::take_hook();
 
         std::panic::set_hook(Box::new(move |reason| {
-            let capture_backtrace = CAPTURE_BACKTRACE.with(|capture| *capture.borrow());
-            let panic = PanicError::new(reason.to_string(), capture_backtrace);
+            let panic = PanicError::new(reason.to_string());
             ERROR.with(|error| {
                 *error.borrow_mut() = Some(panic);
             });
@@ -39,9 +37,9 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct PanicError {
-    message: String,
-    backtrace: Option<Backtrace>,
-    thread_name: Option<String>,
+    pub(crate) message: String,
+    pub(crate) backtrace: Option<Backtrace>,
+    pub(crate) thread_name: Option<String>,
 }
 
 impl std::error::Error for PanicError {}
@@ -53,7 +51,8 @@ impl Display for PanicError {
 }
 
 impl PanicError {
-    pub(crate) fn new(message: String, capture_backtrace: bool) -> Self {
+    pub(crate) fn new(message: String) -> Self {
+        let capture_backtrace = CAPTURE_BACKTRACE.with(|capture| *capture.borrow());
         let backtrace = if capture_backtrace {
             Some(Backtrace::new())
         } else {
@@ -69,28 +68,29 @@ impl PanicError {
     }
 }
 
-pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, Error> {
+pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, PanicError> {
     catch_unwind(AssertUnwindSafe(fun)).map_err(|err| {
-        if let Some(err) = fetch_panic() {
-            return err.into();
+        if let Some(err) = take_panic() {
+            return err;
         }
         macro_rules! try_downcast {
             ($ty:ty, $fmt:expr) => {
                 if let Some(err) = err.downcast_ref::<$ty>() {
-                    return PanicError::new(format!($fmt, err), false).into();
+                    return PanicError::new(format!($fmt, err));
                 }
             };
         }
         try_downcast!(PanicInfo, "{}");
+        try_downcast!(anyhow::Error, "{}");
         try_downcast!(String, "{}");
         try_downcast!(&'static str, "{}");
         try_downcast!(Box<dyn Display>, "{}");
         try_downcast!(Box<dyn Debug>, "{:?}");
-        PanicError::new("thread panicked with unknown error".to_string(), false).into()
+        PanicError::new("thread panicked with an unknown error".to_string())
     })
 }
 
-pub fn fetch_panic() -> Option<PanicError> {
+pub fn take_panic() -> Option<PanicError> {
     ERROR.with(|error| error.borrow_mut().take())
 }
 

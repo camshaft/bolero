@@ -1,10 +1,10 @@
-use anyhow::Error;
+use crate::panic::PanicError;
 use core::fmt::{Debug, Display};
 
 /// Contains information about a test failure
 #[derive(Debug)]
 pub struct TestFailure<Input> {
-    pub error: Error,
+    pub error: PanicError,
     pub input: Input,
     pub seed: Option<u64>,
 }
@@ -22,12 +22,8 @@ impl<Input: Debug> Display for TestFailure<Input> {
         writeln!(f, "Error: \n{}", self.error)?;
 
         if f.alternate() {
-            if std::env::var("RUST_BACKTRACE")
-                .ok()
-                .filter(|v| v == "1")
-                .is_some()
-            {
-                writeln!(f, "{}", self.error.backtrace())?;
+            if let Some(backtrace) = self.error.backtrace.as_ref() {
+                writeln!(f, "{:?}", backtrace)?;
             } else {
                 writeln!(f, "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace.")?;
             }
