@@ -5,7 +5,7 @@ use std::fs;
 macro_rules! optional_arg {
     ($cmd:ident, $arg:expr, $fmt:expr) => {
         if let Some(value) = $arg {
-            $cmd.arg(&format!($fmt, value));
+            $cmd.push(format!($fmt, value));
         }
     };
 }
@@ -26,24 +26,29 @@ const FLAGS: &[&str] = &[
 ];
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
-    let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
-    let test_target = config.test_target()?;
+    let test_target = config.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
-    fs::create_dir_all(&corpus_dir).unwrap();
-    fs::create_dir_all(&crashes_dir).unwrap();
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&crashes_dir)?;
 
-    cmd.arg(corpus_dir)
-        .arg(&format!("-artifact_prefix={}/", crashes_dir.display()));
+    let mut cmd = test_target.command();
 
-    optional_arg!(cmd, fuzz.seed, "-seed={}");
-    optional_arg!(cmd, fuzz.runs, "-runs={}");
-    optional_arg!(cmd, fuzz.time, "-max_total_time={}");
-    optional_arg!(cmd, fuzz.max_input_length, "-max_len={}");
+    let mut args = vec![
+        format!("{}", corpus_dir.display()),
+        format!("-artifact_prefix={}/", crashes_dir.display()),
+    ];
+
+    optional_arg!(args, fuzz.seed, "-seed={}");
+    optional_arg!(args, fuzz.runs, "-runs={}");
+    optional_arg!(args, fuzz.time, "-max_total_time={}");
+    optional_arg!(args, fuzz.max_input_length, "-max_len={}");
 
     // TODO figure out log file location
-    optional_arg!(cmd, fuzz.jobs, "-jobs={}");
+    optional_arg!(args, fuzz.jobs, "-jobs={}");
+
+    cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 
     exec(cmd).exit_on_error();
 
@@ -51,18 +56,22 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
 }
 
 pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
-    let mut cmd = config.cmd("test", FLAGS, "libfuzzer");
-    let test_target = config.test_target()?;
+    let test_target = config.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let tmp_corpus = test_target.temp_dir();
 
-    fs::create_dir(&tmp_corpus).unwrap();
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&tmp_corpus)?;
 
-    cmd.arg(&tmp_corpus)
-        .arg(&corpus_dir)
-        .arg("-shrink=1")
-        .arg("-merge=1")
-        .arg("-reduce_inputs=1");
+    let mut cmd = test_target.command();
+
+    let args = vec![
+        format!("{}", tmp_corpus.display()),
+        format!("{}", corpus_dir.display()),
+        "-merge=1".to_string(),
+    ];
+
+    cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 
     exec(cmd).exit_on_error();
 

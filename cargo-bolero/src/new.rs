@@ -26,8 +26,8 @@ pub struct New {
     generator: bool,
 }
 
-const BYTES_FILE: &str = include_str!("../tests/fuzz_bytes/main.rs");
-const GENERATOR_FILE: &str = include_str!("../tests/fuzz_generator/main.rs");
+const BYTES_FILE: &str = include_str!("../tests/fuzz_bytes/fuzz_target.rs");
+const GENERATOR_FILE: &str = include_str!("../tests/fuzz_generator/fuzz_target.rs");
 
 impl New {
     pub fn exec(&self) -> Result<()> {
@@ -46,7 +46,7 @@ impl New {
         let target_dir = manifest_dir.join("tests").join(&self.test);
 
         mkdir(&target_dir);
-        write(target_dir.join("main.rs"), file);
+        write(target_dir.join("fuzz_target.rs"), file);
 
         mkdir(target_dir.join("corpus"));
         write(target_dir.join("corpus").join(".gitkeep"), "");
@@ -64,7 +64,7 @@ impl New {
                     r#"
 [[test]]
 name = "{name}"
-path = "tests/{name}/main.rs"
+path = "tests/{name}/fuzz_target.rs"
 harness = false
 "#,
                     name = self.test

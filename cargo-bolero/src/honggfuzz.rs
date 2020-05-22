@@ -1,5 +1,6 @@
 use crate::{Config, FuzzArgs, ReduceArgs};
 use anyhow::Result;
+use std::fs;
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_honggfuzz",
@@ -21,10 +22,12 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
-    let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let test_target = config.test_target()?;
+    let test_target = config.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
+
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&crashes_dir)?;
 
     let mut args = vec![
         bin(),
@@ -41,7 +44,8 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
     }
 
     args.push("--".to_string());
-    args.push(bin_path.to_str().unwrap().to_string());
+    args.push(test_target.exe.to_string());
+    args.extend(test_target.command_args().map(String::from));
 
     unsafe { bolero_honggfuzz::exec(args.into_iter()) };
 
@@ -49,12 +53,14 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
 }
 
 pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
-    let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let test_target = config.test_target()?;
+    let test_target = config.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
-    let args = vec![
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&crashes_dir)?;
+
+    let mut args = vec![
         bin(),
         "--persistent".to_string(),
         "-i".to_string(),
@@ -63,8 +69,10 @@ pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
         crashes_dir.to_str().unwrap().to_string(),
         "-M".to_string(),
         "--".to_string(),
-        bin_path.to_str().unwrap().to_string(),
+        test_target.exe.to_string(),
     ];
+
+    args.extend(test_target.command_args().map(String::from));
 
     unsafe { bolero_honggfuzz::exec(args.into_iter()) };
 

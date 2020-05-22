@@ -57,44 +57,12 @@ impl Metadata {
                 .ok_or_else(|| anyhow!("A package name must be supplied in a workspace"))
         }
     }
-
-    fn resolve_target(&self, package_name: Option<&str>, target_name: &str) -> Result<TestTarget> {
-        ensure!(!self.packages.is_empty(), "Not in cargo project");
-
-        if let Ok(package) = self.resolve_package(package_name) {
-            return package.resolve_target(target_name);
-        }
-
-        let mut targets = self
-            .packages
-            .iter()
-            .filter_map(|package| package.resolve_target(target_name).ok())
-            .collect::<Vec<_>>();
-
-        ensure!(
-            !targets.is_empty(),
-            "Could not resolve target {:?}",
-            target_name
-        );
-        ensure!(
-            targets.len() == 1,
-            "Multiple targets found named {:?} in {}. A package name needs to be supplied",
-            target_name,
-            targets
-                .iter()
-                .map(|target| target.package_name.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-        Ok(targets.pop().unwrap())
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Package {
     pub name: String,
     pub manifest_path: String,
-    targets: Vec<Target>,
 }
 
 impl Package {
@@ -108,78 +76,5 @@ impl Package {
         let mut path = PathBuf::from(&self.manifest_path);
         path.pop();
         path
-    }
-
-    fn resolve_target(&self, target_name: &str) -> Result<TestTarget> {
-        self.targets
-            .iter()
-            .find_map(|target| {
-                if target.name == target_name && target.kind == ["test"] {
-                    Some(target.to_test_target(&self.name, &self.manifest_path))
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| anyhow!("Could not resolve target {:?}", target_name))
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Target {
-    kind: Vec<String>,
-    name: String,
-    src_path: String,
-}
-
-impl Target {
-    fn to_test_target(&self, package_name: &str, manifest_path: &str) -> TestTarget {
-        TestTarget {
-            name: self.name.clone(),
-            package_name: package_name.to_string(),
-            src_path: self.src_path.clone(),
-            manifest_path: manifest_path.to_string(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct TestTarget {
-    pub name: String,
-    pub package_name: String,
-    pub src_path: String,
-    pub manifest_path: String,
-}
-
-impl TestTarget {
-    pub fn resolve(
-        manifest_path: Option<&str>,
-        package: Option<&str>,
-        test: &str,
-    ) -> Result<TestTarget> {
-        Metadata::from_manifest_path(manifest_path)?.resolve_target(package, test)
-    }
-
-    pub fn workdir(&self) -> PathBuf {
-        let mut path = PathBuf::from(&self.src_path);
-        path.pop();
-        path
-    }
-
-    pub fn corpus_dir(&self) -> PathBuf {
-        let mut workdir = self.workdir();
-        workdir.push("corpus");
-        workdir
-    }
-
-    pub fn temp_dir(&self) -> PathBuf {
-        let mut workdir = self.workdir();
-        workdir.push("_temp");
-        workdir
-    }
-
-    pub fn crashes_dir(&self) -> PathBuf {
-        let mut workdir = self.workdir();
-        workdir.push("crashes");
-        workdir
     }
 }

@@ -1,7 +1,7 @@
-use crate::{exec, manifest::TestTarget, DEFAULT_TARGET};
+use crate::{exec, test_target::TestTarget, DEFAULT_TARGET};
 use anyhow::Result;
 use core::hash::{Hash, Hasher};
-use std::{collections::hash_map::DefaultHasher, path::PathBuf, process::Command};
+use std::{collections::hash_map::DefaultHasher, process::Command};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -51,27 +51,79 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn bin_path(&self, flags: &[&str], fuzzer: &str) -> PathBuf {
-        exec(self.cmd("build", flags, fuzzer)).exit_on_error();
+    pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
+        let mut target = self.resolve_target()?;
 
-        PathBuf::from(
-            String::from_utf8(
-                self.cmd("test", flags, fuzzer)
-                    .env("CARGO_BOLERO_PATH", "1")
-                    .output()
-                    .expect("could not read info")
-                    .stdout,
-            )
-            .unwrap(),
-        )
+        if target.is_fuzz_target {
+            let mut build_command = self.cmd("test", flags, Some(fuzzer));
+            build_command
+                .arg("--test")
+                .arg(&self.test)
+                .env("CARGO_BOLERO_BOOTSTRAP", "1");
+            exec(build_command).exit_on_error();
+
+            let output = self
+                .cmd("test", flags, Some(fuzzer))
+                .arg("--test")
+                .arg(&self.test)
+                .arg("--")
+                .arg(&self.test)
+                .env("CARGO_BOLERO_SELECT", "1")
+                .output()
+                .expect("could not read info");
+
+            // TODO exit on error
+
+            target = TestTarget::from_stdout(&output.stdout)?;
+        } else {
+            let mut build_command = self.cmd("test", flags, Some(fuzzer));
+            build_command
+                .arg("--lib")
+                .arg("--no-run")
+                .env("CARGO_BOLERO_BOOTSTRAP", "1");
+            exec(build_command).exit_on_error();
+
+            let output = self
+                .cmd("test", flags, Some(fuzzer))
+                .arg(&self.test)
+                .arg("--lib")
+                .arg("--")
+                .arg("--nocapture")
+                .arg("--exact")
+                .env("CARGO_BOLERO_SELECT", "1")
+                .output()
+                .expect("could not read info");
+
+            // TODO exit on error
+
+            target = TestTarget::from_stdout(&output.stdout)?;
+        }
+
+        target.target = self.test.clone();
+
+        Ok(target)
     }
 
-    pub fn test_target(&self) -> Result<TestTarget> {
-        TestTarget::resolve(
-            self.manifest_path.as_ref().map(AsRef::as_ref),
-            self.package.as_ref().map(AsRef::as_ref),
-            &self.test,
-        )
+    fn resolve_target(&self) -> Result<TestTarget> {
+        let mut build_command = self.cmd("test", &[], None);
+        build_command
+            .arg("--no-run")
+            .env("CARGO_BOLERO_BOOTSTRAP", "1");
+        exec(build_command).exit_on_error();
+
+        let output = self
+            .cmd("test", &[], None)
+            .arg(&self.test)
+            .arg("--")
+            .arg("--nocapture")
+            .arg("--exact")
+            .env("CARGO_BOLERO_SELECT", "1")
+            .output()
+            .expect("could not read info");
+
+        // TODO exit on error
+
+        TestTarget::from_stdout(&output.stdout)
     }
 
     fn cargo(&self) -> Command {
@@ -95,16 +147,12 @@ impl Config {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: &str) -> Command {
+    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Command {
         let mut cmd = self.cargo();
 
-        cmd.arg(call)
-            .arg("--test")
-            .arg(&self.test)
-            .arg("--target")
-            .arg(&self.target);
+        cmd.arg(call).arg("--target").arg(&self.target);
 
-        if self.release {
+        if self.release && fuzzer.is_some() {
             cmd.arg("--release");
         }
 
@@ -128,45 +176,46 @@ impl Config {
             cmd.arg("--manifest-path").arg(value);
         }
 
-        let rustflags = [
-            "--cfg fuzzing",
-            "-Cpasses=sancov",
-            "-Cdebug-assertions",
-            "-Ctarget-cpu=native",
-            "-Cdebuginfo=2",
-            "-Coverflow_checks",
-            "-Clink-dead-code",
-        ]
-        .iter()
-        .chain(flags.iter())
-        .map(|v| (*v).to_string())
-        .chain(
-            self.sanitizer
-                .iter()
-                .map(|sanitizer| format!("-Zsanitizer={}", sanitizer)),
-        )
-        .chain(std::env::var("RUSTFLAGS").ok())
-        // https://github.com/rust-lang/rust/issues/53945
-        .chain(if cfg!(target_os = "linux") {
-            Some("-Clink-arg=-fuse-ld=gold".to_string())
-        } else {
-            None
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
+        if let Some(fuzzer) = fuzzer {
+            let rustflags = [
+                "--cfg fuzzing",
+                "-Cpasses=sancov",
+                "-Cdebug-assertions",
+                "-Ctarget-cpu=native",
+                "-Cdebuginfo=2",
+                "-Coverflow_checks",
+                "-Clink-dead-code",
+            ]
+            .iter()
+            .chain(flags.iter())
+            .map(|v| (*v).to_string())
+            .chain(
+                self.sanitizer
+                    .iter()
+                    .filter(|sanitizer| sanitizer != &"NONE")
+                    .map(|sanitizer| format!("-Zsanitizer={}", sanitizer)),
+            )
+            .chain(std::env::var("RUSTFLAGS").ok())
+            // https://github.com/rust-lang/rust/issues/53945
+            .chain(if cfg!(target_os = "linux") {
+                Some("-Clink-arg=-fuse-ld=gold".to_string())
+            } else {
+                None
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
 
-        if let Some(value) = self.target_dir.as_ref() {
-            cmd.arg("--target-dir").arg(value);
-        } else {
-            let mut hasher = DefaultHasher::new();
-            rustflags.hash(&mut hasher);
-            cmd.arg("--target-dir")
-                .arg(format!("target/fuzz/build_{:x}", hasher.finish()));
+            if let Some(value) = self.target_dir.as_ref() {
+                cmd.arg("--target-dir").arg(value);
+            } else {
+                let mut hasher = DefaultHasher::new();
+                rustflags.hash(&mut hasher);
+                cmd.arg("--target-dir")
+                    .arg(format!("target/fuzz/build_{:x}", hasher.finish()));
+            }
+
+            cmd.env("RUSTFLAGS", rustflags).env("BOLERO_FUZZER", fuzzer);
         }
-
-        cmd.env("RUSTFLAGS", rustflags)
-            .env("BOLERO_FUZZER", fuzzer)
-            .arg("--");
 
         cmd
     }

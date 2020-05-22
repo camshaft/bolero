@@ -43,6 +43,7 @@ pub mod fuzzer {
 
         fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
+            panic::forward_panic(false);
 
             let driver_mode = self.driver_mode;
 
@@ -56,7 +57,7 @@ pub mod fuzzer {
                     .shrink(slice.to_vec(), None, driver_mode)
                     .expect("test should fail");
 
-                eprintln!("{}", failure);
+                eprintln!("{:#}", failure);
 
                 false
             })
@@ -70,8 +71,23 @@ pub mod fuzzer {
             ));
         }
 
-        // create a vector of zero terminated strings
+        if std::env::var("__BOLERO_LIBFUZZER_RECURSE").is_ok() {
+            eprintln!("LOOPING BINARY");
+            std::process::exit(1);
+        }
+
+        std::env::set_var("__BOLERO_LIBFUZZER_RECURSE", "1");
+
+        // create a vector of NULL terminated strings
         let args = std::env::args()
+            .next()
+            .as_deref()
+            .into_iter()
+            .chain(
+                std::env::var("BOLERO_LIBFUZZER_ARGS")
+                    .expect("missing libfuzzer args")
+                    .split(' '),
+            )
             .map(|arg| CString::new(arg).unwrap())
             .collect::<Vec<_>>();
 

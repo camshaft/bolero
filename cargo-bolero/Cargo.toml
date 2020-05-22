@@ -28,10 +28,10 @@ bolero = { version = "0.4", path = "../bolero" }
 
 [[test]]
 name = "fuzz_bytes"
-path = "tests/fuzz_bytes/main.rs"
+path = "tests/fuzz_bytes/fuzz_target.rs"
 harness = false
 
 [[test]]
 name = "fuzz_generator"
-path = "tests/fuzz_generator/main.rs"
+path = "tests/fuzz_generator/fuzz_target.rs"
 harness = false

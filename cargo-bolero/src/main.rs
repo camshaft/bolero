@@ -18,6 +18,7 @@ mod libfuzzer;
 mod manifest;
 mod new;
 mod reduce;
+mod test_target;
 
 #[derive(Debug, StructOpt)]
 #[allow(clippy::large_enum_variant)]

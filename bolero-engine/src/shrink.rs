@@ -75,12 +75,13 @@ impl<'a, T: Test> Shrinker<'a, T> {
 
     fn shrink(mut self) -> Option<TestFailure<T::Value>> {
         panic::set_hook();
-        panic::forward_panic(false);
-        panic::capture_backtrace(false);
+        let forward_panic = panic::forward_panic(false);
+        let capture_backtrace = panic::capture_backtrace(false);
 
         // Skip inputs that don't panic
         if self.execute().is_ok() {
-            panic::forward_panic(true);
+            panic::forward_panic(forward_panic);
+            panic::capture_backtrace(capture_backtrace);
             return None;
         }
 
@@ -103,12 +104,14 @@ impl<'a, T: Test> Shrinker<'a, T> {
             }
         }
 
-        panic::capture_backtrace(true);
+        panic::capture_backtrace(capture_backtrace);
         let error = self.execute().err().unwrap();
         panic::capture_backtrace(false);
-        panic::forward_panic(true);
 
         let input = self.generate_value();
+
+        panic::forward_panic(forward_panic);
+        panic::capture_backtrace(capture_backtrace);
 
         Some(TestFailure {
             seed: self.seed,

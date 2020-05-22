@@ -8,11 +8,6 @@ cfg_if::cfg_if! {
     } else if #[cfg(fuzzing_honggfuzz)] {
         /// The default engine used when defining a test target
         pub use bolero_honggfuzz::HonggfuzzEngine as DefaultEngine;
-    } else if #[cfg(test)] {
-        mod test;
-
-        // when testing bolero always use the RngEngine
-        pub use bolero_engine::rng::RngEngine as DefaultEngine;
     } else {
         mod test;
 
@@ -49,7 +44,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// This mode is generally used when testing an implementation that
 /// handles raw bytes, e.g. a parser.
 ///
-/// ```rust
+/// ```rust,no_run
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -66,7 +61,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// This mode is used for testing an implementation that requires
 /// structured input.
 ///
-/// ```rust
+/// ```rust,no_run
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -87,7 +82,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// In the following example, we are only interested in generating
 /// two values, one being between 0 and 100, the other: 10 and 50.
 ///
-/// ```rust
+/// ```rust,no_run
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -107,7 +102,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// * The test code will be contained inside a macro which can trip up
 ///   some editors and IDEs.
 ///
-/// ```rust
+/// ```rust,no_run
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -119,88 +114,36 @@ use core::{fmt::Debug, marker::PhantomData};
 
 #[macro_export]
 macro_rules! fuzz {
-    ($($tt:tt)*) => {
-        $crate::__bolero_parse_input!(fuzz; $($tt)*)
+    () => {{
+        let location = $crate::TargetLocation {
+            package_name: env!("CARGO_PKG_NAME"),
+            manifest_dir: env!("CARGO_MANIFEST_DIR"),
+            module_path: module_path!(),
+            file: file!(),
+            line: line!(),
+        };
+
+        // cargo-bolero needs to compile everything
+        if ::std::env::var("CARGO_BOLERO_BOOTSTRAP").is_ok() {
+            return;
+        }
+
+        // cargo-bolero needs to resolve information about the target
+        if ::std::env::var("CARGO_BOLERO_SELECT").is_ok() {
+            location.print_if_match();
+            return;
+        }
+
+        $crate::fuzz(location)
+    }};
+    ($fun:path) => {
+        $crate::fuzz!(|input| { $fun(input) })
     };
-}
-
-/// Execute property checks for a given target
-///
-/// # Examples
-///
-/// By default, `input` is a `&[u8]`.
-///
-/// This mode is generally used when testing an implementation that
-/// handles raw bytes, e.g. a parser.
-///
-/// ```rust
-/// #[test]
-/// fn bytes_test() {
-///     bolero::check!().for_each(|input| {
-///         // implement checks here
-///     });
-/// }
-/// ```
-///
-/// Calling `with_type::<Type>()` will generate random values of `Type`
-/// to be tested. `Type` is required to implement [`generator::TypeGenerator`]
-/// in order to use this method.
-///
-/// This mode is used for testing an implementation that requires
-/// structured input.
-///
-/// ```rust
-/// #[test]
-/// fn type_generator_test() {
-///     bolero::check!()
-///         .with_type::<(u8, u16)>()
-///         .for_each(|(a, b)| {
-///             // implement checks here
-///         });
-/// }
-/// ```
-///
-/// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
-/// which implements [`generator::ValueGenerator`], to generate input
-/// values of type `Generator::Output`.
-///
-/// This mode is used for testing an implementation that requires
-/// structured input with specific constraints applied to the type.
-/// In the following example, we are only interested in generating
-/// two values, one being between 0 and 100, the other: 10 and 50.
-///
-/// ```rust
-/// #[test]
-/// fn value_generator_test() {
-///     bolero::check!()
-///         .with_generator((0..100, 10..50))
-///         .for_each(|(a, b)| {
-///             // implement checks here
-///         });
-/// }
-/// ```
-///
-/// For compatibility purposes, `bolero` also supports the same interface as
-/// [rust-fuzz/afl.rs](https://github.com/rust-fuzz/afl.rs). This usage
-/// has a few downsides:
-///
-/// * The test cannot be configured
-/// * The test code will be contained inside a macro which can trip up
-///   some editors and IDEs.
-///
-/// ```rust
-/// #[test]
-/// fn compatibility_test() {
-///     bolero::check!(|input| {
-///         // implement checks here
-///     });
-/// }
-/// ```
-
-#[macro_export]
-macro_rules! check {
-    ($($tt:tt)*) => {
-        $crate::__bolero_parse_input!(check; $($tt)*)
+    (| $input:ident $(: &[u8])? | $impl:expr) => {
+        $crate::fuzz!().for_each(|$input: &[u8]| $impl)
+    };
+    (| $input:ident : $ty:ty | $impl:expr) => {
+        $crate::fuzz!().with_type().for_each(|$input: $ty| $impl)
     };
 }
 
@@ -224,23 +167,7 @@ pub struct ClonedInput;
 pub fn fuzz(
     location: TargetLocation,
 ) -> TestTarget<ByteSliceGenerator, DefaultEngine, BorrowedInput> {
-    // cargo-bolero needs to resolve the path of the binary
-    if std::env::var("CARGO_BOLERO_PATH").is_ok() {
-        print!(
-            "{}",
-            std::env::current_exe()
-                .expect("valid current_exe")
-                .display()
-        );
-        std::process::exit(0);
-    }
-
     TestTarget::new(DefaultEngine::new(location))
-}
-
-#[doc(hidden)]
-pub fn check(location: TargetLocation) -> TestTarget<ByteSliceGenerator, RngEngine, BorrowedInput> {
-    TestTarget::new(RngEngine::new(location))
 }
 
 /// Default generator for byte slices
@@ -479,7 +406,7 @@ impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
 #[test]
 #[should_panic]
 fn slice_generator_test() {
-    check!().for_each(|input| {
+    fuzz!().for_each(|input| {
         assert!(input.len() > 1000);
     });
 }
@@ -487,7 +414,7 @@ fn slice_generator_test() {
 #[test]
 #[should_panic]
 fn type_generator_test() {
-    check!().with_type().for_each(|input: &u8| {
+    fuzz!().with_type().for_each(|input: &u8| {
         assert!(input < &128);
     });
 }
@@ -495,21 +422,21 @@ fn type_generator_test() {
 #[test]
 #[should_panic]
 fn type_generator_cloned_test() {
-    check!().with_type().cloned().for_each(|input: u8| {
+    fuzz!().with_type().cloned().for_each(|input: u8| {
         assert!(input < 128);
     });
 }
 
 #[test]
 fn range_generator_test() {
-    check!().with_generator(0..=5).for_each(|_input: &u8| {
+    fuzz!().with_generator(0..=5).for_each(|_input: &u8| {
         // println!("{:?}", input);
     });
 }
 
 #[test]
 fn range_generator_cloned_test() {
-    check!()
+    fuzz!()
         .with_generator(0..=5)
         .cloned()
         .for_each(|_input: u8| {
@@ -517,24 +444,14 @@ fn range_generator_cloned_test() {
         });
 }
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __bolero_parse_input {
-    ($target:ident;) => {{
-        $crate::$target($crate::TargetLocation {
-            manifest_dir: env!("CARGO_MANIFEST_DIR"),
-            module_path: module_path!(),
-            file: file!(),
-            line: line!(),
-        })
-    }};
-    ($target:ident; $fun:path) => {
-        $crate::$target!(|input| { $fun(input) })
-    };
-    ($target:ident; | $input:ident $(: &[u8])? | $impl:expr) => {
-        $crate::$target!().for_each(|$input: &[u8]| $impl)
-    };
-    ($target:ident; | $input:ident : $ty:ty | $impl:expr) => {
-        $crate::$target!().with_type().for_each(|$input: $ty| $impl)
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nested_test() {
+        fuzz!().with_generator(0..=5).for_each(|_input: &u8| {
+            // println!("{:?}", input);
+        });
+    }
 }

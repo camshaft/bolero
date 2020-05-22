@@ -1,4 +1,4 @@
-use crate::panic::PanicError;
+use crate::panic::{rust_backtrace, PanicError};
 use core::fmt::{Debug, Display};
 
 /// Contains information about a test failure
@@ -22,8 +22,8 @@ impl<Input: Debug> Display for TestFailure<Input> {
         writeln!(f, "Error: \n{}", self.error)?;
 
         if f.alternate() {
-            if let Some(backtrace) = self.error.backtrace.as_ref() {
-                writeln!(f, "{:?}", backtrace)?;
+            if let Some(backtrace) = self.error.backtrace.as_ref().filter(|_| rust_backtrace()) {
+                writeln!(f, "{}", backtrace)?;
             } else {
                 writeln!(f, "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace.")?;
             }

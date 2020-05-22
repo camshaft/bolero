@@ -1,5 +1,6 @@
 use crate::{Config, FuzzArgs, ReduceArgs};
 use anyhow::Result;
+use std::fs;
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_afl",
@@ -16,10 +17,12 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
-    let bin_path = config.bin_path(FLAGS, "afl");
-    let test_target = config.test_target()?;
+    let test_target = config.test_target(FLAGS, "afl")?;
     let corpus_dir = test_target.corpus_dir();
     let afl_state = test_target.workdir().join("afl_state");
+
+    fs::create_dir_all(&afl_state)?;
+    fs::create_dir_all(&corpus_dir)?;
 
     if let Some(runs) = fuzz.runs {
         std::env::set_var("AFL_EXIT_WHEN_DONE", "1");
@@ -27,18 +30,19 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
         std::env::set_var("BOLERO_AFL_MAX_CYCLES", format!("{}", cycles));
     }
 
-    let args = vec![
+    let mut args = vec![
         bin(),
         "-i".to_string(),
         corpus_dir.to_str().unwrap().to_string(),
         "-o".to_string(),
         afl_state.to_str().unwrap().to_string(),
         "--".to_string(),
-        bin_path.to_str().unwrap().to_string(),
-    ]
-    .into_iter();
+        test_target.exe.to_string(),
+    ];
 
-    unsafe { bolero_afl::exec(args) };
+    args.extend(test_target.command_args().map(String::from));
+
+    unsafe { bolero_afl::exec(args.into_iter()) };
 
     Ok(())
 }
