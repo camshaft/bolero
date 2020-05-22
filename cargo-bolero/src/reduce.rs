@@ -1,4 +1,4 @@
-use crate::{config::Config, fuzzer::Fuzzer};
+use crate::{fuzzer::Fuzzer, selection::Selection};
 use anyhow::Result;
 use structopt::StructOpt;
 
@@ -13,12 +13,12 @@ pub struct Reduce {
     args: ReduceArgs,
 
     #[structopt(flatten)]
-    config: Config,
+    selection: Selection,
 }
 
 impl Reduce {
     pub fn exec(&self) -> Result<()> {
-        self.fuzzer.reduce(&self.config, &self.args)
+        self.fuzzer.reduce(&self.selection, &self.args)
     }
 }
 

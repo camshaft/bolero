@@ -181,10 +181,10 @@ where
                 })
         };
 
-        if self.location.is_fuzz_target() {
-            self.libtest_mimic(&mut testfn)
-        } else {
+        if self.location.is_harnessed() {
             self.libtest(&mut testfn)
+        } else {
+            self.libtest_mimic(&mut testfn)
         }
     }
 }

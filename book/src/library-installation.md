@@ -4,5 +4,5 @@
 
 ```toml
 [dev-dependencies]
-bolero = "0.4"
+bolero = "0.5"
 ```

@@ -1,7 +1,7 @@
-use anyhow::{anyhow, bail, ensure, Result};
+use crate::StatusAsResult;
+use anyhow::{anyhow, ensure, Result};
 use serde::Deserialize;
 use std::{
-    io::Write,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -24,16 +24,7 @@ impl Metadata {
             cmd.arg("--manifest-path").arg(path);
         }
 
-        let result = cmd.output()?;
-
-        if !result.status.success() {
-            std::io::stderr().write_all(&result.stderr).unwrap();
-            bail!(
-                "`cargo metadata` failed with code {}",
-                result.status.code().unwrap_or(1)
-            );
-        }
-
+        let result = cmd.output()?.status_as_result()?;
         let metadata = serde_json::from_slice(&result.stdout)?;
         Ok(metadata)
     }

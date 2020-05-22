@@ -1,4 +1,4 @@
-use crate::{exec, Config, FuzzArgs, ReduceArgs};
+use crate::{exec, FuzzArgs, ReduceArgs, Selection};
 use anyhow::{anyhow, Result};
 use bit_set::BitSet;
 use core::cmp::Ordering;
@@ -29,8 +29,8 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-stack-depth",
 ];
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
-    let test_target = config.test_target(FLAGS, "libfuzzer")?;
+pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+    let test_target = selection.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
@@ -54,13 +54,13 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
 
     cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 
-    exec(cmd).exit_on_error();
+    exec(cmd)?;
 
     Ok(())
 }
 
-pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
-    let test_target = config.test_target(FLAGS, "libfuzzer")?;
+pub(crate) fn reduce(selection: &Selection, _reduce: &ReduceArgs) -> Result<()> {
+    let test_target = selection.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let tmp_corpus = test_target.temp_dir()?;
 
@@ -80,14 +80,7 @@ pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<()> {
 
     cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 
-    let result = exec(cmd);
-
-    if !result.is_ok() {
-        control_file.close()?;
-        tmp_corpus.close()?;
-        result.exit_on_error();
-        return Ok(());
-    }
+    exec(cmd)?;
 
     let results = parse_control_file(&mut BufReader::new(control_file).lines(), &inputs)?;
     let mut covered_features = BitSet::<u64>::default();

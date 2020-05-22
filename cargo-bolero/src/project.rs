@@ -1,14 +1,10 @@
-use crate::{exec, test_target::TestTarget, DEFAULT_TARGET};
-use anyhow::Result;
+use crate::DEFAULT_TARGET;
 use core::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, process::Command};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-pub struct Config {
-    /// Name of the test target
-    test: String,
-
+pub struct Project {
     /// Build with the sanitizer enabled
     #[structopt(short = "s", long = "sanitizer")]
     sanitizer: Vec<String>,
@@ -54,82 +50,7 @@ pub struct Config {
     build_std: bool,
 }
 
-impl Config {
-    pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut target = self.resolve_target()?;
-
-        if target.is_fuzz_target {
-            let mut build_command = self.cmd("test", flags, Some(fuzzer));
-            build_command
-                .arg("--test")
-                .arg(&self.test)
-                .env("CARGO_BOLERO_BOOTSTRAP", "1");
-            exec(build_command).exit_on_error();
-
-            let output = self
-                .cmd("test", flags, Some(fuzzer))
-                .arg("--test")
-                .arg(&self.test)
-                .arg("--")
-                .arg(&self.test)
-                .env("CARGO_BOLERO_SELECT", "1")
-                .output()
-                .expect("could not read info");
-
-            // TODO exit on error
-
-            target = TestTarget::from_stdout(&output.stdout)?;
-        } else {
-            let mut build_command = self.cmd("test", flags, Some(fuzzer));
-            build_command
-                .arg("--lib")
-                .arg("--no-run")
-                .env("CARGO_BOLERO_BOOTSTRAP", "1");
-            exec(build_command).exit_on_error();
-
-            let output = self
-                .cmd("test", flags, Some(fuzzer))
-                .arg(&self.test)
-                .arg("--lib")
-                .arg("--")
-                .arg("--nocapture")
-                .arg("--exact")
-                .env("CARGO_BOLERO_SELECT", "1")
-                .output()
-                .expect("could not read info");
-
-            // TODO exit on error
-
-            target = TestTarget::from_stdout(&output.stdout)?;
-        }
-
-        target.target = self.test.clone();
-
-        Ok(target)
-    }
-
-    fn resolve_target(&self) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", &[], None);
-        build_command
-            .arg("--no-run")
-            .env("CARGO_BOLERO_BOOTSTRAP", "1");
-        exec(build_command).exit_on_error();
-
-        let output = self
-            .cmd("test", &[], None)
-            .arg(&self.test)
-            .arg("--")
-            .arg("--nocapture")
-            .arg("--exact")
-            .env("CARGO_BOLERO_SELECT", "1")
-            .output()
-            .expect("could not read info");
-
-        // TODO exit on error
-
-        TestTarget::from_stdout(&output.stdout)
-    }
-
+impl Project {
     fn cargo(&self) -> Command {
         match self.toolchain() {
             "default" => Command::new("cargo"),

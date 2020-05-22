@@ -9,34 +9,17 @@ use std::{
 #[derive(Debug, Deserialize)]
 pub struct TestTarget {
     #[serde(rename = "__bolero_target")]
-    pub target: String,
-
+    pub version: String,
     pub exe: String,
-
     pub work_dir: String,
-
     pub package_name: String,
-
-    pub is_fuzz_target: bool,
+    pub is_harnessed: bool,
+    pub test_name: String,
 }
 
 impl TestTarget {
     pub fn from_stdout(stdout: &[u8]) -> Result<Self> {
-        let mut targets = vec![];
-
-        for line in Cursor::new(&stdout).lines() {
-            let line = line?;
-            if let Ok(target) = TestTarget::parse(line) {
-                if target.target != "v0.5.0" {
-                    return Err(anyhow!(
-                        "version mismatch between bolero and cargo-bolero. expected v0.5, got: {}",
-                        target.target
-                    ));
-                }
-                targets.push(target);
-            }
-        }
-
+        let mut targets = Self::all_from_stdout(stdout)?;
         match targets.len() {
             0 => Err(anyhow!("no targets matched")),
             1 => Ok(targets.pop().unwrap()),
@@ -45,6 +28,25 @@ impl TestTarget {
                 Err(anyhow!("multiple targets matched"))
             }
         }
+    }
+
+    pub fn all_from_stdout(stdout: &[u8]) -> Result<Vec<Self>> {
+        let mut targets = vec![];
+
+        for line in Cursor::new(&stdout).lines() {
+            let line = line?;
+            if let Ok(target) = TestTarget::parse(line) {
+                if target.version != "v0.5.0" {
+                    return Err(anyhow!(
+                        "version mismatch between bolero and cargo-bolero. expected v0.5, got: {}",
+                        target.version
+                    ));
+                }
+                targets.push(target);
+            }
+        }
+
+        Ok(targets)
     }
 
     pub fn parse(line: String) -> Result<Self> {
@@ -78,17 +80,19 @@ impl TestTarget {
         let mut cmd = Command::new(&self.exe);
 
         cmd.args(self.command_args());
-        cmd.env("__BOLERO_TEST_TARGET", &self.target);
 
         cmd
     }
 
     pub fn command_args(&self) -> impl Iterator<Item = &str> {
-        let needs_args = !self.is_fuzz_target;
+        let is_harnessed = self.is_harnessed;
         core::iter::empty()
-            .chain(Some(self.target.as_str()))
+            .chain(Some(self.test_name.as_str()))
             .chain(Some("--exact"))
             .chain(Some("--nocapture"))
-            .filter(move |_| needs_args)
+            .chain(Some("--quiet"))
+            .chain(Some("--test-threads"))
+            .chain(Some("1"))
+            .filter(move |_| is_harnessed)
     }
 }

@@ -1,4 +1,4 @@
-use crate::{config::Config, fuzzer::Fuzzer};
+use crate::{fuzzer::Fuzzer, selection::Selection};
 use anyhow::Result;
 use structopt::StructOpt;
 
@@ -13,7 +13,7 @@ pub struct Fuzz {
     args: FuzzArgs,
 
     #[structopt(flatten)]
-    config: Config,
+    selection: Selection,
 }
 
 #[derive(Debug, StructOpt)]
@@ -41,6 +41,6 @@ pub struct FuzzArgs {
 
 impl Fuzz {
     pub fn exec(&self) -> Result<()> {
-        self.fuzzer.fuzz(&self.config, &self.args)
+        self.fuzzer.fuzz(&self.selection, &self.args)
     }
 }

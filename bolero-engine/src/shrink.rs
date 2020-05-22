@@ -1,5 +1,6 @@
 use crate::{panic, panic::PanicError, Test, TestFailure, TestInput};
 use bolero_generator::driver::{ByteSliceDriver, DriverMode};
+use std::time::{Duration, Instant};
 
 /// Shrink the input to a simpler form
 pub fn shrink<T: Test>(
@@ -78,16 +79,16 @@ impl<'a, T: Test> Shrinker<'a, T> {
         let forward_panic = panic::forward_panic(false);
         let capture_backtrace = panic::capture_backtrace(false);
 
-        // Skip inputs that don't panic
-        if self.execute().is_ok() {
-            panic::forward_panic(forward_panic);
-            panic::capture_backtrace(capture_backtrace);
-            return None;
+        if cfg!(test) {
+            assert!(
+                self.execute().is_err(),
+                "shrinking should only be performed on a failing test"
+            );
         }
 
         let mut was_changed;
-        // put a limit on the number of shrink iterations
-        for _ in 0..1000 {
+        let start_time = Instant::now();
+        loop {
             was_changed = self.apply_truncation().is_ok();
 
             for index in 0..self.len {
@@ -100,6 +101,11 @@ impl<'a, T: Test> Shrinker<'a, T> {
             }
 
             if !was_changed {
+                break;
+            }
+
+            // put a time limit on the number of shrink iterations
+            if start_time.elapsed() > Duration::from_secs(1) {
                 break;
             }
         }

@@ -123,14 +123,7 @@ macro_rules! fuzz {
             line: line!(),
         };
 
-        // cargo-bolero needs to compile everything
-        if ::std::env::var("CARGO_BOLERO_BOOTSTRAP").is_ok() {
-            return;
-        }
-
-        // cargo-bolero needs to resolve information about the target
-        if ::std::env::var("CARGO_BOLERO_SELECT").is_ok() {
-            location.print_if_match();
+        if !location.should_run() {
             return;
         }
 

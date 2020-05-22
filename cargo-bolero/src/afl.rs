@@ -1,4 +1,4 @@
-use crate::{Config, FuzzArgs, ReduceArgs};
+use crate::{FuzzArgs, ReduceArgs, Selection};
 use anyhow::Result;
 use std::fs;
 
@@ -16,8 +16,8 @@ fn bin() -> String {
         .to_string()
 }
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
-    let test_target = config.test_target(FLAGS, "afl")?;
+pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+    let test_target = selection.test_target(FLAGS, "afl")?;
     let corpus_dir = test_target.corpus_dir();
     let afl_state = test_target.workdir().join("afl_state");
 
@@ -47,6 +47,6 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reduce(_config: &Config, _shrink: &ReduceArgs) -> Result<()> {
+pub(crate) fn reduce(_selection: &Selection, _shrink: &ReduceArgs) -> Result<()> {
     todo!()
 }
