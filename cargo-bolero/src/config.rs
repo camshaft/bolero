@@ -190,9 +190,7 @@ impl Config {
             .chain(flags.iter())
             .map(|v| (*v).to_string())
             .chain(
-                self.sanitizer
-                    .iter()
-                    .filter(|sanitizer| sanitizer != &"NONE")
+                self.sanitizers()
                     .map(|sanitizer| format!("-Zsanitizer={}", sanitizer)),
             )
             .chain(std::env::var("RUSTFLAGS").ok())
@@ -221,6 +219,13 @@ impl Config {
     }
 
     pub fn requires_nightly(&self) -> bool {
-        !self.sanitizer.is_empty()
+        self.sanitizers().next().is_some()
+    }
+
+    fn sanitizers(&self) -> impl Iterator<Item = &str> {
+        self.sanitizer
+            .iter()
+            .map(String::as_str)
+            .filter(|s| s != &"NONE")
     }
 }
