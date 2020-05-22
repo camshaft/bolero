@@ -74,29 +74,6 @@ pid_t arch_fork(run_t* run HF_ATTR_UNUSED) {
 }
 
 bool arch_launchChild(run_t* run) {
-#define ARGS_MAX 512
-    const char* args[ARGS_MAX + 2];
-    char argData[PATH_MAX];
-    const char inputFile[] = "/dev/fd/" HF_XSTR(_HF_INPUT_FD);
-
-    int x = 0;
-    for (x = 0; x < ARGS_MAX && x < run->global->exe.argc; x++) {
-        if (!strcmp(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            args[x] = inputFile;
-        } else if (strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            const char* off = strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER);
-            snprintf(argData, sizeof(argData), "%.*s%s", (int)(off - run->global->exe.cmdline[x]),
-                run->global->exe.cmdline[x], inputFile);
-            args[x] = argData;
-        } else {
-            args[x] = run->global->exe.cmdline[x];
-        }
-    }
-    args[x++] = NULL;
-
-    LOG_D("Launching '%s' on file '%s'", args[0],
-        run->global->exe.persistent ? "PERSISTENT_MODE" : inputFile);
-
     /* alarms persist across execve(), so disable it here */
     alarm(0);
 
@@ -105,11 +82,11 @@ bool arch_launchChild(run_t* run) {
         LOG_F("Couldn't stop itself");
     }
 
-    execve(args[0], (char* const*)args, environ);
+    execve(run->args[0], (char* const*)run->args, environ);
     int errno_cpy = errno;
     alarm(1);
 
-    LOG_E("execve('%s'): %s", args[0], strerror(errno_cpy));
+    LOG_E("execve('%s'): %s", run->args[0], strerror(errno_cpy));
 
     return false;
 }
@@ -219,11 +196,11 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
 }
 
 bool arch_archThreadInit(run_t* run) {
-    run->netbsd.perfMmapBuf = NULL;
-    run->netbsd.perfMmapAux = NULL;
-    run->netbsd.cpuInstrFd = -1;
-    run->netbsd.cpuBranchFd = -1;
-    run->netbsd.cpuIptBtsFd = -1;
+    run->arch_netbsd.perfMmapBuf = NULL;
+    run->arch_netbsd.perfMmapAux = NULL;
+    run->arch_netbsd.cpuInstrFd = -1;
+    run->arch_netbsd.cpuBranchFd = -1;
+    run->arch_netbsd.cpuIptBtsFd = -1;
 
     return true;
 }

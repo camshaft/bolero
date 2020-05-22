@@ -82,6 +82,10 @@ impl TargetLocation {
     }
 
     pub fn test_name(&self) -> String {
+        if let Ok(name) = std::env::var("__BOLERO_TEST_TARGET") {
+            return name;
+        }
+
         if self.is_fuzz_target() {
             return self.module_path.to_string();
         }

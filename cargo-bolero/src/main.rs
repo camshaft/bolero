@@ -68,6 +68,10 @@ pub(crate) fn exec(mut cmd: std::process::Command) -> Exit {
 pub(crate) struct Exit(i32);
 
 impl Exit {
+    fn is_ok(&self) -> bool {
+        self.0 == 0
+    }
+
     fn exit_on_error(self) {
         let code = self.0;
         if code != 0 {

@@ -27,6 +27,12 @@ impl TestTarget {
         for line in Cursor::new(&stdout).lines() {
             let line = line?;
             if let Ok(target) = TestTarget::parse(line) {
+                if target.target != "v0.5.0" {
+                    return Err(anyhow!(
+                        "version mismatch between bolero and cargo-bolero. expected v0.5, got: {}",
+                        target.target
+                    ));
+                }
                 targets.push(target);
             }
         }
@@ -57,10 +63,9 @@ impl TestTarget {
         workdir
     }
 
-    pub fn temp_dir(&self) -> PathBuf {
-        let mut workdir = self.workdir();
-        workdir.push("_temp");
-        workdir
+    pub fn temp_dir(&self) -> Result<tempfile::TempDir> {
+        let dir = tempfile::tempdir_in(self.workdir())?;
+        Ok(dir)
     }
 
     pub fn crashes_dir(&self) -> PathBuf {
@@ -73,6 +78,7 @@ impl TestTarget {
         let mut cmd = Command::new(&self.exe);
 
         cmd.args(self.command_args());
+        cmd.env("__BOLERO_TEST_TARGET", &self.target);
 
         cmd
     }

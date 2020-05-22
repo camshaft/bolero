@@ -5,9 +5,7 @@ project_dir="$(pwd)"
 tmp_dir="$(mktemp -d)"
 honggfuzz_dir="$project_dir/honggfuzz/"
 
-git clone https://github.com/google/honggfuzz.git "$tmp_dir"
-cd "$tmp_dir"
-git checkout $version --force
+git clone --depth 1 --single-branch --branch $version https://github.com/google/honggfuzz.git "$tmp_dir"
 rm -rf "$honggfuzz_dir"
 mv "$tmp_dir/android/" "$honggfuzz_dir"
 mv "$tmp_dir/includes/" "$honggfuzz_dir"

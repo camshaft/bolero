@@ -1,9 +1,8 @@
 //===- FuzzerUtilWindows.cpp - Misc utils for Windows. --------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 // Misc utils implementation for Windows.
@@ -17,6 +16,7 @@
 #include <chrono>
 #include <cstring>
 #include <errno.h>
+#include <io.h>
 #include <iomanip>
 #include <signal.h>
 #include <stdio.h>
@@ -86,11 +86,11 @@ void CALLBACK AlarmHandler(PVOID, BOOLEAN) {
 class TimerQ {
   HANDLE TimerQueue;
  public:
-  TimerQ() : TimerQueue(NULL) {};
+  TimerQ() : TimerQueue(NULL) {}
   ~TimerQ() {
     if (TimerQueue)
       DeleteTimerQueueEx(TimerQueue, NULL);
-  };
+  }
   void SetTimer(int Seconds) {
     if (!TimerQueue) {
       TimerQueue = CreateTimerQueue();
@@ -105,7 +105,7 @@ class TimerQ {
       Printf("libFuzzer: CreateTimerQueueTimer failed.\n");
       exit(1);
     }
-  };
+  }
 };
 
 static TimerQ Timer;
@@ -189,6 +189,14 @@ std::string DisassembleCmd(const std::string &FileName) {
 
 std::string SearchRegexCmd(const std::string &Regex) {
   return "findstr /r \"" + Regex + "\"";
+}
+
+void DiscardOutput(int Fd) {
+  FILE* Temp = fopen("nul", "w");
+  if (!Temp)
+    return;
+  _dup2(_fileno(Temp), Fd);
+  fclose(Temp);
 }
 
 } // namespace fuzzer

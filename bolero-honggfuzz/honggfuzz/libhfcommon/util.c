@@ -27,8 +27,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#if !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__)
+#include <link.h>
+#endif /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
 #include <math.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -59,7 +63,13 @@ void* util_Calloc(size_t sz) {
     return p;
 }
 
-extern void* util_Realloc(void* ptr, size_t sz) {
+void* util_AllocCopy(const uint8_t* ptr, size_t sz) {
+    void* p = util_Malloc(sz);
+    memcpy(p, ptr, sz);
+    return p;
+}
+
+void* util_Realloc(void* ptr, size_t sz) {
     void* ret = realloc(ptr, sz);
     if (ret == NULL) {
         PLOG_W("realloc(%p, %zu)", ptr, sz);
@@ -158,7 +168,7 @@ void util_rndBuf(uint8_t* buf, size_t sz) {
         return;
     }
     for (size_t i = 0; i < sz; i++) {
-        buf[i] = (uint8_t)util_InternalRnd64();
+        buf[i] = (uint8_t)(util_InternalRnd64() >> 40);
     }
 }
 
@@ -233,13 +243,13 @@ uint64_t util_hash(const char* buf, size_t len) {
     return ret;
 }
 
-int64_t util_timeNowMillis(void) {
+int64_t util_timeNowUSecs(void) {
     struct timeval tv;
     if (gettimeofday(&tv, NULL) == -1) {
         PLOG_F("gettimeofday()");
     }
 
-    return (((int64_t)tv.tv_sec * 1000LL) + ((int64_t)tv.tv_usec / 1000LL));
+    return (((int64_t)tv.tv_sec * 1000000) + (int64_t)tv.tv_usec);
 }
 
 void util_sleepForMSec(uint64_t msec) {
@@ -661,3 +671,240 @@ uint64_t util_CRC64Rev(const uint8_t* buf, size_t len) {
 
     return res;
 }
+
+static const struct {
+    const int signo;
+    const char* const signame;
+} sigNames[] = {
+#if defined(SIGHUP)
+    {SIGHUP, "SIGHUP"},
+#endif
+#if defined(SIGINT)
+    {SIGINT, "SIGINT"},
+#endif
+#if defined(SIGQUIT)
+    {SIGQUIT, "SIGQUIT"},
+#endif
+#if defined(SIGILL)
+    {SIGILL, "SIGILL"},
+#endif
+#if defined(SIGTRAP)
+    {SIGTRAP, "SIGTRAP"},
+#endif
+#if defined(SIGABRT)
+    {SIGABRT, "SIGABRT"},
+#endif
+#if defined(SIGIOT)
+    {SIGIOT, "SIGIOT"},
+#endif
+#if defined(SIGBUS)
+    {SIGBUS, "SIGBUS"},
+#endif
+#if defined(SIGFPE)
+    {SIGFPE, "SIGFPE"},
+#endif
+#if defined(SIGKILL)
+    {SIGKILL, "SIGKILL"},
+#endif
+#if defined(SIGUSR1)
+    {SIGUSR1, "SIGUSR1"},
+#endif
+#if defined(SIGSEGV)
+    {SIGSEGV, "SIGSEGV"},
+#endif
+#if defined(SIGUSR2)
+    {SIGUSR2, "SIGUSR2"},
+#endif
+#if defined(SIGPIPE)
+    {SIGPIPE, "SIGPIPE"},
+#endif
+#if defined(SIGALRM)
+    {SIGALRM, "SIGALRM"},
+#endif
+#if defined(SIGTERM)
+    {SIGTERM, "SIGTERM"},
+#endif
+#if defined(SIGSTKFLT)
+    {SIGSTKFLT, "SIGSTKFLT"},
+#endif
+#if defined(SIGCHLD)
+    {SIGCHLD, "SIGCHLD"},
+#endif
+#if defined(SIGCONT)
+    {SIGCONT, "SIGCONT"},
+#endif
+#if defined(SIGSTOP)
+    {SIGSTOP, "SIGSTOP"},
+#endif
+#if defined(SIGTSTP)
+    {SIGTSTP, "SIGTSTP"},
+#endif
+#if defined(SIGTTIN)
+    {SIGTTIN, "SIGTTIN"},
+#endif
+#if defined(SIGTTOU)
+    {SIGTTOU, "SIGTTOU"},
+#endif
+#if defined(SIGURG)
+    {SIGURG, "SIGURG"},
+#endif
+#if defined(SIGXCPU)
+    {SIGXCPU, "SIGXCPU"},
+#endif
+#if defined(SIGXFSZ)
+    {SIGXFSZ, "SIGXFSZ"},
+#endif
+#if defined(SIGVTALRM)
+    {SIGVTALRM, "SIGVTALRM"},
+#endif
+#if defined(SIGPROF)
+    {SIGPROF, "SIGPROF"},
+#endif
+#if defined(SIGWINCH)
+    {SIGWINCH, "SIGWINCH"},
+#endif
+#if defined(SIGIO)
+    {SIGIO, "SIGIO"},
+#endif
+#if defined(SIGPOLL)
+    {SIGPOLL, "SIGPOLL"},
+#endif
+#if defined(SIGLOST)
+    {SIGLOST, "SIGLOST"},
+#endif
+#if defined(SIGPWR)
+    {SIGPWR, "SIGPWR"},
+#endif
+#if defined(SIGSYS)
+    {SIGSYS, "SIGSYS"},
+#endif
+#if defined(SIGTHR)
+    {SIGTHR, "SIGTHR"},
+#endif
+#if defined(SIGEMT)
+    {SIGEMT, "SIGEMT"},
+#endif
+#if defined(SIGINFO)
+    {SIGINFO, "SIGINFO"},
+#endif
+#if defined(SIGLIBRT)
+    {SIGLIBRT, "SIGLIBRT"},
+#endif
+};
+
+const char* util_sigName(int signo) {
+    static __thread char signame[32];
+    for (size_t i = 0; i < ARRAYSIZE(sigNames); i++) {
+        if (signo == sigNames[i].signo) {
+            return sigNames[i].signame;
+        }
+    }
+#if defined(SIGRTMIN) && defined(SIGRTMAX)
+    if (signo >= SIGRTMIN && signo <= SIGRTMAX) {
+        snprintf(signame, sizeof(signame), "SIG%d-RTMIN+%d", signo, signo - SIGRTMIN);
+        return signame;
+    }
+#endif /* defined(SIGRTMIN) && defined(SIGRTMAX) */
+    snprintf(signame, sizeof(signame), "UNKNOWN-%d", signo);
+    return signame;
+}
+
+#if !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__)
+static int addrStatic_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    for (size_t i = 0; i < info->dlpi_phnum; i++) {
+        if (info->dlpi_phdr[i].p_type != PT_LOAD) {
+            continue;
+        }
+        uintptr_t addr_start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr;
+        uintptr_t addr_end =
+            addr_start + HF_MIN(info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_filesz);
+        if (((uintptr_t)data >= addr_start) && ((uintptr_t)data < addr_end)) {
+            if ((info->dlpi_phdr[i].p_flags & PF_W) == 0) {
+                return LHFC_ADDR_RO;
+            } else {
+                return LHFC_ADDR_RW;
+            }
+        }
+    }
+    return LHFC_ADDR_NOTFOUND;
+}
+
+lhfc_addr_t util_getProgAddr(const void* addr) {
+    return (lhfc_addr_t)dl_iterate_phdr(addrStatic_cb, (void*)addr);
+}
+
+static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    uint32_t v = *(uint32_t*)data;
+
+    for (size_t i = 0; i < info->dlpi_phnum; i++) {
+        /* Look only in the actual binary, and not in libraries */
+        if (info->dlpi_name[0] != '\0') {
+            continue;
+        }
+        if (info->dlpi_phdr[i].p_type != PT_LOAD) {
+            continue;
+        }
+        if (!(info->dlpi_phdr[i].p_flags & PF_R)) {
+            continue;
+        }
+        uint32_t* start = (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+        uint32_t* end =
+            (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr +
+                        HF_MIN(info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_filesz));
+        /* Assume that the 32bit value looked for is also 32bit aligned */
+        for (; start < end; start++) {
+            if (*start == v) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+bool util_32bitValInBinary(uint32_t v) {
+    return (dl_iterate_phdr(check32_cb, &v) == 1);
+}
+
+static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    uint64_t v = *(uint64_t*)data;
+
+    for (size_t i = 0; i < info->dlpi_phnum; i++) {
+        /* Look only in the actual binary, and not in libraries */
+        if (info->dlpi_name[0] != '\0') {
+            continue;
+        }
+        if (info->dlpi_phdr[i].p_type != PT_LOAD) {
+            continue;
+        }
+        if (!(info->dlpi_phdr[i].p_flags & PF_R)) {
+            continue;
+        }
+        uint64_t* start = (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+        uint64_t* end =
+            (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr +
+                        HF_MIN(info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_filesz));
+        /* Assume that the 64bit value looked for is also 64bit aligned */
+        for (; start < end; start++) {
+            if (*start == v) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+bool util_64bitValInBinary(uint32_t v) {
+    return (dl_iterate_phdr(check64_cb, &v) == 1);
+}
+#else  /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
+/* Darwin doesn't use ELF file format for binaries, so dl_iterate_phdr() cannot be used there */
+lhfc_addr_t util_getProgAddr(const void* addr HF_ATTR_UNUSED) {
+    return LHFC_ADDR_NOTFOUND;
+}
+bool util_32bitValInBinary(uint32_t v HF_ATTR_UNUSED) {
+    return false;
+}
+bool util_64bitValInBinary(uint32_t v HF_ATTR_UNUSED) {
+    return false;
+}
+#endif /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */

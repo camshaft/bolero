@@ -17,11 +17,13 @@ honggfuzz = ["bolero-honggfuzz"]
 
 [dependencies]
 anyhow = "1.0"
+bit-set = "0.5"
 bolero-afl = { version = "0.4", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.4", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
 structopt = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tempfile = "3"
 
 [dev-dependencies]
 bolero = { version = "0.4", path = "../bolero" }

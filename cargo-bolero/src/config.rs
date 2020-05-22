@@ -46,8 +46,12 @@ pub struct Config {
     toolchain: Option<String>,
 
     /// Directory for all generated artifacts
-    #[structopt(long = "target_dir")]
+    #[structopt(long = "target-dir")]
     target_dir: Option<String>,
+
+    /// Build the standard library with the provided configuration
+    #[structopt(long = "build-std")]
+    build_std: bool,
 }
 
 impl Config {
@@ -177,31 +181,7 @@ impl Config {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = [
-                "--cfg fuzzing",
-                "-Cpasses=sancov",
-                "-Cdebug-assertions",
-                "-Ctarget-cpu=native",
-                "-Cdebuginfo=2",
-                "-Coverflow_checks",
-                "-Clink-dead-code",
-            ]
-            .iter()
-            .chain(flags.iter())
-            .map(|v| (*v).to_string())
-            .chain(
-                self.sanitizers()
-                    .map(|sanitizer| format!("-Zsanitizer={}", sanitizer)),
-            )
-            .chain(std::env::var("RUSTFLAGS").ok())
-            // https://github.com/rust-lang/rust/issues/53945
-            .chain(if cfg!(target_os = "linux") {
-                Some("-Clink-arg=-fuse-ld=gold".to_string())
-            } else {
-                None
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
+            let rustflags = self.rustflags(flags);
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
@@ -212,14 +192,44 @@ impl Config {
                     .arg(format!("target/fuzz/build_{:x}", hasher.finish()));
             }
 
+            if self.build_std {
+                cmd.arg("-Zbuild-std");
+            }
+
             cmd.env("RUSTFLAGS", rustflags).env("BOLERO_FUZZER", fuzzer);
         }
 
         cmd
     }
 
+    fn rustflags(&self, flags: &[&str]) -> String {
+        [
+            "--cfg fuzzing",
+            "-Cpasses=sancov",
+            "-Cdebug-assertions",
+            "-Ctarget-cpu=native",
+            "-Cdebuginfo=2",
+            "-Coverflow_checks",
+            "-Clink-dead-code",
+        ]
+        .iter()
+        .chain(flags.iter())
+        .cloned()
+        .map(String::from)
+        .chain(self.sanitizer_flags())
+        .chain(std::env::var("RUSTFLAGS").ok())
+        // https://github.com/rust-lang/rust/issues/53945
+        .chain(if cfg!(target_os = "linux") {
+            Some("-Clink-arg=-fuse-ld=gold".to_string())
+        } else {
+            None
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+    }
+
     pub fn requires_nightly(&self) -> bool {
-        self.sanitizers().next().is_some()
+        self.sanitizers().next().is_some() || self.build_std
     }
 
     fn sanitizers(&self) -> impl Iterator<Item = &str> {
@@ -227,5 +237,10 @@ impl Config {
             .iter()
             .map(String::as_str)
             .filter(|s| s != &"NONE")
+    }
+
+    fn sanitizer_flags(&self) -> impl Iterator<Item = String> + '_ {
+        self.sanitizers()
+            .map(|sanitizer| format!("-Zsanitizer={}", sanitizer))
     }
 }

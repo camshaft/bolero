@@ -124,7 +124,7 @@ const char* subproc_StatusToStr(int status, char* str, size_t len) {
 }
 
 static bool subproc_persistentSendFileIndicator(run_t* run) {
-    uint64_t len = (uint64_t)run->dynamicFileSz;
+    uint64_t len = (uint64_t)run->dynfile->size;
     if (!files_sendToSocketNB(run->persistentSock, (uint8_t*)&len, sizeof(len))) {
         PLOG_W("files_sendToSocketNB(len=%zu)", sizeof(len));
         return false;
@@ -183,6 +183,25 @@ bool subproc_persistentModeStateMachine(run_t* run) {
     }
 }
 
+static void subproc_prepareExecvArgs(run_t* run) {
+    size_t x = 0;
+    for (x = 0; x < _HF_ARGS_MAX && x < (size_t)run->global->exe.argc; x++) {
+        const char* ph_str = strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER);
+        if (!strcmp(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
+            run->args[x] = _HF_INPUT_FILE_PATH;
+        } else if (ph_str) {
+            static __thread char argData[PATH_MAX];
+            snprintf(argData, sizeof(argData), "%.*s%s",
+                (int)(ph_str - run->global->exe.cmdline[x]), run->global->exe.cmdline[x],
+                _HF_INPUT_FILE_PATH);
+            run->args[x] = argData;
+        } else {
+            run->args[x] = (char*)run->global->exe.cmdline[x];
+        }
+    }
+    run->args[x] = NULL;
+}
+
 static bool subproc_PrepareExecv(run_t* run) {
     /*
      * The address space limit. If big enough - roughly the size of RAM used
@@ -229,12 +248,24 @@ static bool subproc_PrepareExecv(run_t* run) {
         PLOG_W("Couldn't enforce the RLIMIT_CORE resource limit, ignoring");
     }
 #endif /* ifdef RLIMIT_CORE */
+#ifdef RLIMIT_STACK
+    if (run->global->exe.stackLimit) {
+        const struct rlimit rl = {
+            .rlim_cur = run->global->exe.stackLimit * 1024ULL * 1024ULL,
+            .rlim_max = run->global->exe.stackLimit * 1024ULL * 1024ULL,
+        };
+        if (setrlimit(RLIMIT_STACK, &rl) == -1) {
+            PLOG_W("Couldn't enforce the RLIMIT_STACK resource limit, ignoring");
+        }
+    }
+#endif /* ifdef RLIMIT_STACK */
 
     if (run->global->exe.clearEnv) {
         environ = NULL;
     }
-    for (size_t i = 0; i < ARRAYSIZE(run->global->exe.envs) && run->global->exe.envs[i]; i++) {
-        putenv(run->global->exe.envs[i]);
+    for (size_t i = 0; i < ARRAYSIZE(run->global->exe.env_ptrs) && run->global->exe.env_ptrs[i];
+         i++) {
+        putenv(run->global->exe.env_ptrs[i]);
     }
     char fuzzNo[128];
     snprintf(fuzzNo, sizeof(fuzzNo), "%" PRId32, run->fuzzNo);
@@ -250,20 +281,43 @@ static bool subproc_PrepareExecv(run_t* run) {
         /* close_stdout= */ run->global->exe.nullifyStdio,
         /* close_stderr= */ run->global->exe.nullifyStdio);
 
-    /* The bitmap/feedback structure */
-    if (TEMP_FAILURE_RETRY(dup2(run->global->feedback.bbFd, _HF_BITMAP_FD)) == -1) {
-        PLOG_E("dup2(%d, _HF_BITMAP_FD=%d)", run->global->feedback.bbFd, _HF_BITMAP_FD);
+    /* The coverage bitmap/feedback structure */
+    if (TEMP_FAILURE_RETRY(dup2(run->global->feedback.covFeedbackFd, _HF_COV_BITMAP_FD)) == -1) {
+        PLOG_E("dup2(%d, _HF_COV_BITMAP_FD=%d)", run->global->feedback.covFeedbackFd,
+            _HF_COV_BITMAP_FD);
+        return false;
+    }
+    /* The const comparison bitmap/feedback structure */
+    if (run->global->feedback.cmpFeedback &&
+        TEMP_FAILURE_RETRY(dup2(run->global->feedback.cmpFeedbackFd, _HF_CMP_BITMAP_FD)) == -1) {
+        PLOG_E("dup2(%d, _HF_CMP_BITMAP_FD=%d)", run->global->feedback.cmpFeedbackFd,
+            _HF_CMP_BITMAP_FD);
         return false;
     }
 
-    /* The input file to _HF_INPUT_FD */
-    if (TEMP_FAILURE_RETRY(dup2(run->dynamicFileFd, _HF_INPUT_FD)) == -1) {
-        PLOG_E("dup2('%d', _HF_INPUT_FD='%d')", run->dynamicFileFd, _HF_INPUT_FD);
+    /* The per-thread coverage feedback bitmap */
+    if (TEMP_FAILURE_RETRY(dup2(run->perThreadCovFeedbackFd, _HF_PERTHREAD_BITMAP_FD)) == -1) {
+        PLOG_E("dup2(%d, _HF_CMP_PERTHREAD_FD=%d)", run->perThreadCovFeedbackFd,
+            _HF_PERTHREAD_BITMAP_FD);
         return false;
     }
-    if (lseek(_HF_INPUT_FD, 0, SEEK_SET) == (off_t)-1) {
-        PLOG_E("lseek(_HF_INPUT_FD=%d, 0, SEEK_SET)", _HF_INPUT_FD);
-        return false;
+
+    /* Do not try to handle input files with socketfuzzer */
+    if (!run->global->socketFuzzer.enabled) {
+        /* The input file to _HF_INPUT_FD */
+        if (TEMP_FAILURE_RETRY(dup2(run->dynfile->fd, _HF_INPUT_FD)) == -1) {
+            PLOG_E("dup2('%d', _HF_INPUT_FD='%d')", run->dynfile->fd, _HF_INPUT_FD);
+            return false;
+        }
+        if (lseek(_HF_INPUT_FD, 0, SEEK_SET) == (off_t)-1) {
+            PLOG_E("lseek(_HF_INPUT_FD=%d, 0, SEEK_SET)", _HF_INPUT_FD);
+            return false;
+        }
+        if (run->global->exe.fuzzStdin &&
+            TEMP_FAILURE_RETRY(dup2(run->dynfile->fd, STDIN_FILENO)) == -1) {
+            PLOG_E("dup2(_HF_INPUT_FD=%d, STDIN_FILENO=%d)", run->dynfile->fd, STDIN_FILENO);
+            return false;
+        }
     }
 
     /* The log FD */
@@ -283,12 +337,7 @@ static bool subproc_PrepareExecv(run_t* run) {
         PLOG_W("sigprocmask(empty_set)");
     }
 
-    if (run->global->exe.fuzzStdin &&
-        TEMP_FAILURE_RETRY(dup2(run->dynamicFileFd, STDIN_FILENO)) == -1) {
-        PLOG_E("dup2(_HF_INPUT_FD=%d, STDIN_FILENO=%d)", run->dynamicFileFd, STDIN_FILENO);
-        return false;
-    }
-
+    subproc_prepareExecvArgs(run);
     return true;
 }
 
@@ -350,6 +399,11 @@ static bool subproc_New(run_t* run) {
             LOG_E("subproc_PrepareExecv() failed");
             exit(EXIT_FAILURE);
         }
+
+        LOG_D("Launching '%s' on file '%s' (%s mode)", run->args[0],
+            run->global->exe.persistent ? "PERSISTENT_MODE" : _HF_INPUT_FILE_PATH,
+            run->global->exe.fuzzStdin ? "stdin" : "file");
+
         if (!arch_launchChild(run)) {
             LOG_E("Error launching child process");
             kill(run->global->threads.mainPid, SIGTERM);
@@ -374,8 +428,6 @@ static bool subproc_New(run_t* run) {
 }
 
 bool subproc_Run(run_t* run) {
-    run->timeStartedMillis = util_timeNowMillis();
-
     if (!subproc_New(run)) {
         LOG_E("subproc_New()");
         return false;
@@ -384,9 +436,14 @@ bool subproc_Run(run_t* run) {
     arch_prepareParent(run);
     arch_reapChild(run);
 
-    int64_t diffMillis = util_timeNowMillis() - run->timeStartedMillis;
-    if (diffMillis >= run->global->timing.timeOfLongestUnitInMilliseconds) {
-        run->global->timing.timeOfLongestUnitInMilliseconds = diffMillis;
+    int64_t diffUSecs = util_timeNowUSecs() - run->timeStartedUSecs;
+
+    {
+        static pthread_mutex_t local_mutex = PTHREAD_MUTEX_INITIALIZER;
+        MX_SCOPED_LOCK(&local_mutex);
+        if (diffUSecs >= ATOMIC_GET(run->global->timing.timeOfLongestUnitUSecs)) {
+            ATOMIC_SET(run->global->timing.timeOfLongestUnitUSecs, diffUSecs);
+        }
     }
 
     return true;
@@ -456,17 +513,17 @@ void subproc_checkTimeLimit(run_t* run) {
         return;
     }
 
-    int64_t curMillis = util_timeNowMillis();
-    int64_t diffMillis = curMillis - run->timeStartedMillis;
+    int64_t curUSecs = util_timeNowUSecs();
+    int64_t diffUSecs = curUSecs - run->timeStartedUSecs;
 
-    if (run->tmOutSignaled && (diffMillis > ((run->global->timing.tmOut + 1) * 1000))) {
+    if (run->tmOutSignaled && (diffUSecs > ((run->global->timing.tmOut + 1) * 1000000))) {
         /* Has this instance been already signaled due to timeout? Just, SIGKILL it */
         LOG_W("pid=%d has already been signaled due to timeout. Killing it with SIGKILL", run->pid);
         kill(run->pid, SIGKILL);
         return;
     }
 
-    if ((diffMillis > (run->global->timing.tmOut * 1000)) && !run->tmOutSignaled) {
+    if ((diffUSecs > (run->global->timing.tmOut * 1000000)) && !run->tmOutSignaled) {
         run->tmOutSignaled = true;
         LOG_W("pid=%d took too much time (limit %ld s). Killing it with %s", (int)run->pid,
             (long)run->global->timing.tmOut,

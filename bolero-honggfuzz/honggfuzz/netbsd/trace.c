@@ -56,6 +56,8 @@
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
 #include "netbsd/unwind.h"
+#include "report.h"
+#include "sanitizers.h"
 #include "subproc.h"
 
 #include <capstone/capstone.h>
@@ -100,8 +102,7 @@ static struct {
     [SIGBUS].important = true,
     [SIGBUS].descr = "SIGBUS",
 
-    /* Is affected from monitorSIGABRT flag */
-    [SIGABRT].important = false,
+    [SIGABRT].important = true,
     [SIGABRT].descr = "SIGABRT",
 
     /* Is affected from tmoutVTALRM flag */
@@ -116,12 +117,6 @@ static struct {
 #ifndef SI_FROMUSER
 #define SI_FROMUSER(siptr) ((siptr)->si_code == SI_USER)
 #endif /* SI_FROMUSER */
-
-static __thread char arch_signame[32];
-static const char* arch_sigName(int signo) {
-    snprintf(arch_signame, sizeof(arch_signame), "SIG%s", signalname(signo));
-    return arch_signame;
-}
 
 static size_t arch_getProcMem(pid_t pid, uint8_t* buf, size_t len, register_t pc) {
     struct ptrace_io_desc io;
@@ -235,56 +230,6 @@ static void arch_getInstrStr(pid_t pid, lwpid_t lwp, register_t* pc, char* instr
     return;
 }
 
-static void arch_hashCallstack(
-    run_t* run, funcs_t* funcs HF_ATTR_UNUSED, size_t funcCnt, bool enableMasking) {
-    uint64_t hash = 0;
-    for (size_t i = 0; i < funcCnt && i < run->global->netbsd.numMajorFrames; i++) {
-        /*
-         * Convert PC to char array to be compatible with hash function
-         */
-        char pcStr[REGSIZEINCHAR] = {0};
-        snprintf(pcStr, REGSIZEINCHAR, "%" PRIxREGISTER, (register_t)(long)funcs[i].pc);
-
-        /*
-         * Hash the last three nibbles
-         */
-        hash ^= util_hash(&pcStr[strlen(pcStr) - 3], 3);
-    }
-
-    /*
-     * If only one frame, hash is not safe to be used for uniqueness. We mask it
-     * here with a constant prefix, so analyzers can pick it up and create filenames
-     * accordingly. 'enableMasking' is controlling masking for cases where it should
-     * not be enabled (e.g. fuzzer worker is from verifier).
-     */
-    if (enableMasking && funcCnt == 1) {
-        hash |= _HF_SINGLE_FRAME_MASK;
-    }
-    run->backtrace = hash;
-}
-
-static void arch_traceGenerateReport(
-    pid_t pid, run_t* run, funcs_t* funcs, size_t funcCnt, siginfo_t* si, const char* instr) {
-    run->report[0] = '\0';
-    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->origFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", pid);
-    util_ssnprintf(run->report, sizeof(run->report), "SIGNAL: %s (%d)\n",
-        arch_sigName(si->si_signo), si->si_signo);
-    util_ssnprintf(run->report, sizeof(run->report), "FAULT ADDRESS: %p\n",
-        SI_FROMUSER(si) ? NULL : si->si_addr);
-    util_ssnprintf(run->report, sizeof(run->report), "INSTRUCTION: %s\n", instr);
-    util_ssnprintf(
-        run->report, sizeof(run->report), "STACK HASH: %016" PRIx64 "\n", run->backtrace);
-    util_ssnprintf(run->report, sizeof(run->report), "STACK:\n");
-    for (size_t i = 0; i < funcCnt; i++) {
-        util_ssnprintf(run->report, sizeof(run->report), " <%" PRIxREGISTER "> [%s():%zu at %s]\n",
-            (register_t)(long)funcs[i].pc, funcs[i].func, funcs[i].line, funcs[i].mapName);
-    }
-
-    return;
-}
-
 static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
     ptrace_siginfo_t info;
     register_t pc = 0, status_reg = 0;
@@ -325,7 +270,7 @@ static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
     /*
      * Calculate backtrace callstack hash signature
      */
-    arch_hashCallstack(run, funcs, funcCnt, false);
+    run->backtrace = sanitizers_hashCallstack(run, funcs, funcCnt, false);
 }
 
 static void arch_traceSaveData(run_t* run, pid_t pid) {
@@ -349,10 +294,10 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
         info.psi_siginfo.si_addr, pc, instr);
 
     if (!SI_FROMUSER(&info.psi_siginfo) && pc &&
-        info.psi_siginfo.si_addr < run->global->netbsd.ignoreAddr) {
+        info.psi_siginfo.si_addr < run->global->arch_netbsd.ignoreAddr) {
         LOG_I("Input is interesting (%s), but the si.si_addr is %p (below %p), skipping",
-            arch_sigName(info.psi_siginfo.si_signo), info.psi_siginfo.si_addr,
-            run->global->netbsd.ignoreAddr);
+            util_sigName(info.psi_siginfo.si_signo), info.psi_siginfo.si_addr,
+            run->global->arch_netbsd.ignoreAddr);
         return;
     }
 
@@ -389,7 +334,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     /*
      * Calculate backtrace callstack hash signature
      */
-    arch_hashCallstack(run, funcs, funcCnt, saveUnique);
+    run->backtrace = sanitizers_hashCallstack(run, funcs, funcCnt, saveUnique);
 
     /*
      * If unique flag is set and single frame crash, disable uniqueness for this crash
@@ -424,9 +369,9 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
      * both stackhash and symbol blacklist. Crash is always kept regardless
      * of the status of uniqueness flag.
      */
-    if (run->global->netbsd.symsWl) {
+    if (run->global->arch_netbsd.symsWl) {
         char* wlSymbol = arch_btContainsSymbol(
-            run->global->netbsd.symsWlCnt, run->global->netbsd.symsWl, funcCnt, funcs);
+            run->global->arch_netbsd.symsWlCnt, run->global->arch_netbsd.symsWl, funcCnt, funcs);
         if (wlSymbol != NULL) {
             saveUnique = false;
             LOG_D("Whitelisted symbol '%s' found, skipping blacklist checks", wlSymbol);
@@ -447,7 +392,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
          * Check if backtrace contains blacklisted symbol
          */
         char* blSymbol = arch_btContainsSymbol(
-            run->global->netbsd.symsBlCnt, run->global->netbsd.symsBl, funcCnt, funcs);
+            run->global->arch_netbsd.symsBlCnt, run->global->arch_netbsd.symsBl, funcCnt, funcs);
         if (blSymbol != NULL) {
             LOG_I("Blacklisted symbol '%s' found, skipping", blSymbol);
             ATOMIC_POST_INC(run->global->cnts.blCrashesCnt);
@@ -470,18 +415,18 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     /* If dry run mode, copy file with same name into workspace */
     if (run->global->mutate.mutationsPerRun == 0U && run->global->cfg.useVerifier) {
         snprintf(run->crashFileName, sizeof(run->crashFileName), "%s/%s", run->global->io.crashDir,
-            run->origFileName);
+            run->dynfile->path);
     } else if (saveUnique) {
         snprintf(run->crashFileName, sizeof(run->crashFileName),
             "%s/%s.PC.%" PRIxREGISTER ".STACK.%" PRIx64 ".CODE.%d.ADDR.%p.INSTR.%s.%s",
-            run->global->io.crashDir, arch_sigName(info.psi_siginfo.si_signo), pc, run->backtrace,
+            run->global->io.crashDir, util_sigName(info.psi_siginfo.si_signo), pc, run->backtrace,
             info.psi_siginfo.si_code, sig_addr, instr, run->global->io.fileExtn);
     } else {
         char localtmstr[PATH_MAX];
         util_getLocalTime("%F.%H:%M:%S", localtmstr, sizeof(localtmstr), time(NULL));
         snprintf(run->crashFileName, sizeof(run->crashFileName),
             "%s/%s.PC.%" PRIxREGISTER ".STACK.%" PRIx64 ".CODE.%d.ADDR.%p.INSTR.%s.%s.%d.%s",
-            run->global->io.crashDir, arch_sigName(info.psi_siginfo.si_signo), pc, run->backtrace,
+            run->global->io.crashDir, util_sigName(info.psi_siginfo.si_signo), pc, run->backtrace,
             info.psi_siginfo.si_code, sig_addr, instr, localtmstr, pid, run->global->io.fileExtn);
     }
 
@@ -492,7 +437,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
         return;
     }
 
-    if (!files_writeBufToFile(run->crashFileName, run->dynamicFile, run->dynamicFileSz,
+    if (!files_writeBufToFile(run->crashFileName, run->dynfile->data, run->dynfile->size,
             O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC)) {
         LOG_E("Couldn't write to '%s'", run->crashFileName);
         return;
@@ -504,7 +449,8 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     /* If unique crash found, reset dynFile counter */
     ATOMIC_CLEAR(run->global->cfg.dynFileIterExpire);
 
-    arch_traceGenerateReport(pid, run, funcs, funcCnt, &info.psi_siginfo, instr);
+    report_appendReport(pid, run, funcs, funcCnt, pc, (uint64_t)info.psi_siginfo.si_addr,
+        info.psi_siginfo.si_signo, instr, "");
 }
 
 static void arch_traceEvent(run_t* run HF_ATTR_UNUSED, pid_t pid) {
@@ -698,9 +644,6 @@ void arch_traceDetach(pid_t pid) {
 }
 
 void arch_traceSignalsInit(honggfuzz_t* hfuzz) {
-    /* Default is true for all platforms except Android */
-    arch_sigs[SIGABRT].important = hfuzz->cfg.monitorSIGABRT;
-
     /* Default is false */
     arch_sigs[SIGVTALRM].important = hfuzz->timing.tmoutVTALRM;
 }

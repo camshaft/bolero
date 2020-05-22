@@ -38,7 +38,7 @@
 #include "libhfcommon/util.h"
 
 #define PROG_NAME "honggfuzz"
-#define PROG_VERSION "1.9"
+#define PROG_VERSION "2.2"
 
 /* Name of the template which will be replaced with the proper name of the file */
 #define _HF_FILE_PLACEHOLDER "___FILE___"
@@ -62,7 +62,7 @@
 #define _HF_VERIFIER_ITER 5
 
 /* Size (in bytes) for report data to be stored in stack before written to file */
-#define _HF_REPORT_SIZE 8192
+#define _HF_REPORT_SIZE 32768
 
 /* Perf bitmap size */
 #define _HF_PERF_BITMAP_SIZE_16M (1024U * 1024U * 16U)
@@ -70,17 +70,31 @@
 /* Maximum number of PC guards (=trace-pc-guard) we support */
 #define _HF_PC_GUARD_MAX (1024ULL * 1024ULL * 64ULL)
 
-/* Maximum size of the input file in bytes (128 MiB) */
-#define _HF_INPUT_MAX_SIZE (1024ULL * 1024ULL * 128ULL)
+/* Maximum size of the input file in bytes (1 MiB) */
+#define _HF_INPUT_MAX_SIZE (1024ULL * 1024ULL)
 
+/* Default maximum size of produced inputs */
+#define _HF_INPUT_DEFAULT_SIZE (1024ULL * 8)
+
+/* Per-thread bitmap */
+#define _HF_PERTHREAD_BITMAP_FD 1018
+/* FD used to report back used int/str constants from the fuzzed process */
+#define _HF_CMP_BITMAP_FD 1019
 /* FD used to log inside the child process */
 #define _HF_LOG_FD 1020
 /* FD used to represent the input file */
 #define _HF_INPUT_FD 1021
-/* FD used to pass feedback bitmap a process */
-#define _HF_BITMAP_FD 1022
+/* FD used to pass coverage feedback from the fuzzed process */
+#define _HF_COV_BITMAP_FD 1022
+#define _HF_BITMAP_FD _HF_COV_BITMAP_FD /* Old name for _HF_COV_BITMAP_FD */
 /* FD used to pass data to a persistent process */
 #define _HF_PERSISTENT_FD 1023
+
+/* Input file as a string */
+#define _HF_INPUT_FILE_PATH "/dev/fd/" HF_XSTR(_HF_INPUT_FD)
+
+/* Maximum number of supported execve() args */
+#define _HF_ARGS_MAX 512
 
 /* Message indicating that the fuzzed process is ready for new data */
 static const uint8_t HFReadyTag = 'R';
@@ -92,6 +106,9 @@ static const uint8_t HFReadyTag = 'R';
 #define _HF_PERSISTENT_SIG "\x01_LIBHFUZZ_PERSISTENT_BINARY_SIGNATURE_\x02\xFF"
 /* HF NetDriver signature - if found within file, it means it's a NetDriver-based binary */
 #define _HF_NETDRIVER_SIG "\x01_LIBHFUZZ_NETDRIVER_BINARY_SIGNATURE_\x02\xFF"
+
+/* printf() nonmonetary separator. According to MacOSX's man it's supported there as well */
+#define _HF_NONMON_SEP "'"
 
 typedef enum {
     _HF_DYNFILE_NONE = 0x0,
@@ -112,39 +129,6 @@ typedef struct {
     uint64_t softCntCmp;
 } hwcnt_t;
 
-typedef struct {
-    uint32_t capacity;
-    uint32_t* pChunks;
-    uint32_t nChunks;
-} bitmap_t;
-
-/* Memory map struct */
-typedef struct __attribute__((packed)) {
-    uint64_t start;          // region start addr
-    uint64_t end;            // region end addr
-    uint64_t base;           // region base addr
-    char mapName[NAME_MAX];  // bin/DSO name
-    uint64_t bbCnt;
-    uint64_t newBBCnt;
-} memMap_t;
-
-/* Trie node data struct */
-typedef struct __attribute__((packed)) {
-    bitmap_t* pBM;
-} trieData_t;
-
-/* Trie node struct */
-typedef struct node {
-    char key;
-    trieData_t data;
-    struct node* next;
-    struct node* prev;
-    struct node* children;
-    struct node* parent;
-} node_t;
-
-/* EOF Sanitizer coverage specific data structures */
-
 typedef enum {
     _HF_STATE_UNSET = 0,
     _HF_STATE_STATIC,
@@ -153,13 +137,26 @@ typedef enum {
     _HF_STATE_DYNAMIC_MINIMIZE,
 } fuzzState_t;
 
-struct dynfile_t {
+typedef enum {
+    HF_MAYBE = -1,
+    HF_NO = 0,
+    HF_YES = 1,
+} tristate_t;
+
+struct _dynfile_t {
     size_t size;
     uint64_t cov[4];
+    size_t idx;
+    int fd;
+    uint64_t timeExecUSecs;
     char path[PATH_MAX];
-    TAILQ_ENTRY(dynfile_t) pointers;
-    uint8_t data[];
+    struct _dynfile_t* src;
+    uint32_t refs;
+    uint8_t* data;
+    TAILQ_ENTRY(_dynfile_t) pointers;
 };
+
+typedef struct _dynfile_t dynfile_t;
 
 struct strings_t {
     size_t len;
@@ -168,14 +165,25 @@ struct strings_t {
 };
 
 typedef struct {
-    bool pcGuardMap[_HF_PC_GUARD_MAX];
+    uint8_t pcGuardMap[_HF_PC_GUARD_MAX];
     uint8_t bbMapPc[_HF_PERF_BITMAP_SIZE_16M];
     uint32_t bbMapCmp[_HF_PERF_BITMAP_SIZE_16M];
-    uint64_t pidFeedbackPc[_HF_THREAD_MAX];
-    uint64_t pidFeedbackEdge[_HF_THREAD_MAX];
-    uint64_t pidFeedbackCmp[_HF_THREAD_MAX];
+    uint64_t pidNewPC[_HF_THREAD_MAX];
+    uint64_t pidNewEdge[_HF_THREAD_MAX];
+    uint64_t pidNewCmp[_HF_THREAD_MAX];
     uint64_t guardNb;
+    uint64_t pidTotalPC[_HF_THREAD_MAX];
+    uint64_t pidTotalEdge[_HF_THREAD_MAX];
+    uint64_t pidTotalCmp[_HF_THREAD_MAX];
 } feedback_t;
+
+typedef struct {
+    uint32_t cnt;
+    struct {
+        uint8_t val[32];
+        uint32_t len;
+    } valArr[1024 * 16];
+} cmpfeedback_t;
 
 typedef struct {
     struct {
@@ -191,17 +199,21 @@ typedef struct {
         const char* outputDir;
         DIR* inputDirPtr;
         size_t fileCnt;
+        size_t testedFileCnt;
         const char* fileExtn;
-        bool fileCntDone;
+        size_t maxFileSz;
         size_t newUnitsAdded;
-        const char* workDir;
+        char workDir[PATH_MAX];
         const char* crashDir;
         const char* covDirNew;
         bool saveUnique;
+        size_t dynfileqMaxSz;
         size_t dynfileqCnt;
         pthread_rwlock_t dynfileq_mutex;
-        struct dynfile_t* dynfileqCurrent;
-        TAILQ_HEAD(dyns_t, dynfile_t) dynfileq;
+        dynfile_t* dynfileqCurrent;
+        dynfile_t* dynfileq2Current;
+        TAILQ_HEAD(dyns_t, _dynfile_t) dynfileq;
+        bool exportFeedback;
     } io;
     struct {
         int argc;
@@ -217,8 +229,10 @@ typedef struct {
         uint64_t rssLimit;
         uint64_t dataLimit;
         uint64_t coreLimit;
+        uint64_t stackLimit;
         bool clearEnv;
-        char* envs[128];
+        char* env_ptrs[128];
+        char env_vals[128][4096];
         sigset_t waitSigSet;
     } exe;
     struct {
@@ -226,28 +240,30 @@ typedef struct {
         time_t runEndTime;
         time_t tmOut;
         time_t lastCovUpdate;
-        int64_t timeOfLongestUnitInMilliseconds;
+        int64_t timeOfLongestUnitUSecs;
         bool tmoutVTALRM;
     } timing;
     struct {
-        const char* dictionaryFile;
-        TAILQ_HEAD(strq_t, strings_t) dictq;
+        struct {
+            uint8_t val[256];
+            size_t len;
+        } dictionary[1024];
         size_t dictionaryCnt;
+        const char* dictionaryFile;
         size_t mutationsMax;
         unsigned mutationsPerRun;
-        size_t maxFileSz;
+        size_t maxInputSz;
     } mutate;
     struct {
         bool useScreen;
         char cmdline_txt[65];
-        int64_t lastDisplayMillis;
+        int64_t lastDisplayUSecs;
     } display;
     struct {
         bool useVerifier;
         bool exitUponCrash;
         const char* reportFile;
         pthread_mutex_t report_mutex;
-        bool monitorSIGABRT;
         size_t dynFileIterExpire;
         bool only_printable;
         bool minimize;
@@ -255,17 +271,23 @@ typedef struct {
     } cfg;
     struct {
         bool enable;
+        bool del_report;
     } sanitizer;
     struct {
         fuzzState_t state;
-        feedback_t* feedbackMap;
-        int bbFd;
-        pthread_mutex_t feedback_mutex;
+        feedback_t* covFeedbackMap;
+        int covFeedbackFd;
+        pthread_mutex_t covFeedback_mutex;
+        cmpfeedback_t* cmpFeedbackMap;
+        int cmpFeedbackFd;
+        bool cmpFeedback;
         const char* blacklistFile;
         uint64_t* blacklist;
         size_t blacklistCnt;
         bool skipFeedbackOnTimeout;
+        uint64_t maxCov[4];
         dynFileMethod_t dynFileMethod;
+        hwcnt_t hwCnts;
     } feedback;
     struct {
         size_t mutationsCnt;
@@ -283,11 +305,9 @@ typedef struct {
     /* For the Linux code */
     struct {
         int exeFd;
-        hwcnt_t hwCnts;
         uint64_t dynamicCutOffAddr;
         bool disableRandomization;
         void* ignoreAddr;
-        size_t numMajorFrames;
         const char* symsBlFile;
         char** symsBl;
         size_t symsBlCnt;
@@ -295,20 +315,20 @@ typedef struct {
         char** symsWl;
         size_t symsWlCnt;
         uintptr_t cloneFlags;
+        tristate_t useNetNs;
         bool kernelOnly;
         bool useClone;
-    } linux;
+    } arch_linux;
     /* For the NetBSD code */
     struct {
         void* ignoreAddr;
-        size_t numMajorFrames;
         const char* symsBlFile;
         char** symsBl;
         size_t symsBlCnt;
         const char* symsWlFile;
         char** symsWl;
         size_t symsWlCnt;
-    } netbsd;
+    } arch_netbsd;
 } honggfuzz_t;
 
 typedef enum {
@@ -321,8 +341,7 @@ typedef enum {
 typedef struct {
     honggfuzz_t* global;
     pid_t pid;
-    int64_t timeStartedMillis;
-    char origFileName[PATH_MAX];
+    int64_t timeStartedUSecs;
     char crashFileName[PATH_MAX];
     uint64_t pc;
     uint64_t backtrace;
@@ -331,37 +350,39 @@ typedef struct {
     char report[_HF_REPORT_SIZE];
     bool mainWorker;
     unsigned mutationsPerRun;
-    uint8_t* dynamicFile;
-    size_t dynamicFileSz;
-    int dynamicFileFd;
+    dynfile_t* dynfile;
+    bool staticFileTryMore;
     uint32_t fuzzNo;
     int persistentSock;
     bool waitingForReady;
     runState_t runState;
     bool tmOutSignaled;
+    char* args[_HF_ARGS_MAX + 1];
+    int perThreadCovFeedbackFd;
+    unsigned triesLeft;
+    dynfile_t* current;
 #if !defined(_HF_ARCH_DARWIN)
     timer_t timerId;
 #endif  // !defined(_HF_ARCH_DARWIN)
+    hwcnt_t hwCnts;
 
     struct {
         /* For Linux code */
         uint8_t* perfMmapBuf;
         uint8_t* perfMmapAux;
-        hwcnt_t hwCnts;
         int cpuInstrFd;
         int cpuBranchFd;
         int cpuIptBtsFd;
-    } linux;
+    } arch_linux;
 
     struct {
         /* For NetBSD code */
         uint8_t* perfMmapBuf;
         uint8_t* perfMmapAux;
-        hwcnt_t hwCnts;
         int cpuInstrFd;
         int cpuBranchFd;
         int cpuIptBtsFd;
-    } netbsd;
+    } arch_netbsd;
 } run_t;
 
 /*

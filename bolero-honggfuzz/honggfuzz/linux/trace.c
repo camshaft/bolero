@@ -54,30 +54,14 @@
 #include "libhfcommon/util.h"
 #include "linux/bfd.h"
 #include "linux/unwind.h"
+#include "report.h"
 #include "sanitizers.h"
 #include "socketfuzzer.h"
 #include "subproc.h"
 
 #if defined(__ANDROID__)
-#include "capstone.h"
+#include "capstone/capstone.h"
 #endif
-
-#if defined(__i386__) || defined(__arm__) || defined(__powerpc__)
-#define REG_TYPE uint32_t
-#define REG_PM PRIx32
-#define REG_PD "0x%08"
-#elif defined(__x86_64__) || defined(__aarch64__) || defined(__powerpc64__) || \
-    defined(__mips__) || defined(__mips64__)
-#define REG_TYPE uint64_t
-#define REG_PM PRIx64
-#define REG_PD "0x%016"
-#endif
-
-/*
- * Size in characters required to store a string representation of a
- * register value (0xdeadbeef style))
- */
-#define REGSIZEINCHAR (2 * sizeof(REG_TYPE) + 3)
 
 #if defined(__i386__) || defined(__x86_64__)
 #define MAX_INSTR_SZ 16
@@ -267,8 +251,7 @@ static struct {
     [SIGBUS].important = true,
     [SIGBUS].descr = "SIGBUS",
 
-    /* Is affected from monitorSIGABRT flag */
-    [SIGABRT].important = false,
+    [SIGABRT].important = true,
     [SIGABRT].descr = "SIGABRT",
 
     /* Is affected from tmoutVTALRM flag */
@@ -284,31 +267,7 @@ static struct {
 #define SI_FROMUSER(siptr) ((siptr)->si_code <= 0)
 #endif /* SI_FROMUSER */
 
-extern const char* sys_sigabbrev[];
-
-static __thread char arch_signame[32];
-static const char* arch_sigName(int signo) {
-    if (signo < 0 || signo > _NSIG) {
-        snprintf(arch_signame, sizeof(arch_signame), "UNKNOWN-%d", signo);
-        return arch_signame;
-    }
-    if (signo > __SIGRTMIN) {
-        snprintf(arch_signame, sizeof(arch_signame), "SIG%d-RTMIN+%d", signo, signo - __SIGRTMIN);
-        return arch_signame;
-    }
-#ifdef __ANDROID__
-    return arch_sigs[signo].descr;
-#else
-    if (sys_sigabbrev[signo] == NULL) {
-        snprintf(arch_signame, sizeof(arch_signame), "SIG%d", signo);
-    } else {
-        snprintf(arch_signame, sizeof(arch_signame), "SIG%s", sys_sigabbrev[signo]);
-    }
-    return arch_signame;
-#endif /* __ANDROID__ */
-}
-
-static size_t arch_getProcMem(pid_t pid, uint8_t* buf, size_t len, REG_TYPE pc) {
+static size_t arch_getProcMem(pid_t pid, uint8_t* buf, size_t len, uint64_t pc) {
     /*
      * Let's try process_vm_readv first
      */
@@ -348,7 +307,7 @@ static size_t arch_getProcMem(pid_t pid, uint8_t* buf, size_t len, REG_TYPE pc) 
     return memsz;
 }
 
-static size_t arch_getPC(pid_t pid, REG_TYPE* pc, REG_TYPE* status_reg HF_ATTR_UNUSED) {
+static size_t arch_getPC(pid_t pid, uint64_t* pc, uint64_t* status_reg HF_ATTR_UNUSED) {
 /*
  * Some old ARM android kernels are failing with PTRACE_GETREGS to extract
  * the correct register values if struct size is bigger than expected. As such the
@@ -465,30 +424,26 @@ static size_t arch_getPC(pid_t pid, REG_TYPE* pc, REG_TYPE* status_reg HF_ATTR_U
     return 0;
 }
 
-static void arch_getInstrStr(pid_t pid, REG_TYPE* pc, char* instr) {
+static void arch_getInstrStr(pid_t pid, uint64_t pc, uint64_t status_reg HF_ATTR_UNUSED,
+    size_t pcRegSz HF_ATTR_UNUSED, char* instr) {
     /*
      * We need a value aligned to 8
      * which is sizeof(long) on 64bit CPU archs (on most of them, I hope;)
      */
     uint8_t buf[MAX_INSTR_SZ];
     size_t memsz;
-    REG_TYPE status_reg = 0;
 
     snprintf(instr, _HF_INSTR_SZ, "%s", "[UNKNOWN]");
 
-    size_t pcRegSz = arch_getPC(pid, pc, &status_reg);
-    if (!pcRegSz) {
-        LOG_W("Current architecture not supported for disassembly");
-        return;
-    }
-
-    if ((memsz = arch_getProcMem(pid, buf, sizeof(buf), *pc)) == 0) {
+    if ((memsz = arch_getProcMem(pid, buf, sizeof(buf), pc)) == 0) {
         snprintf(instr, _HF_INSTR_SZ, "%s", "[NOT_MMAPED]");
         return;
     }
 #if !defined(__ANDROID__)
+#if !defined(_HF_LINUX_NO_BFD)
     arch_bfdDisasm(pid, buf, memsz, instr);
-#else
+#endif /* !defined(_HF_LINUX_NO_BFD) */
+#else  /* !defined(__ANDROID__) */
     cs_arch arch;
     cs_mode mode;
 #if defined(__arm__) || defined(__aarch64__)
@@ -513,7 +468,7 @@ static void arch_getInstrStr(pid_t pid, REG_TYPE* pc, char* instr) {
     }
 
     cs_insn* insn;
-    size_t count = cs_disasm(handle, buf, sizeof(buf), *pc, 0, &insn);
+    size_t count = cs_disasm(handle, buf, sizeof(buf), pc, 0, &insn);
 
     if (count < 1) {
         LOG_W("Couldn't disassemble the assembler instructions' stream: '%s'",
@@ -536,76 +491,60 @@ static void arch_getInstrStr(pid_t pid, REG_TYPE* pc, char* instr) {
     return;
 }
 
-static void arch_hashCallstack(run_t* run, funcs_t* funcs, size_t funcCnt, bool enableMasking) {
-    uint64_t hash = 0;
-    for (size_t i = 0; i < funcCnt && i < run->global->linux.numMajorFrames; i++) {
-        /*
-         * Convert PC to char array to be compatible with hash function
-         */
-        char pcStr[REGSIZEINCHAR] = {0};
-        snprintf(pcStr, REGSIZEINCHAR, REG_PD REG_PM, (REG_TYPE)(long)funcs[i].pc);
+static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
+    funcs_t* funcs = util_Calloc(_HF_MAX_FUNCS * sizeof(funcs_t));
+    defer {
+        free(funcs);
+    };
 
-        /*
-         * Hash the last three nibbles
-         */
-        hash ^= util_hash(&pcStr[strlen(pcStr) - 3], 3);
+    uint64_t pc = 0;
+    uint64_t status_reg = 0;
+    size_t pcRegSz = arch_getPC(pid, &pc, &status_reg);
+    if (!pcRegSz) {
+        LOG_W("ptrace arch_getPC failed");
+        return;
     }
+
+    uint64_t crashAddr = 0;
+    char description[HF_STR_LEN] = {};
+    size_t funcCnt = sanitizers_parseReport(run, pid, funcs, &pc, &crashAddr, description);
+    if (funcCnt <= 0) {
+        funcCnt = arch_unwindStack(pid, funcs);
+#if !defined(__ANDROID__)
+#if !defined(_HF_LINUX_NO_BFD)
+        arch_bfdResolveSyms(pid, funcs, funcCnt);
+#endif /* !defined(_HF_LINUX_NO_BFD) */
+#endif /* !defined(__ANDROID__) */
+    }
+
+#if !defined(__ANDROID__)
+#if !defined(_HF_LINUX_NO_BFD)
+    arch_bfdDemangle(funcs, funcCnt);
+#endif /* !defined(_HF_LINUX_NO_BFD) */
+#endif /* !defined(__ANDROID__) */
 
     /*
-     * If only one frame, hash is not safe to be used for uniqueness. We mask it
-     * here with a constant prefix, so analyzers can pick it up and create filenames
-     * accordingly. 'enableMasking' is controlling masking for cases where it should
-     * not be enabled (e.g. fuzzer worker is from verifier).
+     * Calculate backtrace callstack hash signature
      */
-    if (enableMasking && funcCnt == 1) {
-        hash |= _HF_SINGLE_FRAME_MASK;
-    }
-    run->backtrace = hash;
+    run->backtrace = sanitizers_hashCallstack(run, funcs, funcCnt, false);
 }
 
-static void arch_traceGenerateReport(
-    pid_t pid, run_t* run, funcs_t* funcs, size_t funcCnt, siginfo_t* si, const char* instr) {
-    run->report[0] = '\0';
-    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->origFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", pid);
-    util_ssnprintf(run->report, sizeof(run->report), "SIGNAL: %s (%d)\n",
-        arch_sigName(si->si_signo), si->si_signo);
-    util_ssnprintf(run->report, sizeof(run->report), "FAULT ADDRESS: %p\n",
-        SI_FROMUSER(si) ? NULL : si->si_addr);
-    util_ssnprintf(run->report, sizeof(run->report), "INSTRUCTION: %s\n", instr);
-    util_ssnprintf(
-        run->report, sizeof(run->report), "STACK HASH: %016" PRIx64 "\n", run->backtrace);
-    util_ssnprintf(run->report, sizeof(run->report), "STACK:\n");
-    for (size_t i = 0; i < funcCnt; i++) {
-#ifdef __HF_USE_CAPSTONE__
-        util_ssnprintf(
-            run->report, sizeof(run->report), " <" REG_PD REG_PM "> ", (REG_TYPE)(long)funcs[i].pc);
-        if (funcs[i].func[0] != '\0')
-            util_ssnprintf(run->report, sizeof(run->report), "[%s() + 0x%x at %s]\n", funcs[i].func,
-                funcs[i].line, funcs[i].mapName);
-        else
-            util_ssnprintf(run->report, sizeof(run->report), "[]\n");
-#else
-        util_ssnprintf(run->report, sizeof(run->report), " <" REG_PD REG_PM "> [%s():%zu at %s]\n",
-            (REG_TYPE)(long)funcs[i].pc, funcs[i].func, funcs[i].line, funcs[i].mapName);
-#endif
+static void arch_traceSaveData(run_t* run, pid_t pid) {
+    char instr[_HF_INSTR_SZ] = "\x00";
+    siginfo_t si = {};
+
+    if (ptrace(PTRACE_GETSIGINFO, pid, 0, &si) == -1) {
+        PLOG_W("Couldn't get siginfo for pid %d", pid);
     }
 
-// libunwind is not working for 32bit targets in 64bit systems
-#if defined(__aarch64__)
-    if (funcCnt == 0) {
-        util_ssnprintf(run->report, sizeof(run->report),
-            " !ERROR: If 32bit fuzz target"
-            " in aarch64 system, try ARM 32bit build\n");
+    uint64_t crashAddr = (uint64_t)(uintptr_t)si.si_addr;
+    /* User-induced signals don't set si.si_addr */
+    if (SI_FROMUSER(&si)) {
+        crashAddr = 0UL;
     }
-#endif
 
-    return;
-}
-
-static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
-    REG_TYPE pc = 0, status_reg = 0;
+    uint64_t pc = 0;
+    uint64_t status_reg = 0;
     size_t pcRegSz = arch_getPC(pid, &pc, &status_reg);
     if (!pcRegSz) {
         LOG_W("ptrace arch_getPC failed");
@@ -615,93 +554,38 @@ static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
     /*
      * Unwind and resolve symbols
      */
-    funcs_t* funcs = util_Malloc(_HF_MAX_FUNCS * sizeof(funcs_t));
+    funcs_t* funcs = util_Calloc(_HF_MAX_FUNCS * sizeof(funcs_t));
     defer {
         free(funcs);
     };
-    memset(funcs, 0, _HF_MAX_FUNCS * sizeof(funcs_t));
+
+    char description[HF_STR_LEN] = {};
+    size_t funcCnt = sanitizers_parseReport(run, pid, funcs, &pc, &crashAddr, description);
+    if (funcCnt == 0) {
+        funcCnt = arch_unwindStack(pid, funcs);
+#if !defined(__ANDROID__)
+#if !defined(_HF_LINUX_NO_BFD)
+        arch_bfdResolveSyms(pid, funcs, funcCnt);
+#endif /* !defined(_HF_LINUX_NO_BFD) */
+#endif /* !defined(__ANDROID__) */
+    }
 
 #if !defined(__ANDROID__)
-    size_t funcCnt = arch_unwindStack(pid, funcs);
-    arch_bfdResolveSyms(pid, funcs, funcCnt);
-#else
-    size_t funcCnt = arch_unwindStack(pid, funcs);
-#endif
+#if !defined(_HF_LINUX_NO_BFD)
+    arch_bfdDemangle(funcs, funcCnt);
+#endif /* !defined(_HF_LINUX_NO_BFD) */
+#endif /* !defined(__ANDROID__) */
+    arch_getInstrStr(pid, pc, status_reg, pcRegSz, instr);
 
-    /*
-     * If unwinder failed (zero frames), use PC from ptrace GETREGS if not zero.
-     * If PC reg zero return and callers should handle zero hash case.
-     */
-    if (funcCnt == 0) {
-        if (pc) {
-            /* Manually update major frame PC & frames counter */
-            funcs[0].pc = (void*)(uintptr_t)pc;
-            funcCnt = 1;
-        } else {
-            return;
-        }
-    }
+    LOG_D("Pid: %d, signo: %d, errno: %d, code: %d, addr: %p, pc: %" PRIx64 ", crashAddr: %" PRIx64
+          " instr: '%s'",
+        pid, si.si_signo, si.si_errno, si.si_code, si.si_addr, pc, crashAddr, instr);
 
-    /*
-     * Calculate backtrace callstack hash signature
-     */
-    arch_hashCallstack(run, funcs, funcCnt, false);
-}
-
-static void arch_traceSaveData(run_t* run, pid_t pid) {
-    REG_TYPE pc = 0;
-
-    /* Local copy since flag is overridden for some crashes */
-    bool saveUnique = run->global->io.saveUnique;
-
-    char instr[_HF_INSTR_SZ] = "\x00";
-    siginfo_t si;
-    bzero(&si, sizeof(si));
-
-    if (ptrace(PTRACE_GETSIGINFO, pid, 0, &si) == -1) {
-        PLOG_W("Couldn't get siginfo for pid %d", pid);
-    }
-
-    arch_getInstrStr(pid, &pc, instr);
-
-    LOG_D("Pid: %d, signo: %d, errno: %d, code: %d, addr: %p, pc: %" REG_PM ", instr: '%s'", pid,
-        si.si_signo, si.si_errno, si.si_code, si.si_addr, pc, instr);
-
-    if (!SI_FROMUSER(&si) && pc && si.si_addr < run->global->linux.ignoreAddr) {
+    if (!SI_FROMUSER(&si) && pc &&
+        crashAddr < (uint64_t)(uintptr_t)run->global->arch_linux.ignoreAddr) {
         LOG_I("Input is interesting (%s), but the si.si_addr is %p (below %p), skipping",
-            arch_sigName(si.si_signo), si.si_addr, run->global->linux.ignoreAddr);
+            util_sigName(si.si_signo), si.si_addr, run->global->arch_linux.ignoreAddr);
         return;
-    }
-
-    /*
-     * Unwind and resolve symbols
-     */
-    funcs_t* funcs = util_Malloc(_HF_MAX_FUNCS * sizeof(funcs_t));
-    defer {
-        free(funcs);
-    };
-    memset(funcs, 0, _HF_MAX_FUNCS * sizeof(funcs_t));
-
-#if !defined(__ANDROID__)
-    size_t funcCnt = arch_unwindStack(pid, funcs);
-    arch_bfdResolveSyms(pid, funcs, funcCnt);
-#else
-    size_t funcCnt = arch_unwindStack(pid, funcs);
-#endif
-
-    /*
-     * If unwinder failed (zero frames), use PC from ptrace GETREGS if not zero.
-     * If PC reg zero, temporarily disable uniqueness flag since callstack
-     * hash will be also zero, thus not safe for unique decisions.
-     */
-    if (funcCnt == 0) {
-        if (pc) {
-            /* Manually update major frame PC & frames counter */
-            funcs[0].pc = (void*)(uintptr_t)pc;
-            funcCnt = 1;
-        } else {
-            saveUnique = false;
-        }
     }
 
     /*
@@ -710,16 +594,19 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
      */
     uint64_t oldBacktrace = run->backtrace;
 
+    /* Local copy since flag is overridden for some crashes */
+    bool saveUnique = run->global->io.saveUnique;
+
     /*
      * Calculate backtrace callstack hash signature
      */
-    arch_hashCallstack(run, funcs, funcCnt, saveUnique);
+    run->backtrace = sanitizers_hashCallstack(run, funcs, funcCnt, saveUnique);
 
     /*
      * If unique flag is set and single frame crash, disable uniqueness for this crash
      * to always save (timestamp will be added to the filename)
      */
-    if (saveUnique && (funcCnt == 1)) {
+    if (saveUnique && (funcCnt == 0)) {
         saveUnique = false;
     }
 
@@ -748,9 +635,9 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
      * both stackhash and symbol blacklist. Crash is always kept regardless
      * of the status of uniqueness flag.
      */
-    if (run->global->linux.symsWl) {
+    if (run->global->arch_linux.symsWl) {
         char* wlSymbol = arch_btContainsSymbol(
-            run->global->linux.symsWlCnt, run->global->linux.symsWl, funcCnt, funcs);
+            run->global->arch_linux.symsWlCnt, run->global->arch_linux.symsWl, funcCnt, funcs);
         if (wlSymbol != NULL) {
             saveUnique = false;
             LOG_D("Whitelisted symbol '%s' found, skipping blacklist checks", wlSymbol);
@@ -771,7 +658,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
          * Check if backtrace contains blacklisted symbol
          */
         char* blSymbol = arch_btContainsSymbol(
-            run->global->linux.symsBlCnt, run->global->linux.symsBl, funcCnt, funcs);
+            run->global->arch_linux.symsBlCnt, run->global->arch_linux.symsBl, funcCnt, funcs);
         if (blSymbol != NULL) {
             LOG_I("Blacklisted symbol '%s' found, skipping", blSymbol);
             ATOMIC_POST_INC(run->global->cnts.blCrashesCnt);
@@ -782,33 +669,32 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     /* If non-blacklisted crash detected, zero set two MSB */
     ATOMIC_POST_ADD(run->global->cfg.dynFileIterExpire, _HF_DYNFILE_SUB_MASK);
 
-    void* sig_addr = si.si_addr;
-    if (!run->global->linux.disableRandomization) {
+    /* Those addresses will be random, so depend on stack-traces for uniqueness */
+    if (!run->global->arch_linux.disableRandomization) {
         pc = 0UL;
-        sig_addr = NULL;
+        crashAddr = 0UL;
     }
-
-    /* User-induced signals don't set si.si_addr */
-    if (SI_FROMUSER(&si)) {
-        sig_addr = NULL;
+    /* crashAddr (si.si_addr) never makes sense for SIGABRT */
+    if (si.si_signo == SIGABRT) {
+        crashAddr = 0UL;
     }
 
     /* If dry run mode, copy file with same name into workspace */
     if (run->global->mutate.mutationsPerRun == 0U && run->global->cfg.useVerifier) {
         snprintf(run->crashFileName, sizeof(run->crashFileName), "%s/%s", run->global->io.crashDir,
-            run->origFileName);
+            run->dynfile->path);
     } else if (saveUnique) {
         snprintf(run->crashFileName, sizeof(run->crashFileName),
-            "%s/%s.PC.%" REG_PM ".STACK.%" PRIx64 ".CODE.%d.ADDR.%p.INSTR.%s.%s",
-            run->global->io.crashDir, arch_sigName(si.si_signo), pc, run->backtrace, si.si_code,
-            sig_addr, instr, run->global->io.fileExtn);
+            "%s/%s.PC.%" PRIx64 ".STACK.%" PRIx64 ".CODE.%d.ADDR.%" PRIx64 ".INSTR.%s.%s",
+            run->global->io.crashDir, util_sigName(si.si_signo), pc, run->backtrace, si.si_code,
+            crashAddr, instr, run->global->io.fileExtn);
     } else {
-        char localtmstr[PATH_MAX];
+        char localtmstr[HF_STR_LEN];
         util_getLocalTime("%F.%H:%M:%S", localtmstr, sizeof(localtmstr), time(NULL));
         snprintf(run->crashFileName, sizeof(run->crashFileName),
-            "%s/%s.PC.%" REG_PM ".STACK.%" PRIx64 ".CODE.%d.ADDR.%p.INSTR.%s.%s.%d.%s",
-            run->global->io.crashDir, arch_sigName(si.si_signo), pc, run->backtrace, si.si_code,
-            sig_addr, instr, localtmstr, pid, run->global->io.fileExtn);
+            "%s/%s.PC.%" PRIx64 ".STACK.%" PRIx64 ".CODE.%d.ADDR.%" PRIx64 ".INSTR.%s.%s.%d.%s",
+            run->global->io.crashDir, util_sigName(si.si_signo), pc, run->backtrace, si.si_code,
+            crashAddr, instr, localtmstr, pid, run->global->io.fileExtn);
     }
 
     /* Target crashed (no duplicate detection yet) */
@@ -818,12 +704,12 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
 
     if (files_exists(run->crashFileName)) {
         LOG_I("Crash (dup): '%s' already exists, skipping", run->crashFileName);
-        // Clear filename so that verifier can understand we hit a duplicate
+        /* Clear filename so that verifier can understand we hit a duplicate */
         memset(run->crashFileName, 0, sizeof(run->crashFileName));
         return;
     }
 
-    if (!files_writeBufToFile(run->crashFileName, run->dynamicFile, run->dynamicFileSz,
+    if (!files_writeBufToFile(run->crashFileName, run->dynfile->data, run->dynfile->size,
             O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC)) {
         LOG_E("Couldn't write to '%s'", run->crashFileName);
         return;
@@ -840,310 +726,11 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     /* If unique crash found, reset dynFile counter */
     ATOMIC_CLEAR(run->global->cfg.dynFileIterExpire);
 
-    arch_traceGenerateReport(pid, run, funcs, funcCnt, &si, instr);
-}
-
-/* TODO: Add report parsing support for other sanitizers too */
-static int arch_parseAsanReport(
-    run_t* run, pid_t pid, funcs_t* funcs, void** crashAddr, char** op) {
-    char crashReport[PATH_MAX] = {0};
-    const char* const crashReportCpy = crashReport;
-    snprintf(
-        crashReport, sizeof(crashReport), "%s/%s.%d", run->global->io.workDir, kLOGPREFIX, pid);
-
-    FILE* fReport = fopen(crashReport, "rb");
-    if (fReport == NULL) {
-        PLOG_D("Couldn't open '%s' - R/O mode", crashReport);
-        return -1;
-    }
-    defer {
-        fclose(fReport);
-    };
-    defer {
-        unlink(crashReportCpy);
-    };
-
-    char header[35] = {0};
-    snprintf(header, sizeof(header), "==%d==ERROR: AddressSanitizer:", pid);
-    size_t headerSz = strlen(header);
-    bool headerFound = false;
-
-    uint8_t frameIdx = 0;
-    char framePrefix[5] = {0};
-    snprintf(framePrefix, sizeof(framePrefix), "#%" PRIu8, frameIdx);
-
-    char *lineptr = NULL, *cAddr = NULL;
-    size_t n = 0;
-    defer {
-        free(lineptr);
-    };
-    for (;;) {
-        if (getline(&lineptr, &n, fReport) == -1) {
-            break;
-        }
-
-        /* First step is to identify header */
-        if (!headerFound) {
-            if ((strlen(lineptr) > headerSz) && (strncmp(header, lineptr, headerSz) == 0)) {
-                headerFound = true;
-
-                /* Parse crash address */
-                cAddr = strstr(lineptr, "address 0x");
-                if (cAddr) {
-                    cAddr = cAddr + strlen("address ");
-                    char* endOff = strchr(cAddr, ' ');
-                    cAddr[endOff - cAddr] = '\0';
-                    *crashAddr = (void*)((size_t)strtoull(cAddr, NULL, 16));
-                } else {
-                    *crashAddr = 0x0;
-                }
-            }
-            continue;
-        } else {
-            char* pLineLC = lineptr;
-            /* Trim leading spaces */
-            while (*pLineLC != '\0' && isspace(*pLineLC)) {
-                ++pLineLC;
-            }
-
-            /* End separator for crash thread stack trace is an empty line */
-            if ((*pLineLC == '\0') && (frameIdx != 0)) {
-                break;
-            }
-
-            /* Basic length checks */
-            if (strlen(pLineLC) < 10) {
-                continue;
-            }
-
-            /* If available parse the type of error (READ/WRITE) */
-            if (cAddr && strstr(pLineLC, cAddr)) {
-                if (strncmp(pLineLC, "READ", 4) == 0) {
-                    *op = "READ";
-                } else if (strncmp(pLineLC, "WRITE", 5) == 0) {
-                    *op = "WRITE";
-                }
-                cAddr = NULL;
-            }
-
-            /* Check for crash thread frames */
-            if (strncmp(pLineLC, framePrefix, strlen(framePrefix)) == 0) {
-                /* Abort if max depth */
-                if (frameIdx >= _HF_MAX_FUNCS) {
-                    break;
-                }
-
-                /*
-                 * Frames have following format:
-                 #0 0xaa860177  (/system/lib/libc.so+0x196177)
-                 */
-                char* savePtr = NULL;
-                strtok_r(pLineLC, " ", &savePtr);
-                funcs[frameIdx].pc =
-                    (void*)((size_t)strtoull(strtok_r(NULL, " ", &savePtr), NULL, 16));
-
-                /* DSO & code offset parsing */
-                char* targetStr = strtok_r(NULL, " ", &savePtr);
-                char* startOff = strchr(targetStr, '(') + 1;
-                char* plusOff = strchr(targetStr, '+');
-                char* endOff = strrchr(targetStr, ')');
-                targetStr[endOff - startOff] = '\0';
-                if ((startOff == NULL) || (endOff == NULL) || (plusOff == NULL)) {
-                    LOG_D("Invalid ASan report entry (%s)", lineptr);
-                } else {
-                    size_t dsoSz =
-                        MIN(sizeof(funcs[frameIdx].mapName), (size_t)(plusOff - startOff));
-                    memcpy(funcs[frameIdx].mapName, startOff, dsoSz);
-                    char* codeOff = targetStr + (plusOff - startOff) + 1;
-                    funcs[frameIdx].line = strtoull(codeOff, NULL, 16);
-                }
-
-                frameIdx++;
-                snprintf(framePrefix, sizeof(framePrefix), "#%" PRIu8, frameIdx);
-            }
-        }
-    }
-
-    return frameIdx;
-}
-
-/*
- * Special book keeping for cases where crashes are detected based on exitcode and not
- * a raised signal. Such case is the ASan fuzzing for Android. Crash file name maintains
- * the same format for compatibility with post campaign tools.
- */
-static void arch_traceExitSaveData(run_t* run, pid_t pid) {
-    REG_TYPE pc = 0;
-    void* crashAddr = 0;
-    char* op = "UNKNOWN";
-
-    /* Save only the first hit for each worker */
-    if (run->crashFileName[0] != '\0') {
-        return;
-    }
-
-    /* Increase global crashes counter */
-    ATOMIC_POST_INC(run->global->cnts.crashesCnt);
-    ATOMIC_POST_AND(run->global->cfg.dynFileIterExpire, _HF_DYNFILE_SUB_MASK);
-
-    /* If sanitizer produces reports with stack traces (e.g. ASan), they're parsed manually */
-    int funcCnt = 0;
-    funcs_t* funcs = util_Malloc(_HF_MAX_FUNCS * sizeof(funcs_t));
-    defer {
-        free(funcs);
-    };
-    memset(funcs, 0, _HF_MAX_FUNCS * sizeof(funcs_t));
-
-    /* Sanitizers save reports against parent PID */
-    if (run->pid != pid) {
-        return;
-    }
-    funcCnt = arch_parseAsanReport(run, pid, funcs, &crashAddr, &op);
-
-    /*
-     * -1 error indicates a file not found for report. This is expected to happen often since
-     * ASan report is generated once for crashing TID. Ptrace arch is not guaranteed to parse
-     * that TID first. Not setting the 'crashFileName' variable will ensure that this branch
-     * is executed again for all TIDs until the matching report is found
-     */
-    if (funcCnt == -1) {
-        return;
-    }
-
-    /* Since crash address is available, apply ignoreAddr filters */
-    if (crashAddr < run->global->linux.ignoreAddr) {
-        LOG_I("Input is interesting, but the crash addr is %p (below %p), skipping", crashAddr,
-            run->global->linux.ignoreAddr);
-        return;
-    }
-
-    /* If frames successfully recovered, calculate stack hash & populate crash PC */
-    arch_hashCallstack(run, funcs, funcCnt, false);
-    pc = (uintptr_t)funcs[0].pc;
-
-    /*
-     * Check if stackhash is blacklisted
-     */
-    if (run->global->feedback.blacklist &&
-        (fastArray64Search(run->global->feedback.blacklist, run->global->feedback.blacklistCnt,
-             run->backtrace) != -1)) {
-        LOG_I("Blacklisted stack hash '%" PRIx64 "', skipping", run->backtrace);
-        ATOMIC_POST_INC(run->global->cnts.blCrashesCnt);
-        return;
-    }
-
-    /* If dry run mode, copy file with same name into workspace */
-    if (run->global->mutate.mutationsPerRun == 0U && run->global->cfg.useVerifier) {
-        snprintf(run->crashFileName, sizeof(run->crashFileName), "%s/%s", run->global->io.crashDir,
-            run->origFileName);
-    } else {
-        /* Keep the crashes file name format identical */
-        if (run->backtrace != 0ULL && run->global->io.saveUnique) {
-            snprintf(run->crashFileName, sizeof(run->crashFileName),
-                "%s/%s.PC.%" REG_PM ".STACK.%" PRIx64 ".CODE.%s.ADDR.%p.INSTR.%s.%s",
-                run->global->io.crashDir, "SAN", pc, run->backtrace, op, crashAddr, "[UNKNOWN]",
-                run->global->io.fileExtn);
-        } else {
-            /* If no stack hash available, all crashes treated as unique */
-            char localtmstr[PATH_MAX];
-            util_getLocalTime("%F.%H:%M:%S", localtmstr, sizeof(localtmstr), time(NULL));
-            snprintf(run->crashFileName, sizeof(run->crashFileName),
-                "%s/%s.PC.%" REG_PM ".STACK.%" PRIx64 ".CODE.%s.ADDR.%p.INSTR.%s.%s.%s",
-                run->global->io.crashDir, "SAN", pc, run->backtrace, op, crashAddr, "[UNKNOWN]",
-                localtmstr, run->global->io.fileExtn);
-        }
-    }
-
-    int fd = TEMP_FAILURE_RETRY(open(run->crashFileName, O_WRONLY | O_EXCL | O_CREAT, 0600));
-    if (fd == -1 && errno == EEXIST) {
-        LOG_I("It seems that '%s' already exists, skipping", run->crashFileName);
-        return;
-    } else if (fd == -1) {
-        PLOG_E("Cannot create output file '%s'", run->crashFileName);
-        return;
-    } else {
-        defer {
-            close(fd);
-        };
-        if (files_writeToFd(fd, run->dynamicFile, run->dynamicFileSz)) {
-            LOG_I("Ok, that's interesting, saved new crash as '%s'", run->crashFileName);
-            /* Clear stack hash so that verifier can understand we hit a duplicate */
-            run->backtrace = 0ULL;
-            /* Increase unique crashes counters */
-            ATOMIC_POST_INC(run->global->cnts.uniqueCrashesCnt);
-            ATOMIC_CLEAR(run->global->cfg.dynFileIterExpire);
-        } else {
-            LOG_E("Couldn't save crash to '%s'", run->crashFileName);
-            /* In case of write error, clear crashFileName to so that other monitored TIDs can retry
-             */
-            memset(run->crashFileName, 0, sizeof(run->crashFileName));
-            return;
-        }
-    }
-
-    /* Generate report */
-    run->report[0] = '\0';
-    util_ssnprintf(run->report, sizeof(run->report), "EXIT_CODE: %d\n", HF_SAN_EXIT_CODE);
-    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->origFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", pid);
-    util_ssnprintf(run->report, sizeof(run->report), "OPERATION: %s\n", op);
-    util_ssnprintf(run->report, sizeof(run->report), "FAULT ADDRESS: %p\n", crashAddr);
-    if (funcCnt > 0) {
-        util_ssnprintf(
-            run->report, sizeof(run->report), "STACK HASH: %016" PRIx64 "\n", run->backtrace);
-        util_ssnprintf(run->report, sizeof(run->report), "STACK:\n");
-        for (int i = 0; i < funcCnt; i++) {
-            util_ssnprintf(run->report, sizeof(run->report), " <" REG_PD REG_PM "> ",
-                (REG_TYPE)(long)funcs[i].pc);
-            if (funcs[i].mapName[0] != '\0') {
-                util_ssnprintf(run->report, sizeof(run->report), "[%s + 0x%zx]\n", funcs[i].mapName,
-                    funcs[i].line);
-            } else {
-                util_ssnprintf(run->report, sizeof(run->report), "[]\n");
-            }
-        }
-    }
-}
-
-static void arch_traceExitAnalyzeData(run_t* run, pid_t pid) {
-    void* crashAddr = 0;
-    char* op = "UNKNOWN";
-    int funcCnt = 0;
-    funcs_t* funcs = util_Malloc(_HF_MAX_FUNCS * sizeof(funcs_t));
-    defer {
-        free(funcs);
-    };
-    memset(funcs, 0, _HF_MAX_FUNCS * sizeof(funcs_t));
-
-    funcCnt = arch_parseAsanReport(run, pid, funcs, &crashAddr, &op);
-
-    /*
-     * -1 error indicates a file not found for report. This is expected to happen often since
-     * ASan report is generated once for crashing TID. Ptrace arch is not guaranteed to parse
-     * that TID first. Not setting the 'crashFileName' variable will ensure that this branch
-     * is executed again for all TIDs until the matching report is found
-     */
-    if (funcCnt == -1) {
-        return;
-    }
-
-    /* If frames successfully recovered, calculate stack hash & populate crash PC */
-    arch_hashCallstack(run, funcs, funcCnt, false);
-}
-
-void arch_traceExitAnalyze(run_t* run, pid_t pid) {
-    if (run->mainWorker) {
-        /* Main fuzzing threads */
-        arch_traceExitSaveData(run, pid);
-    } else {
-        /* Post crash analysis (e.g. crashes verifier) */
-        arch_traceExitAnalyzeData(run, pid);
-    }
+    report_appendReport(pid, run, funcs, funcCnt, pc, crashAddr, si.si_signo, instr, description);
 }
 
 #define __WEVENT(status) ((status & 0xFF0000) >> 16)
-static void arch_traceEvent(run_t* run, int status, pid_t pid) {
+static void arch_traceEvent(int status, pid_t pid) {
     LOG_D("PID: %d, Ptrace event: %d", pid, __WEVENT(status));
     switch (__WEVENT(status)) {
         case PTRACE_EVENT_EXIT: {
@@ -1156,9 +743,6 @@ static void arch_traceEvent(run_t* run, int status, pid_t pid) {
             if (WIFEXITED(event_msg)) {
                 LOG_D("PID: %d exited with exit_code: %lu", pid,
                     (unsigned long)WEXITSTATUS(event_msg));
-                if (WEXITSTATUS(event_msg) == (unsigned long)HF_SAN_EXIT_CODE) {
-                    arch_traceExitAnalyze(run, pid);
-                }
             } else if (WIFSIGNALED(event_msg)) {
                 LOG_D(
                     "PID: %d terminated with signal: %lu", pid, (unsigned long)WTERMSIG(event_msg));
@@ -1178,7 +762,7 @@ void arch_traceAnalyze(run_t* run, int status, pid_t pid) {
      * It's a ptrace event, deal with it elsewhere
      */
     if (WIFSTOPPED(status) && __WEVENT(status)) {
-        return arch_traceEvent(run, status, pid);
+        return arch_traceEvent(status, pid);
     }
 
     if (WIFSTOPPED(status)) {
@@ -1213,12 +797,6 @@ void arch_traceAnalyze(run_t* run, int status, pid_t pid) {
      * Process exited
      */
     if (WIFEXITED(status)) {
-        /*
-         * Target exited with sanitizer defined exitcode (used when SIGABRT is not monitored)
-         */
-        if (WEXITSTATUS(status) == (unsigned long)HF_SAN_EXIT_CODE) {
-            arch_traceExitAnalyze(run, pid);
-        }
         return;
     }
 
@@ -1376,9 +954,16 @@ void arch_traceDetach(pid_t pid) {
 }
 
 void arch_traceSignalsInit(honggfuzz_t* hfuzz) {
-    /* Default is true for all platforms except Android */
-    arch_sigs[SIGABRT].important = hfuzz->cfg.monitorSIGABRT;
-
     /* Default is false */
     arch_sigs[SIGVTALRM].important = hfuzz->timing.tmoutVTALRM;
+
+    /* Let *SAN handle it, if it's enabled */
+    if (hfuzz->sanitizer.enable) {
+        LOG_I("Sanitizer support enabled. SIGSEGV/SIGBUS/SIGILL/SIGFPE will not be reported, and "
+              "should be handled by *SAN code internally");
+        arch_sigs[SIGSEGV].important = false;
+        arch_sigs[SIGBUS].important = false;
+        arch_sigs[SIGILL].important = false;
+        arch_sigs[SIGFPE].important = false;
+    }
 }
