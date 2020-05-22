@@ -1,6 +1,6 @@
-# Unit/Property Testing
+# Private Testing
 
-`bolero` also supports tests inside of the project
+`bolero` also supports running tests inside of a project. This is useful for testing private interfaces and implementations.
 
 ```rust
 #[test]

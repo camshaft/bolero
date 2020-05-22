@@ -9,6 +9,6 @@
     - [Corpus Replay](./features/corpus-replay.md)
     - [Input Shrinking](./features/input-shrinking.md)
     - [Unified Fuzzing Interface](./features/unified-fuzzing-interface.md)
-    - [Unit/Property Testing](./features/unit-testing.md)
+    - [Private Testing](./features/private-testing.md)
     - [Structural Testing](./features/structural-testing.md)
     - [Works on Rust Stable](./features/rust-stable.md)
