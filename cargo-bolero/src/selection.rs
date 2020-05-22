@@ -42,8 +42,6 @@ impl Selection {
             .output()?
             .status_as_result()?;
 
-        // TODO exit on error
-
         TestTarget::from_stdout(&output.stdout)
     }
 
@@ -65,8 +63,6 @@ impl Selection {
             .env("CARGO_BOLERO_SELECT", "one")
             .output()?
             .status_as_result()?;
-
-        // TODO exit on error
 
         let target = TestTarget::from_stdout(&output.stdout)?;
 
@@ -91,8 +87,6 @@ impl Selection {
             .env("CARGO_BOLERO_SELECT", "one")
             .output()?
             .status_as_result()?;
-
-        // TODO exit on error
 
         let target = TestTarget::from_stdout(&output.stdout)?;
 

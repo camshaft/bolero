@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use core::fmt;
 use serde::Deserialize;
 use std::{
     io::{BufRead, Cursor},
@@ -24,7 +25,9 @@ impl TestTarget {
             0 => Err(anyhow!("no targets matched")),
             1 => Ok(targets.pop().unwrap()),
             _ => {
-                // TODO better error
+                for target in targets {
+                    eprintln!("{}", target);
+                }
                 Err(anyhow!("multiple targets matched"))
             }
         }
@@ -94,5 +97,16 @@ impl TestTarget {
             .chain(Some("--test-threads"))
             .chain(Some("1"))
             .filter(move |_| is_harnessed)
+    }
+}
+
+impl fmt::Display for TestTarget {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            r#"{{"package":{:?},"test":{:?}}}"#,
+            self.package_name, self.test_name
+        )?;
+        Ok(())
     }
 }

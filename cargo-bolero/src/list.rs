@@ -27,10 +27,7 @@ impl List {
             .status_as_result()?;
 
         for target in TestTarget::all_from_stdout(&output.stdout)? {
-            println!(
-                r#"{{"package":{:?},"test":{:?}}}"#,
-                target.package_name, target.test_name
-            );
+            println!("{}", target);
         }
 
         Ok(())
