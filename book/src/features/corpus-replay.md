@@ -1,6 +1,6 @@
 # Corpus Replay
 
-After running a fuzz target, a corpus is generated (a set of inputs that trigger unique codepaths). This corpus can be now executed using the standard `cargo test` command. The corpus should either be commited to the project repository or be stored/restored from storage, like S3.
+After fuzzing a test target, a corpus is generated. A corpus is a set of inputs that trigger unique codepaths. This corpus can be now executed using the standard `cargo test` command. The corpus should either be commited to the project repository or be stored/restored from storage, like S3.
 
 ```bash
 $ cargo test

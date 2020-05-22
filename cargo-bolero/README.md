@@ -6,14 +6,15 @@
 $ cargo install -f cargo-bolero
 ```
 
-#### Linux Installation
+## Linux Installation
 
-`cargo-bolero` needs a couple of libraries installed to function:
+`cargo-bolero` needs a couple of libraries installed to compile. If these libraries aren't
+available the requirement can be relaxed by executing `cargo install cargo-bolero --no-default-features -f`
 
-##### Debian/Ubuntu
+### Debian/Ubuntu
 
 ```bash
-$ apt install binutils-dev libunwind-dev
+$ sudo apt install binutils-dev libunwind-dev
 ```
 
 ## fuzz
@@ -22,7 +23,7 @@ $ apt install binutils-dev libunwind-dev
 Run a fuzzing engine for a target
 
 USAGE:
-    cargo bolero fuzz [FLAGS] [OPTIONS] <test>
+    cargo-bolero fuzz [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features
@@ -42,6 +43,7 @@ OPTIONS:
     -s, --sanitizer <sanitizer>...               Build with the sanitizer enabled
     -S, --seed <seed>                            Run the fuzzer with an initial seed
         --target <target>                        Build for the target triple
+        --target_dir <target-dir>                Directory for all generated artifacts
     -T, --time <time>                            Run the fuzzer for a specified number of seconds
         --toolchain <toolchain>                  Use a rustup toolchain to execute cargo build
 
@@ -55,7 +57,7 @@ ARGS:
 Reduce the corpus of a test target with a fuzzing engine
 
 USAGE:
-    cargo bolero reduce [FLAGS] [OPTIONS] <test>
+    cargo-bolero reduce [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features
@@ -71,6 +73,7 @@ OPTIONS:
     -p, --package <package>                Package to run tests for
     -s, --sanitizer <sanitizer>...         Build with the sanitizer enabled
         --target <target>                  Build for the target triple
+        --target_dir <target-dir>          Directory for all generated artifacts
         --toolchain <toolchain>            Use a rustup toolchain to execute cargo build
 
 ARGS:
