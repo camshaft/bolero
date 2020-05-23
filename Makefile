@@ -129,19 +129,19 @@ book:
 
 publish: book
 	@cd bolero-generator-derive && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero-generator && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero-engine && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero-afl && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero-honggfuzz && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero-libfuzzer && cargo publish
-	@sleep 10
-	@cd cargo-bolero && cargo publish
-	@sleep 10
+	@sleep 30
 	@cd bolero && cargo publish
+	@sleep 30
+	@cd cargo-bolero && cargo publish
 
 .PHONY: book
