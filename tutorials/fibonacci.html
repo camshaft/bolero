@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/unit-testing.html"><strong aria-hidden="true">2.6.</strong> Unit Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html" class="active"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html" class="active"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -172,7 +172,7 @@ pub fn fibonacci(number: u64) -&gt; u64 {
 <p>Now we define a test:</p>
 <pre><code class="language-bash">$ cargo bolero new fibonacci_test --generator
 </code></pre>
-<pre><pre class="playpen"><code class="language-rust">// tests/fibonacci_test/main.rs
+<pre><pre class="playpen"><code class="language-rust">// tests/fibonacci_test/fuzz_target.rs
 use bolero::fuzz;
 use my_fibonacci::fibonacci;
 
@@ -190,7 +190,7 @@ fn main() {
     Finished test [unoptimized + debuginfo] target(s) in 0.10s
      Running target/fuzz/build_62a8ab526939db81/x86_64-apple-darwin/debug/deps/fibonacci_test-f9f8f1dcc806b6b6
 ...
-thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/main.rs:8:9
+thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/fuzz_target.rs:8:9
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 ======================== Test Failure ========================
@@ -199,7 +199,7 @@ Input:
 93
 
 Error:
-panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/main.rs:8:9
+panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/fuzz_target.rs:8:9
 
 ==============================================================
 </code></pre>

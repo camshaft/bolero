@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Input Shrinking - Bolero Book</title>
+        <title>Private Testing - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html" class="active"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html" class="active"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,132 +148,35 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#input-shrinking" id="input-shrinking">Input Shrinking</a></h1>
-<p><code>bolero</code> supports input shrinking for all of the provided testing engines.</p>
-<h2><a class="header" href="#what-is-it" id="what-is-it">What is it?</a></h2>
-<p>From <a href="https://propertesting.com/book_shrinking.html">PropEr Testing</a>:</p>
-<blockquote>
-<p>Shrinking is the mechanism by which a property-based testing framework can be told how to simplify failure cases enough to let it figure out exactly what the minimal reproducible case is.</p>
-<p>Sometimes the input required to find a failure can be fairly large or complex. Finding the initial failing case may have required hundreds of attempts, and it may contain vast amounts of irrelevant information. The framework will then attempt to reduce that data set through shrinking. It generally does so by transforming all the generators used and trying to bring them back towards their own zero point.</p>
-</blockquote>
-<h2><a class="header" href="#example" id="example">Example</a></h2>
-<p>Let's suppose we're testing a <code>MySet</code> data structure:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
-use my_set::MySet;
-
-#[derive(Debug, TypeGenerator)]
-enum Operation {
-    Insert(u64),
-    Remove(u64),
-    Clear,
+                        <h1><a class="header" href="#private-testing" id="private-testing">Private Testing</a></h1>
+<p><code>bolero</code> also supports running tests inside of a project. This is useful for testing private interfaces and implementations.</p>
+<pre><pre class="playpen"><code class="language-rust">
+<span class="boring">#![allow(unused_variables)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn my_property_test() {
+    bolero::fuzz!()
+        .with_type()
+        .cloned()
+        .for_each(|value: u64| {
+            // implement property checks here
+        });
 }
-
-fn main() {
-    fuzz!()
-        .with_type::&lt;Vec&lt;Operation&gt;&gt;()
-        .for_each(|operations| {
-            let mut set = MySet::new();
-
-            for operation in operations.iter() {
-                match operation {
-                    Operation::Insert(value) =&gt; {
-                        set.insert(value);
-                    }
-                    Operation::Remove(value) =&gt; {
-                        set.remove(value);
-                    }
-                    Operation::Clear =&gt; {
-                        set.clear();
-                    }
-                }
-            }
-        })
-}
-</code></pre></pre>
-<p>Assume there's hypothetical scenario in which adding 16 elements to <code>MySet</code> causes a panic. Without shrinking, the randomly-generated inputs can be difficult to interpret:</p>
-<pre><code>======================== Test Failure ========================
-
-Input:
-[
-    Insert(9693583160302274182),
-    Insert(15890536247564076678),
-    Clear,
-    Insert(15914819332679195868),
-    Insert(9717884937115065564),
-    Insert(15914645609842007260),
-    Insert(18446738425238052060),
-    Remove(15912577393975689024),
-    Insert(15338377272073444572),
-    Insert(15914838024242123988),
-    Insert(11228695243045262548),
-    Insert(11212726789901900955),
-    Insert(11212726789901884315),
-    Insert(11212726789901884316),
-    Insert(11212726789901884317),
-    Insert(11212726789901884318),
-    Insert(11212726789901884319),
-    Insert(11212726789901884311),
-    Insert(11212726789901884312),
-    Insert(11212726789901884313),
-    Insert(11212726789901884314),
-    Insert(9727500806739001343),
-    Insert(9693583160302274182),
-    Insert(9693583160302274182),
-    Insert(5714873654208093419),
-    Remove(5714873654208057167),
-    Remove(16717362667219255119),
-    Insert(9726366166670698728),
-    Insert(9727642152175306374),
-    Remove(18446181099529437184),
-    Insert(18446744073709551615),
-    Insert(15336116641675083775),
-    Remove(11212726789901884372),
-    Insert(11212726789901884315),
-    Insert(11212666079612935067)
-]
-
-Error:
-panicked at 'internal assertion', src/lib.rs:16:17
-</code></pre>
-<p>After shrinking the input, it becomes more obvious how to trigger the bug:</p>
-<pre><code>======================== Test Failure ========================
-
-Input:
-[
-    Insert(0),
-    Insert(1),
-    Insert(2),
-    Insert(3),
-    Insert(4),
-    Insert(5),
-    Insert(6),
-    Insert(7),
-    Insert(8),
-    Insert(9),
-    Insert(10),
-    Insert(11),
-    Insert(12),
-    Insert(13),
-    Insert(14),
-    Insert(15),
-]
-
-Error:
-panicked at 'internal assertion', src/lib.rs:16:17
-</code></pre>
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../features/corpus-replay.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../features/unified-interface.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
                         
-                            <a rel="next" href="../features/rust-stable.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../tutorials/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -285,13 +188,13 @@ panicked at 'internal assertion', src/lib.rs:16:17
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="../features/corpus-replay.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a href="../features/unified-interface.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
-                    <a href="../features/rust-stable.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a href="../tutorials/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
