@@ -17,8 +17,7 @@ impl<G: ValueGenerator, M: Fn(G::Output) -> T, T> ValueGenerator for MapGenerato
 
 #[test]
 fn map_test() {
-    let _ = generator_test!(gen::<bool>().map(|value| !value));
-    let _ = generator_test!(gen::<u8>().map(|value| value > 4));
+    let _ = generator_mutate_test!(gen::<u8>().map(|value| value > 4));
 }
 
 #[derive(Clone, Debug)]
@@ -40,8 +39,7 @@ impl<G: ValueGenerator, H: ValueGenerator, F: Fn(G::Output) -> H> ValueGenerator
 
 #[test]
 fn and_then_test() {
-    let _ = generator_test!(gen::<bool>().and_then(|value| !value));
-    let _ = generator_test!(gen::<u8>().and_then(|value| value..));
+    let _ = generator_mutate_test!(gen::<u8>().and_then(|value| value..));
 }
 
 #[derive(Clone, Debug)]
@@ -65,8 +63,7 @@ impl<G: ValueGenerator, F: Fn(&G::Output) -> bool> ValueGenerator for FilterGene
 
 #[test]
 fn filter_test() {
-    let _ = generator_test!(gen::<bool>().filter(|value| *value));
-    let _ = generator_test!(gen::<u8>().filter(|value| *value > 40));
+    let _ = generator_mutate_test!(gen::<u8>().filter(|value| *value > 40));
 }
 
 #[derive(Clone, Debug)]
@@ -88,6 +85,5 @@ impl<G: ValueGenerator, F: Fn(G::Output) -> Option<T>, T> ValueGenerator
 
 #[test]
 fn filter_map_test() {
-    let _ = generator_test!(gen::<bool>().filter_map(Some));
-    let _ = generator_test!(gen::<u8>().filter_map(|value| Some(value > 40)));
+    let _ = generator_mutate_test!(gen::<u8>().filter_map(|value| Some(value > 40)));
 }

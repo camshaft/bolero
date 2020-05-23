@@ -1,16 +1,16 @@
 use crate::{
-    bounded::{is_within, BoundedValue},
+    bounded::{is_within, BoundedGenerator, BoundedValue},
     driver::DriverMode,
-    Driver, TypeGenerator, ValueGenerator,
+    Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator,
 };
-use core::ops::RangeBounds;
+use core::ops::{Range, RangeBounds};
 
 impl TypeGenerator for char {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
         if driver.mode() == DriverMode::Forced {
             Some(coerce_char(TypeGenerator::generate(driver)?).unwrap_or_default())
         } else {
-            convert_char(TypeGenerator::generate(driver)?)
+            core::char::from_u32(TypeGenerator::generate(driver)?)
         }
     }
 }
@@ -22,7 +22,7 @@ impl<R: RangeBounds<Self>> BoundedValue<R> for char {
         is_within(self, range_bounds)
     }
 
-    fn bind_within(self, range_bounds: &R) -> Self {
+    fn bind_within(&mut self, range_bounds: &R) {
         use core::ops::Bound::*;
 
         let start = match range_bounds.start_bound() {
@@ -37,9 +37,10 @@ impl<R: RangeBounds<Self>> BoundedValue<R> for char {
             Unbounded => Unbounded,
         };
 
-        let value = (self as u32).bind_within(&(start, end));
+        let mut value = *self as u32;
+        value.bind_within(&(start, end));
 
-        coerce_char(value).unwrap_or_default()
+        *self = coerce_char(value).unwrap_or_default()
     }
 }
 
@@ -51,16 +52,12 @@ impl ValueGenerator for char {
     }
 }
 
-fn convert_char(value: u32) -> Option<char> {
-    if value > core::char::MAX as u32 {
-        return None;
-    }
+impl TypeGeneratorWithParams for char {
+    type Output = BoundedGenerator<TypeValueGenerator<char>, Range<char>>;
 
-    if value >= 0xD800 && value <= 0xDFFF {
-        return None;
+    fn gen_with() -> Self::Output {
+        BoundedGenerator::new(Default::default(), (0 as char)..core::char::MAX)
     }
-
-    Some(unsafe { core::char::from_u32_unchecked(value) })
 }
 
 fn coerce_char(mut value: u32) -> Option<char> {
@@ -74,4 +71,14 @@ fn coerce_char(mut value: u32) -> Option<char> {
             return None;
         }
     }
+}
+
+#[test]
+fn char_type_test() {
+    let _ = generator_mutate_test!(gen::<char>());
+}
+
+#[test]
+fn char_bounds_test() {
+    let _ = generator_mutate_test!(gen::<char>().with().bounds('a'..='f'));
 }

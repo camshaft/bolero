@@ -1,21 +1,28 @@
 use crate::{
-    config::Config,
     fuzz::{Fuzz, FuzzArgs},
+    list::List,
     new::New,
     reduce::{Reduce, ReduceArgs},
+    selection::Selection,
 };
-use failure::Error;
+use anyhow::{anyhow, Result};
+use std::io::Write;
 use structopt::StructOpt;
 
+#[cfg(feature = "afl")]
 mod afl;
-mod config;
 mod fuzz;
 mod fuzzer;
+#[cfg(feature = "honggfuzz")]
 mod honggfuzz;
 mod libfuzzer;
+mod list;
 mod manifest;
 mod new;
+mod project;
 mod reduce;
+mod selection;
+mod test_target;
 
 #[derive(Debug, StructOpt)]
 #[allow(clippy::large_enum_variant)]
@@ -23,14 +30,16 @@ enum Commands {
     Fuzz(Fuzz),
     Reduce(Reduce),
     New(New),
+    List(List),
 }
 
 impl Commands {
-    fn exec(&self) -> Result<(), Error> {
+    fn exec(&self) -> Result<()> {
         match self {
             Self::Fuzz(cmd) => cmd.exec(),
             Self::Reduce(cmd) => cmd.exec(),
             Self::New(cmd) => cmd.exec(),
+            Self::List(cmd) => cmd.exec(),
         }
     }
 }
@@ -51,24 +60,36 @@ fn main() {
     }
 }
 
-pub(crate) fn exec(mut cmd: std::process::Command) -> Exit {
-    let status = cmd
-        .spawn()
-        .expect("failed to start fuzzer")
-        .wait()
-        .expect("fuzzer was not running");
-
-    Exit(status.code().unwrap_or(0))
+pub(crate) fn exec(mut cmd: std::process::Command) -> Result<()> {
+    cmd.spawn()?.wait()?.status_as_result()
 }
 
-#[derive(Debug)]
-pub(crate) struct Exit(i32);
+pub(crate) trait StatusAsResult {
+    type Output;
 
-impl Exit {
-    fn exit_on_error(self) {
-        let code = self.0;
-        if code != 0 {
-            std::process::exit(code);
+    fn status_as_result(self) -> Result<Self::Output>;
+}
+
+impl StatusAsResult for std::process::ExitStatus {
+    type Output = ();
+
+    fn status_as_result(self) -> Result<()> {
+        match self.code() {
+            Some(0) => Ok(()),
+            Some(code) => Err(anyhow!("process exited with status {}", code)),
+            None => Err(anyhow!("process exited with no status code")),
         }
+    }
+}
+
+impl StatusAsResult for std::process::Output {
+    type Output = Self;
+
+    fn status_as_result(self) -> Result<Self::Output> {
+        if let Err(err) = self.status.status_as_result() {
+            std::io::stdout().write_all(&self.stderr)?;
+            return Err(err);
+        }
+        Ok(self)
     }
 }

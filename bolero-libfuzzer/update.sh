@@ -4,9 +4,7 @@ version=${1:-master}
 project_dir="$(pwd)"
 tmp_dir="$(mktemp -d)"
 
-git clone https://github.com/llvm-mirror/compiler-rt.git "$tmp_dir"
-cd "$tmp_dir"
-git checkout $version --force
+git clone --depth 1 --single-branch --branch $version https://github.com/llvm/llvm-project.git "$tmp_dir"
 rm -rf "$project_dir/libfuzzer/"
-mv "$tmp_dir/lib/fuzzer/" "$project_dir/libfuzzer/"
-mv "$tmp_dir/LICENSE.txt" "$project_dir/libfuzzer/"
+mv "$tmp_dir/compiler-rt/lib/fuzzer/" "$project_dir/libfuzzer/"
+mv "$tmp_dir/compiler-rt/LICENSE.txt" "$project_dir/libfuzzer/"

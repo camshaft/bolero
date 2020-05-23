@@ -1,5 +1,6 @@
-use crate::{Config, FuzzArgs, ReduceArgs};
-use failure::Error;
+use crate::{FuzzArgs, ReduceArgs, Selection};
+use anyhow::Result;
+use std::fs;
 
 const FLAGS: &[&str] = &[
     "--cfg fuzzing_honggfuzz",
@@ -14,14 +15,19 @@ const FLAGS: &[&str] = &[
 ];
 
 fn bin() -> String {
-    std::env::args().next().unwrap()
+    std::env::current_exe()
+        .expect("valid current_exe")
+        .display()
+        .to_string()
 }
 
-pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
-    let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let test_target = config.test_target()?;
+pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+    let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
+
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&crashes_dir)?;
 
     let mut args = vec![
         bin(),
@@ -38,20 +44,23 @@ pub(crate) fn fuzz(config: &Config, fuzz: &FuzzArgs) -> Result<(), Error> {
     }
 
     args.push("--".to_string());
-    args.push(bin_path.to_str().unwrap().to_string());
+    args.push(test_target.exe.to_string());
+    args.extend(test_target.command_args().map(String::from));
 
     unsafe { bolero_honggfuzz::exec(args.into_iter()) };
 
     Ok(())
 }
 
-pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error> {
-    let bin_path = config.bin_path(FLAGS, "honggfuzz");
-    let test_target = config.test_target()?;
+pub(crate) fn reduce(selection: &Selection, _reduce: &ReduceArgs) -> Result<()> {
+    let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
-    let args = vec![
+    fs::create_dir_all(&corpus_dir)?;
+    fs::create_dir_all(&crashes_dir)?;
+
+    let mut args = vec![
         bin(),
         "--persistent".to_string(),
         "-i".to_string(),
@@ -60,8 +69,10 @@ pub(crate) fn reduce(config: &Config, _reduce: &ReduceArgs) -> Result<(), Error>
         crashes_dir.to_str().unwrap().to_string(),
         "-M".to_string(),
         "--".to_string(),
-        bin_path.to_str().unwrap().to_string(),
+        test_target.exe.to_string(),
     ];
+
+    args.extend(test_target.command_args().map(String::from));
 
     unsafe { bolero_honggfuzz::exec(args.into_iter()) };
 

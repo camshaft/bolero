@@ -1,6 +1,6 @@
 [package]
 name = "bolero-engine"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "fuzz and property testing framework"
 homepage = "https://github.com/camshaft/bolero"
@@ -11,17 +11,17 @@ edition = "2018"
 readme = "../README.md"
 
 [features]
-default = ["std", "rand", "panic_hook"]
-std = ["alloc", "bolero-generator/std"]
-alloc = ["bolero-generator/alloc"]
+default = ["rand", "panic_hook"]
 panic_hook = []
 
 [dependencies]
-bolero-generator = { version = "0.4", path = "../bolero-generator", default-features = false }
-failure = "0.1"
+anyhow = "1.0"
+backtrace = "0.3"
+bolero-generator = { version = "0.5", path = "../bolero-generator", default-features = false }
 lazy_static = "1"
 pretty-hex = "0.1.1"
 rand = { version = "0.7", optional = true }
 
 [dev-dependencies]
+bolero-generator = { version = "0.5", path = "../bolero-generator", features = ["std"] }
 rand = "0.7"

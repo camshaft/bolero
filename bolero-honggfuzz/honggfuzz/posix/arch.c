@@ -46,6 +46,8 @@
 #include "libhfcommon/files.h"
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
+#include "report.h"
+#include "sanitizers.h"
 #include "subproc.h"
 
 struct {
@@ -67,8 +69,7 @@ struct {
     [SIGBUS].important = true,
     [SIGBUS].descr = "SIGBUS",
 
-    /* Is affected from monitorSIGABRT flag */
-    [SIGABRT].important = false,
+    [SIGABRT].important = true,
     [SIGABRT].descr = "SIGABRT",
 
     /* Is affected from tmout_vtalrm flag */
@@ -80,7 +81,7 @@ struct {
  * Returns true if a process exited (so, presumably, we can delete an input
  * file)
  */
-static void arch_analyzeSignal(run_t* run, int status) {
+static void arch_analyzeSignal(run_t* run, pid_t pid, int status) {
     /*
      * Resumed by delivery of SIGCONT
      */
@@ -92,7 +93,7 @@ static void arch_analyzeSignal(run_t* run, int status) {
      * Boring, the process just exited
      */
     if (WIFEXITED(status)) {
-        LOG_D("Process (pid %d) exited normally with status %d", run->pid, WEXITSTATUS(status));
+        LOG_D("Process (pid %d) exited normally with status %d", pid, WEXITSTATUS(status));
         return;
     }
 
@@ -101,42 +102,77 @@ static void arch_analyzeSignal(run_t* run, int status) {
      */
     if (!WIFSIGNALED(status)) {
         LOG_E("Process (pid %d) exited with the following status %d, please report that as a bug",
-            run->pid, status);
+            pid, status);
         return;
     }
 
     int termsig = WTERMSIG(status);
-    LOG_D("Process (pid %d) killed by signal %d '%s'", run->pid, termsig, strsignal(termsig));
+    LOG_D("Process (pid %d) killed by signal %d '%s'", pid, termsig, strsignal(termsig));
     if (!arch_sigs[termsig].important) {
         LOG_D("It's not that important signal, skipping");
         return;
     }
 
-    char localtmstr[PATH_MAX];
-    util_getLocalTime("%F.%H.%M.%S", localtmstr, sizeof(localtmstr), time(NULL));
+    funcs_t* funcs = util_Calloc(_HF_MAX_FUNCS * sizeof(funcs_t));
+    defer {
+        free(funcs);
+    };
+    uint64_t pc = 0;
+    uint64_t crashAddr = 0;
+    char description[HF_STR_LEN] = {};
+    size_t funcCnt = sanitizers_parseReport(run, pid, funcs, &pc, &crashAddr, description);
 
-    char newname[PATH_MAX];
+    /*
+     * Calculate backtrace callstack hash signature
+     */
+    run->backtrace = sanitizers_hashCallstack(run, funcs, funcCnt, false);
+
+    /*
+     * If unique flag is set and single frame crash, disable uniqueness for this crash
+     * to always save (timestamp will be added to the filename)
+     */
+    bool saveUnique = run->global->io.saveUnique;
+    if (saveUnique && (funcCnt == 0)) {
+        saveUnique = false;
+    }
 
     /* If dry run mode, copy file with same name into workspace */
     if (run->global->mutate.mutationsPerRun == 0U && run->global->cfg.useVerifier) {
-        snprintf(newname, sizeof(newname), "%s", run->origFileName);
+        snprintf(run->crashFileName, sizeof(run->crashFileName), "%s/%s", run->global->io.crashDir,
+            run->dynfile->path);
+    } else if (saveUnique) {
+        snprintf(run->crashFileName, sizeof(run->crashFileName),
+            "%s/%s.PC.%" PRIx64 ".STACK.%" PRIx64 ".ADDR.%" PRIx64 ".%s", run->global->io.crashDir,
+            util_sigName(termsig), pc, run->backtrace, crashAddr, run->global->io.fileExtn);
     } else {
-        snprintf(newname, sizeof(newname), "%s/%s.PID.%d.TIME.%s.%s", run->global->io.crashDir,
-            arch_sigs[termsig].descr, run->pid, localtmstr, run->global->io.fileExtn);
+        char localtmstr[HF_STR_LEN];
+        util_getLocalTime("%F.%H:%M:%S", localtmstr, sizeof(localtmstr), time(NULL));
+        snprintf(run->crashFileName, sizeof(run->crashFileName),
+            "%s/%s.PC.%" PRIx64 ".STACK.%" PRIx64 ".ADDR.%" PRIx64 ".%s.%d.%s",
+            run->global->io.crashDir, util_sigName(termsig), pc, run->backtrace, crashAddr,
+            localtmstr, pid, run->global->io.fileExtn);
     }
 
-    LOG_I("Ok, that's interesting, saving input '%s'", newname);
+    if (files_exists(run->crashFileName)) {
+        LOG_I("Crash (dup): '%s' already exists, skipping", run->crashFileName);
+        /* Clear filename so that verifier can understand we hit a duplicate */
+        memset(run->crashFileName, 0, sizeof(run->crashFileName));
+        return;
+    }
 
-    /*
-     * All crashes are marked as unique due to lack of information in POSIX arch
-     */
+    LOG_I("Ok, that's interesting, saving input '%s'", run->crashFileName);
+
     ATOMIC_POST_INC(run->global->cnts.crashesCnt);
     ATOMIC_POST_INC(run->global->cnts.uniqueCrashesCnt);
+    /* If unique crash found, reset dynFile counter */
+    ATOMIC_CLEAR(run->global->cfg.dynFileIterExpire);
 
-    if (files_writeBufToFile(
-            newname, run->dynamicFile, run->dynamicFileSz, O_CREAT | O_EXCL | O_WRONLY) == false) {
+    if (files_writeBufToFile(run->crashFileName, run->dynfile->data, run->dynfile->size,
+            O_CREAT | O_EXCL | O_WRONLY) == false) {
         LOG_E("Couldn't save crash to '%s'", run->crashFileName);
     }
+
+    report_appendReport(pid, run, funcs, funcCnt, pc, crashAddr, termsig, "", description);
 }
 
 pid_t arch_fork(run_t* fuzzer HF_ATTR_UNUSED) {
@@ -144,31 +180,9 @@ pid_t arch_fork(run_t* fuzzer HF_ATTR_UNUSED) {
 }
 
 bool arch_launchChild(run_t* run) {
-#define ARGS_MAX 512
-    const char* args[ARGS_MAX + 2];
-    char argData[PATH_MAX];
-    const char inputFile[] = "/dev/fd/" HF_XSTR(_HF_INPUT_FD);
-
-    int x;
-    for (x = 0; x < ARGS_MAX && x < run->global->exe.argc; x++) {
-        if (!strcmp(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            args[x] = inputFile;
-        } else if (strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            const char* off = strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER);
-            snprintf(argData, sizeof(argData), "%.*s%s", (int)(off - run->global->exe.cmdline[x]),
-                run->global->exe.cmdline[x], inputFile);
-            args[x] = argData;
-        } else {
-            args[x] = run->global->exe.cmdline[x];
-        }
-    }
-    args[x++] = NULL;
-
-    LOG_D("Launching '%s' on file '%s'", args[0], inputFile);
-
     /* alarm persists across forks, so disable it here */
     alarm(0);
-    execvp(args[0], (char* const*)args);
+    execvp(run->args[0], (char* const*)run->args);
     alarm(1);
 
     return false;
@@ -200,7 +214,7 @@ static bool arch_checkWait(run_t* run) {
         LOG_D("pid=%d returned with status: %s", pid,
             subproc_StatusToStr(status, statusStr, sizeof(statusStr)));
 
-        arch_analyzeSignal(run, status);
+        arch_analyzeSignal(run, pid, status);
 
         if (pid == run->pid && (WIFEXITED(status) || WIFSIGNALED(status))) {
             if (run->global->exe.persistent) {
@@ -249,20 +263,11 @@ void arch_reapChild(run_t* run) {
     }
 }
 
-bool arch_archInit(honggfuzz_t* hfuzz) {
-    /* Default is true for all platforms except Android */
-    arch_sigs[SIGABRT].important = hfuzz->cfg.monitorSIGABRT;
-    /* Default is false */
-    arch_sigs[SIGVTALRM].important = hfuzz->timing.tmoutVTALRM;
-
+bool arch_archInit(honggfuzz_t* hfuzz HF_ATTR_UNUSED) {
     /* Make %'d work */
     setlocale(LC_NUMERIC, "en_US.UTF-8");
 
     return true;
-}
-
-void arch_sigFunc(int sig HF_ATTR_UNUSED) {
-    return;
 }
 
 bool arch_archThreadInit(run_t* fuzzer HF_ATTR_UNUSED) {

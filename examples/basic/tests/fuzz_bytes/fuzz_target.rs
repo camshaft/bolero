@@ -16,6 +16,6 @@ fn main() {
 
         let a = input[0];
         let b = input[1];
-        assert!(add(a, b) >= a);
+        assert!(add(a, b, should_panic) >= a);
     });
 }

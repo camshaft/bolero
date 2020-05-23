@@ -117,8 +117,6 @@ __attribute__((constructor)) void arch_initSigs(void) {
     arch_sigs[SIGSEGV].descr = "SIGSEGV";
     arch_sigs[SIGBUS].important = true;
     arch_sigs[SIGBUS].descr = "SIGBUS";
-
-    /* Is affected from monitorSIGABRT flag */
     arch_sigs[SIGABRT].important = true;
     arch_sigs[SIGABRT].descr = "SIGABRT";
 
@@ -155,7 +153,7 @@ const char* exception_to_string(int exception) {
 
 static void arch_generateReport(run_t* run, int termsig) {
     run->report[0] = '\0';
-    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->origFileName);
+    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->dynfile->path);
     util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
     util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", run->pid);
     util_ssnprintf(
@@ -248,7 +246,7 @@ static void arch_analyzeSignal(run_t* run, int status) {
     /* If dry run mode, copy file with same name into workspace */
     if (run->global->mutate.mutationsPerRun == 0U && run->global->cfg.useVerifier) {
         snprintf(run->crashFileName, sizeof(run->crashFileName), "%s/%s", run->global->io.crashDir,
-            run->origFileName);
+            run->dynfile->path);
     } else if (run->global->io.saveUnique) {
         snprintf(run->crashFileName, sizeof(run->crashFileName),
             "%s/%s.%s.PC.%.16llx.STACK.%.16llx.ADDR.%.16llx.%s", run->global->io.crashDir,
@@ -271,7 +269,7 @@ static void arch_analyzeSignal(run_t* run, int status) {
         return;
     }
 
-    if (!files_writeBufToFile(run->crashFileName, run->dynamicFile, run->dynamicFileSz,
+    if (!files_writeBufToFile(run->crashFileName, run->dynfile->data, run->dynfile->size,
             O_CREAT | O_EXCL | O_WRONLY)) {
         LOG_E("Couldn't save crash as '%s'", run->crashFileName);
         return;
@@ -291,27 +289,9 @@ pid_t arch_fork(run_t* run HF_ATTR_UNUSED) {
 }
 
 bool arch_launchChild(run_t* run) {
-#define ARGS_MAX 512
-    const char* args[ARGS_MAX + 2];
-    char argData[PATH_MAX];
-    const char inputFile[] = "/dev/fd/" HF_XSTR(_HF_INPUT_FD);
-
-    int x;
-    for (x = 0; x < ARGS_MAX && x < run->global->exe.argc; x++) {
-        if (!strcmp(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            args[x] = inputFile;
-        } else if (strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            const char* off = strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER);
-            snprintf(argData, sizeof(argData), "%.*s%s", (int)(off - run->global->exe.cmdline[x]),
-                run->global->exe.cmdline[x], inputFile);
-            args[x] = argData;
-        } else {
-            args[x] = run->global->exe.cmdline[x];
-        }
-    }
-    args[x++] = NULL;
-
-    LOG_D("Launching '%s'", args[0]);
+    LOG_D("Launching '%s' on file '%s' (%s mode)", run->args[0],
+        run->global->exe.persistent ? "PERSISTENT_MODE" : _HF_INPUT_FILE_PATH,
+        run->global->exe.fuzzStdin ? "stdin" : "file");
 
     /*
      * Get child's bootstrap port.
@@ -341,7 +321,7 @@ bool arch_launchChild(run_t* run) {
 
     /* alarm persists across forks, so disable it here */
     alarm(0);
-    execvp(args[0], (char* const*)args);
+    execvp(run->args[0], (char* const*)run->args);
     alarm(1);
 
     return false;
@@ -489,9 +469,6 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
         LOG_F("Parent: could not detach thread to wait for child's exception");
         return false;
     }
-
-    /* Default is true for all platforms except Android */
-    arch_sigs[SIGABRT].important = hfuzz->cfg.monitorSIGABRT;
 
     /* Default is false */
     arch_sigs[SIGVTALRM].important = hfuzz->timing.tmoutVTALRM;

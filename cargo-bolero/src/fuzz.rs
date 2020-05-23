@@ -1,5 +1,5 @@
-use crate::{config::Config, fuzzer::Fuzzer};
-use failure::Error;
+use crate::{fuzzer::Fuzzer, selection::Selection};
+use anyhow::Result;
 use structopt::StructOpt;
 
 /// Run a fuzzing engine for a target
@@ -13,7 +13,7 @@ pub struct Fuzz {
     args: FuzzArgs,
 
     #[structopt(flatten)]
-    config: Config,
+    selection: Selection,
 }
 
 #[derive(Debug, StructOpt)]
@@ -40,7 +40,7 @@ pub struct FuzzArgs {
 }
 
 impl Fuzz {
-    pub fn exec(&self) -> Result<(), Error> {
-        self.fuzzer.fuzz(&self.config, &self.args)
+    pub fn exec(&self) -> Result<()> {
+        self.fuzzer.fuzz(&self.selection, &self.args)
     }
 }

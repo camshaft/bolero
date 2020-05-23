@@ -15,6 +15,11 @@ impl TypeGenerator for AtomicBool {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
         Some(AtomicBool::new(driver.gen()?))
     }
+
+    fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+        self.store(driver.gen()?, Ordering::SeqCst);
+        Some(())
+    }
 }
 
 macro_rules! impl_atomic_integer {
@@ -22,6 +27,11 @@ macro_rules! impl_atomic_integer {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 Some($ty::new(driver.gen()?))
+            }
+
+            fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+                self.store(driver.gen()?, Ordering::SeqCst);
+                Some(())
             }
         }
 
@@ -32,8 +42,10 @@ macro_rules! impl_atomic_integer {
                 self.load(Ordering::SeqCst).is_within(range_bounds)
             }
 
-            fn bind_within(self, range_bounds: &R) -> Self {
-                $ty::new(self.load(Ordering::SeqCst).bind_within(range_bounds))
+            fn bind_within(&mut self, range_bounds: &R) {
+                let mut value = self.load(Ordering::SeqCst);
+                value.bind_within(range_bounds);
+                self.store(value, Ordering::SeqCst);
             }
         }
 
@@ -50,8 +62,12 @@ macro_rules! impl_atomic_integer {
 #[test]
 fn atomicu8_test() {
     let _ = generator_test!(gen::<AtomicU8>());
-    // let _ = generator_test!(gen::<AtomicU8>().with().bounds(0u8..5));
 }
+
+// #[test]
+// fn atomicu8_with_test() {
+//     let _ = generator_test!(gen::<AtomicU8>().with().bounds(0u8..5));
+// }
 
 impl_atomic_integer!(AtomicI8, i8);
 impl_atomic_integer!(AtomicU8, u8);

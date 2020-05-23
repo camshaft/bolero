@@ -33,6 +33,9 @@
 #include <stdint.h>
 #include <time.h>
 
+#define HF_STR_LEN 8192
+#define HF_STR_LEN_MINUS_1 8191
+
 #define MX_LOCK(m) util_mutexLock(m, __func__, __LINE__)
 #define MX_UNLOCK(m) util_mutexUnlock(m, __func__, __LINE__)
 #define MX_RWLOCK_READ(m) util_mutexRWLockRead(m, __func__, __LINE__)
@@ -63,52 +66,71 @@
 #define ATOMIC_PRE_OR(x, y) __atomic_or_fetch(&(x), y, __ATOMIC_RELAXED)
 #define ATOMIC_POST_OR(x, y) __atomic_fetch_or(&(x), y, __ATOMIC_RELAXED)
 
-#define ATOMIC_PRE_INC_RELAXED(x) __atomic_add_fetch(&(x), 1, __ATOMIC_RELAXED)
-#define ATOMIC_POST_OR_RELAXED(x, y) __atomic_fetch_or(&(x), y, __ATOMIC_RELAXED)
-
-__attribute__((always_inline)) static inline uint8_t ATOMIC_BTS(uint8_t* addr, size_t offset) {
-    uint8_t oldbit;
+__attribute__((always_inline)) static inline bool ATOMIC_BITMAP_SET(uint8_t* addr, size_t offset) {
     addr += (offset / 8);
-    oldbit = ATOMIC_POST_OR_RELAXED(*addr, ((uint8_t)1U << (offset % 8)));
-    return oldbit;
+    uint8_t mask = (1U << (offset % 8));
+
+    if (ATOMIC_GET(*addr) & mask) {
+        return true;
+    }
+
+#if defined(__x86_64__) || defined(__i386__)
+    bool old;
+    __asm__ __volatile__("lock bts %2, %0\n\t"
+                         "sbb %1, %1\n\t"
+                         : "+m"(*addr), "=r"(old)
+                         : "Ir"(offset % 8));
+    return old;
+#else  /* defined(__x86_64__) || defined(__i386__) */
+    return (ATOMIC_POST_OR(*addr, mask) & mask);
+#endif /* defined(__x86_64__) || defined(__i386__) */
 }
 
+#define HF_MAX(x, y) ((x > y) ? x : y)
+#define HF_MIN(x, y) ((x < y) ? x : y)
+#define HF_CAP(v, x, y) HF_MAX(x, HF_MIN(y, v))
+
+#define util_Log2(v) ((sizeof(unsigned int) * 8) - __builtin_clz((unsigned int)v) - 1)
+
+typedef enum {
+    LHFC_ADDR_NOTFOUND = 0,
+    LHFC_ADDR_RO = 1,
+    LHFC_ADDR_RW = 2,
+} lhfc_addr_t;
+
 extern void* util_Malloc(size_t sz);
-
 extern void* util_Calloc(size_t sz);
-
+extern void* util_AllocCopy(const uint8_t* ptr, size_t sz);
 extern void* util_MMap(size_t sz);
-
 extern void* util_Realloc(void* ptr, size_t sz);
 
-extern char* util_StrDup(const char* s);
-
 extern uint64_t util_rndGet(uint64_t min, uint64_t max);
-
 extern void util_rndBuf(uint8_t* buf, size_t sz);
-
 extern void util_rndBufPrintable(uint8_t* buf, size_t sz);
-
 extern uint64_t util_rnd64(void);
-
 extern uint8_t util_rndPrintable(void);
 
-extern void util_turnToPrintable(uint8_t* buf, size_t sz);
-
+extern char* util_StrDup(const char* s);
 extern int util_ssnprintf(char* str, size_t size, const char* format, ...)
     __attribute__((format(printf, 3, 4)));
-
 extern int util_vssnprintf(char* str, size_t size, const char* format, va_list ap);
-
 extern bool util_strStartsWith(const char* str, const char* tofind);
-
+extern bool util_isANumber(const char* s);
+extern size_t util_decodeCString(char* s);
 extern void util_getLocalTime(const char* fmt, char* buf, size_t len, time_t tm);
+extern const char* util_sigName(int signo);
+extern void util_turnToPrintable(uint8_t* buf, size_t sz);
 
 extern void util_closeStdio(bool close_stdin, bool close_stdout, bool close_stderr);
 
-extern uint64_t util_hash(const char* buf, size_t len);
+extern lhfc_addr_t util_getProgAddr(const void* addr);
+extern bool util_32bitValInBinary(uint32_t v);
+extern bool util_64bitValInBinary(uint32_t v);
 
-extern int64_t util_timeNowMillis(void);
+extern uint64_t util_hash(const char* buf, size_t len);
+extern int64_t fastArray64Search(uint64_t* array, size_t arraySz, uint64_t key);
+
+extern int64_t util_timeNowUSecs(void);
 extern void util_sleepForMSec(uint64_t msec);
 
 extern uint64_t util_getUINT32(const uint8_t* buf);
@@ -120,12 +142,6 @@ extern void util_mutexUnlock(pthread_mutex_t* mutex, const char* func, int line)
 extern void util_mutexRWLockRead(pthread_rwlock_t* mutex, const char* func, int line);
 extern void util_mutexRWLockWrite(pthread_rwlock_t* mutex, const char* func, int line);
 extern void util_mutexRWUnlock(pthread_rwlock_t* mutex, const char* func, int line);
-
-extern int64_t fastArray64Search(uint64_t* array, size_t arraySz, uint64_t key);
-
-extern bool util_isANumber(const char* s);
-
-extern size_t util_decodeCString(char* s);
 
 extern uint64_t util_CRC64(const uint8_t* buf, size_t len);
 extern uint64_t util_CRC64Rev(const uint8_t* buf, size_t len);

@@ -9,28 +9,40 @@ pub struct OneValueOf<O>(O);
 impl<O: OneOfGenerator> ValueGenerator for OneOf<O> {
     type Output = O::Output;
 
-    fn generate<R: Driver>(&self, driver: &mut R) -> Option<Self::Output> {
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         self.0.generate_one_of(driver)
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        self.0.mutate_one_of(driver, value)
     }
 }
 
 impl<O: OneValueOfGenerator> ValueGenerator for OneValueOf<O> {
     type Output = O::Output;
 
-    fn generate<R: Driver>(&self, driver: &mut R) -> Option<Self::Output> {
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         self.0.generate_one_value_of(driver)
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        self.0.mutate_one_value_of(driver, value)
     }
 }
 
+/// Extensions for picking a generator from a set of generators
 pub trait OneOfExt {
     type Generator;
 
+    /// Pick a generator for the provided set of generators
     fn one_of(self) -> OneOf<Self::Generator>;
 }
 
+/// Extensions for picking a value from a set of values
 pub trait OneValueOfExt {
     type Generator;
 
+    /// Pick a value for the provided set of values
     fn one_value_of(self) -> OneValueOf<Self::Generator>;
 }
 
@@ -53,21 +65,32 @@ impl<O: OneValueOfGenerator> OneValueOfExt for O {
 pub trait OneOfGenerator {
     type Output;
 
-    fn generate_one_of<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output>;
+    fn generate_one_of<D: Driver>(&self, driver: &mut D) -> Option<Self::Output>;
+    fn mutate_one_of<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()>;
 }
 
 pub trait OneValueOfGenerator {
     type Output;
 
     fn generate_one_value_of<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output>;
+    fn mutate_one_value_of<D: Driver>(
+        &self,
+        driver: &mut D,
+        value: &mut Self::Output,
+    ) -> Option<()>;
 }
 
 impl<Output, T: ValueGenerator<Output = Output>> OneOfGenerator for &[T] {
     type Output = Output;
 
     fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0usize..self.len()).generate(driver)?;
+        let index = (0..self.len()).generate(driver)?;
         self[index].generate(driver)
+    }
+
+    fn mutate_one_of<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        let index = (0..self.len()).generate(driver)?;
+        self[index].mutate(driver, value)
     }
 }
 
@@ -75,8 +98,18 @@ impl<T: Clone> OneValueOfGenerator for &[T] {
     type Output = T;
 
     fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0usize..self.len()).generate(driver)?;
+        let index = (0..self.len()).generate(driver)?;
         Some(self[index].clone())
+    }
+
+    fn mutate_one_value_of<D: Driver>(
+        &self,
+        driver: &mut D,
+        value: &mut Self::Output,
+    ) -> Option<()> {
+        let index = (0..self.len()).generate(driver)?;
+        *value = self[index].clone();
+        Some(())
     }
 }
 
@@ -101,6 +134,20 @@ macro_rules! impl_selectors {
                     _ => unreachable!("generated value out of bounds")
                 }
             }
+
+            fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
+                match (0u8..=$h_value).generate(driver)? {
+                    $(
+                        $a_value => {
+                            self.$a_value.mutate(driver, value)
+                        },
+                    )*
+                    $h_value => {
+                        self.$h_value.mutate(driver, value)
+                    }
+                    _ => unreachable!("generated value out of bounds")
+                }
+            }
         }
 
         impl<Output, T: ValueGenerator<Output = Output>> OneOfGenerator for [T; $h_value + 1] {
@@ -110,6 +157,11 @@ macro_rules! impl_selectors {
                 let index = (0u8..=$h_value).generate(driver)? as usize;
                 self[index].generate(driver)
             }
+
+            fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
+                let index = (0u8..=$h_value).generate(driver)? as usize;
+                self[index].mutate(driver, value)
+            }
         }
 
         impl<T: Clone> OneValueOfGenerator for [T; $h_value + 1] {
@@ -118,6 +170,16 @@ macro_rules! impl_selectors {
             fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
                 let index = (0u8..=$h_value).generate(driver)? as usize;
                 Some(self[index].clone())
+            }
+
+            fn mutate_one_value_of<D: Driver>(
+                &self,
+                driver: &mut D,
+                value: &mut Self::Output,
+            ) -> Option<()> {
+                let index = (0u8..=$h_value).generate(driver)? as usize;
+                *value = self[index].clone();
+                Some(())
             }
         }
 
@@ -163,31 +225,51 @@ impl_selectors!(
 );
 
 #[inline]
+/// Pick a generator for the provided set of generators
 pub fn one_of<O: OneOfGenerator>(options: O) -> OneOf<O> {
     OneOf(options)
 }
 
 #[inline]
+/// Pick a value for the provided set of values
 pub fn one_value_of<O: OneValueOfGenerator>(options: O) -> OneValueOf<O> {
     OneValueOf(options)
 }
 
 #[test]
-fn one_of_test() {
+fn one_of_array_test() {
     use crate::gen;
+
+    let options = [gen::<u8>(), gen(), gen()];
+    let _ = generator_mutate_test!(one_of(options));
+    let _ = generator_mutate_test!(options.one_of());
+    let _ = generator_mutate_test!(one_of(&options[..]));
+
+    let _ = generator_mutate_test!([1u8, 2, 3].one_of());
+}
+
+#[test]
+fn one_of_slice_test() {
+    use crate::constant;
     use core::cmp::Ordering;
 
-    let options = [gen(), gen(), gen()];
-    let _: Option<u8> = generator_test!(one_of(options));
-    let _: Option<u8> = generator_test!(options.one_of());
-    let _: Option<u8> = generator_test!(one_of(&options[..]));
+    let options = [
+        constant(Ordering::Equal),
+        constant(Ordering::Less),
+        constant(Ordering::Greater),
+    ];
 
-    let _: Option<u8> = generator_test!([1u8, 2, 3].one_of());
+    let _ = generator_mutate_test!(one_of(&options[..]));
+}
 
-    let _: Option<Ordering> =
-        generator_test!([constant(Ordering::Equal), constant(Ordering::Less)].one_of());
+#[test]
+fn one_of_tuple_test() {
+    let _ = generator_mutate_test!(one_of((gen::<u8>(), 0..4, 8..9)));
+}
 
-    let _: Option<Ordering> = generator_test!([Ordering::Equal, Ordering::Less].one_value_of());
+#[test]
+fn one_value_of_test() {
+    use core::cmp::Ordering;
 
-    let _: Option<u8> = generator_test!(one_of((gen(), 0..4, 8..9)));
+    generator_mutate_test!([Ordering::Equal, Ordering::Less, Ordering::Greater].one_value_of());
 }

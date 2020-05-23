@@ -1,3 +1,5 @@
+SANITIZER ?= NONE
+
 test: test_bolero test_fuzzers test_harness
 
 test_harness:
@@ -9,55 +11,123 @@ test_harness:
 test_bolero:
 	@cargo test
 
-test_fuzzers: test_libfuzzer test_afl test_honggfuzz
+test_fuzzers: libfuzzer honggfuzz afl
 
-test_afl:
+libfuzzer honggfuzz:
 	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer afl \
-	    --release
-
-test_libfuzzer:
-	@cargo run \
-	    fuzz \
-	    fuzz_bytes \
-	    --manifest-path examples/basic/Cargo.toml \
-	    --runs 100000 \
-	    --fuzzer libfuzzer \
-	    --release
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer libfuzzer \
-	    --release
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    fuzz \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer libfuzzer \
-	    --release
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer libfuzzer \
-	    --release
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@cargo run \
+	    fuzz \
+	    fuzz_operations \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@cargo run \
+	    reduce \
+	    fuzz_operations \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@OTHER_SHOULD_PANIC=1 cargo run \
+	    fuzz \
+	    tests::add_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@OTHER_SHOULD_PANIC=1 cargo run \
+	    reduce \
+	    tests::add_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@ADD_SHOULD_PANIC=1 cargo run \
+	    fuzz \
+	    tests::other_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@ADD_SHOULD_PANIC=1 cargo run \
+	    reduce \
+	    tests::other_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
 
-test_honggfuzz:
+afl:
 	@cargo run \
 	    fuzz \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer honggfuzz \
-	    --release
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@cargo run \
+	    fuzz \
+	    fuzz_generator \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@OTHER_SHOULD_PANIC=1 cargo run \
+	    fuzz \
+	    tests::add_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@ADD_SHOULD_PANIC=1 cargo run \
+	    fuzz \
+	    tests::other_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 100000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
 
-publish:
+book:
+	@mdbook build book
+
+publish: book
 	@cd bolero-generator-derive && cargo publish
 	@sleep 10
 	@cd bolero-generator && cargo publish
@@ -73,3 +143,5 @@ publish:
 	@cd cargo-bolero && cargo publish
 	@sleep 10
 	@cd bolero && cargo publish
+
+.PHONY: book

@@ -1,27 +1,14 @@
-#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 use crate::combinator::{AndThenGenerator, FilterGenerator, FilterMapGenerator, MapGenerator};
 use core::marker::PhantomData;
 
+#[cfg(test)]
+#[macro_use]
+mod testing;
+
 #[cfg(feature = "either")]
 pub use either;
-
-#[cfg(test)]
-macro_rules! generator_test {
-    ($gen:expr) => {{
-        use $crate::*;
-        let gen = $gen;
-        let driver = &mut $crate::driver::DirectRng::new(rand::thread_rng());
-        for _ in 0..1000 {
-            ValueGenerator::generate(&gen, driver);
-        }
-        let driver = &mut $crate::driver::ForcedRng::new(rand::thread_rng());
-        for _ in 0..1000 {
-            ValueGenerator::generate(&gen, driver);
-        }
-        ValueGenerator::generate(&gen, driver)
-    }};
-}
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -31,10 +18,10 @@ extern crate alloc;
 #[macro_use]
 pub mod alloc_generators;
 
-#[cfg(feature = "std")]
+#[cfg(any(test, feature = "std"))]
 extern crate std;
 
-#[cfg(feature = "std")]
+#[cfg(any(test, feature = "std"))]
 #[path = "std/mod.rs"]
 pub mod std_generators;
 
@@ -58,7 +45,14 @@ pub use driver::Driver;
 
 /// Generate a value for a given type
 pub trait TypeGenerator: Sized {
-    fn generate<R: Driver>(driver: &mut R) -> Option<Self>;
+    /// Generates a value with the given driver
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self>;
+
+    /// Mutates an existing value with the given driver
+    fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
+        *self = Self::generate(driver)?;
+        Some(())
+    }
 
     /// Returns a generator for a given type
     #[inline]
@@ -70,7 +64,15 @@ pub trait TypeGenerator: Sized {
 /// Generate a value with a parameterized generator
 pub trait ValueGenerator: Sized {
     type Output;
-    fn generate<R: Driver>(&self, driver: &mut R) -> Option<Self::Output>;
+
+    /// Generates a value with the given driver
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output>;
+
+    /// Mutates an existing value with the given driver
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        *value = self.generate(driver)?;
+        Some(())
+    }
 
     /// Map the value of a generator
     fn map<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
@@ -153,6 +155,18 @@ pub trait ValueGenerator: Sized {
     }
 }
 
+impl<'a, T: ValueGenerator> ValueGenerator for &'a T {
+    type Output = T::Output;
+
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        (*self).generate(driver)
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        (*self).mutate(driver, value)
+    }
+}
+
 /// Convert a type generator into the default value generator
 pub trait TypeGeneratorWithParams {
     type Output: ValueGenerator;
@@ -179,8 +193,12 @@ impl<T: TypeGenerator + TypeGeneratorWithParams> TypeValueGenerator<T> {
 impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
     type Output = T;
 
-    fn generate<R: Driver>(&self, driver: &mut R) -> Option<Self::Output> {
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         T::generate(driver)
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut T) -> Option<()> {
+        T::mutate(value, driver)
     }
 }
 
@@ -196,16 +214,18 @@ pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
     T::gen_with()
 }
 
+pub use one_of::{one_of, one_value_of};
+
 impl<T> ValueGenerator for PhantomData<T> {
     type Output = Self;
 
-    fn generate<R: Driver>(&self, _driver: &mut R) -> Option<Self::Output> {
+    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {
         Some(PhantomData)
     }
 }
 
 impl<T> TypeGenerator for PhantomData<T> {
-    fn generate<R: Driver>(_driver: &mut R) -> Option<Self> {
+    fn generate<D: Driver>(_driver: &mut D) -> Option<Self> {
         Some(PhantomData)
     }
 }
@@ -217,7 +237,7 @@ pub struct Constant<T> {
 impl<T: Clone> ValueGenerator for Constant<T> {
     type Output = T;
 
-    fn generate<R: Driver>(&self, _driver: &mut R) -> Option<Self::Output> {
+    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {
         Some(self.value.clone())
     }
 }
@@ -231,7 +251,7 @@ pub fn constant<T: Clone>(value: T) -> Constant<T> {
 pub mod prelude {
     pub use crate::{
         constant, gen, gen_with,
-        one_of::{one_of, OneOfExt},
+        one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
         TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
 }

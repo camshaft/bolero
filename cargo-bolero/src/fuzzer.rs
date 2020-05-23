@@ -1,28 +1,40 @@
-use crate::{config::Config, fuzz::FuzzArgs, reduce::ReduceArgs};
-use failure::Error;
+use crate::{fuzz::FuzzArgs, reduce::ReduceArgs, selection::Selection};
+use anyhow::Error;
 use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum Fuzzer {
     Libfuzzer,
+
+    #[cfg(feature = "afl")]
     Afl,
+
+    #[cfg(feature = "honggfuzz")]
     Honggfuzz,
 }
 
 impl Fuzzer {
-    pub fn fuzz(&self, config: &Config, args: &FuzzArgs) -> Result<(), Error> {
+    pub fn fuzz(&self, selection: &Selection, args: &FuzzArgs) -> Result<(), Error> {
         match self {
-            Self::Libfuzzer => crate::libfuzzer::fuzz(config, args),
-            Self::Afl => crate::afl::fuzz(config, args),
-            Self::Honggfuzz => crate::honggfuzz::fuzz(config, args),
+            Self::Libfuzzer => crate::libfuzzer::fuzz(selection, args),
+
+            #[cfg(feature = "afl")]
+            Self::Afl => crate::afl::fuzz(selection, args),
+
+            #[cfg(feature = "honggfuzz")]
+            Self::Honggfuzz => crate::honggfuzz::fuzz(selection, args),
         }
     }
 
-    pub fn reduce(&self, config: &Config, args: &ReduceArgs) -> Result<(), Error> {
+    pub fn reduce(&self, selection: &Selection, args: &ReduceArgs) -> Result<(), Error> {
         match self {
-            Self::Libfuzzer => crate::libfuzzer::reduce(config, args),
-            Self::Afl => crate::afl::reduce(config, args),
-            Self::Honggfuzz => crate::honggfuzz::reduce(config, args),
+            Self::Libfuzzer => crate::libfuzzer::reduce(selection, args),
+
+            #[cfg(feature = "afl")]
+            Self::Afl => crate::afl::reduce(selection, args),
+
+            #[cfg(feature = "honggfuzz")]
+            Self::Honggfuzz => crate::honggfuzz::reduce(selection, args),
         }
     }
 }
@@ -33,8 +45,13 @@ impl FromStr for Fuzzer {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "libfuzzer" => Ok(Self::Libfuzzer),
+
+            #[cfg(feature = "afl")]
             "afl" => Ok(Self::Afl),
+
+            #[cfg(feature = "honggfuzz")]
             "honggfuzz" => Ok(Self::Honggfuzz),
+
             _ => Err(format!("invalid fuzzer {:?}", value)),
         }
     }

@@ -31,6 +31,14 @@ macro_rules! impl_tuple {
                     $acc::generate(driver)?,
                 )* $head::generate(driver)?, ))
             }
+
+            fn mutate<D_: Driver>(&mut self, driver: &mut D_) -> Option<()> {
+                $(
+                    self.$a_value.mutate(driver)?;
+                )*
+                self.$h_value.mutate(driver)?;
+                Some(())
+            }
         }
 
         impl<$head: ValueGenerator $(, $acc: ValueGenerator)*> ValueGenerator for ($($acc, )* $head ,) {
@@ -40,6 +48,14 @@ macro_rules! impl_tuple {
                 Some(($(
                     self.$a_value.generate(driver)?,
                 )* self.$h_value.generate(driver)?,))
+            }
+
+            fn mutate<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
+                $(
+                    self.$a_value.mutate(driver, &mut value.$a_value)?;
+                )*
+                self.$h_value.mutate(driver, &mut value.$h_value)?;
+                Some(())
             }
         }
 
@@ -95,7 +111,16 @@ impl_tuple!(
 );
 
 #[test]
-fn tuple_test() {
-    let _ = generator_test!(gen::<(u8, u16, u32, u64)>());
-    let _ = generator_test!((gen::<u8>(), gen::<u16>()));
+fn tuple_type_test() {
+    let _ = generator_mutate_test!(gen::<(u8, u16, u32, u64)>());
+}
+
+#[test]
+fn tuple_gen_test() {
+    let _ = generator_mutate_test!((gen::<u8>(), gen::<u16>()));
+}
+
+#[test]
+fn tuple_with_test() {
+    let _ = generator_mutate_test!(gen::<(u8, u8)>().with());
 }

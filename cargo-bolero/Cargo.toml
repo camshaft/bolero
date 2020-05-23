@@ -1,6 +1,6 @@
 [package]
 name = "cargo-bolero"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
@@ -10,11 +10,30 @@ license = "MIT"
 edition = "2018"
 readme = "README.md"
 
+[features]
+default = ["afl", "honggfuzz"]
+afl = ["bolero-afl"]
+honggfuzz = ["bolero-honggfuzz"]
+
 [dependencies]
-bolero-afl = { version = "0.4", path = "../bolero-afl", default-features = false, features = ["bin"] }
-bolero-honggfuzz = { version = "0.4", path = "../bolero-honggfuzz", default-features = false, features = ["bin"] }
-failure = "0.1"
+anyhow = "1.0"
+bit-set = "0.5"
+bolero-afl = { version = "0.5", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
+bolero-honggfuzz = { version = "0.5", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
 structopt = "0.3"
-tempfile = "3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tempfile = "3"
+
+[dev-dependencies]
+bolero = { version = "0.5", path = "../bolero" }
+
+[[test]]
+name = "fuzz_bytes"
+path = "tests/fuzz_bytes/fuzz_target.rs"
+harness = false
+
+[[test]]
+name = "fuzz_generator"
+path = "tests/fuzz_generator/fuzz_target.rs"
+harness = false

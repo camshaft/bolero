@@ -7,4 +7,4 @@ Bolero has several features that make testing easy:
 - [Works on Rust Stable](./rust-stable.md)
 - [Structured Testing](./structured-testing.md)
 - [Unified Interface](./unified-interface.md)
-- [Unit Testing](./unit-testing.md)
+- [Private Testing](./private-testing.md)

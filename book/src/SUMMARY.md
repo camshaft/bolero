@@ -9,6 +9,6 @@
     - [Works on Rust Stable](./features/rust-stable.md)
     - [Structured Testing](./features/structured-testing.md)
     - [Unified Interface](./features/unified-interface.md)
-    - [Unit Testing](./features/unit-testing.md)
+    - [Private Testing](./features/private-testing.md)
 - [Tutorials](./tutorials/index.md)
     - [Fibonacci](./tutorials/fibonacci.md)

@@ -1,8 +1,8 @@
+pub use anyhow::Error;
 pub use bolero_generator::{
     driver::{Driver, DriverMode},
     TypeGenerator, ValueGenerator,
 };
-pub use failure::Error;
 
 pub mod panic;
 pub mod rng;
@@ -23,7 +23,8 @@ pub use target_location::TargetLocation;
 mod test_result;
 pub use test_result::*;
 
-pub trait Engine<T: Test> {
+/// Trait for defining an engine that executes a test
+pub trait Engine<T: Test>: Sized {
     type Output;
 
     fn set_driver_mode(&mut self, mode: DriverMode);

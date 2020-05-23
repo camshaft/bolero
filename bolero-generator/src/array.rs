@@ -35,6 +35,14 @@ macro_rules! impl_array {
                 let $head = T::generate(driver)?;
                 Some([$($acc, )* $head])
             }
+
+            fn mutate<D_: Driver>(&mut self, driver: &mut D_) -> Option<()> {
+                $(
+                    self[$a_index].mutate(driver)?;
+                )*
+                self[$h_index].mutate(driver)?;
+                Some(())
+            }
         }
 
         impl<G: ValueGenerator> ValueGenerator for [G; $h_index + 1] {
@@ -46,6 +54,14 @@ macro_rules! impl_array {
                 )*
                 let $head = self[$h_index].generate(driver)?;
                 Some([$($acc, )* $head])
+            }
+
+            fn mutate<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
+                $(
+                    self[$a_index].mutate(driver, &mut value[$a_index])?;
+                )*
+                self[$h_index].mutate(driver, &mut value[$h_index])?;
+                Some(())
             }
         }
 
@@ -103,7 +119,11 @@ impl_array!(
 );
 
 #[test]
-fn array_test() {
-    let _ = generator_test!(gen::<[u8; 10]>());
-    let _ = generator_test!([gen::<u8>(), gen::<u8>()]);
+fn array_type_test() {
+    let _ = generator_mutate_test!(gen::<[u8; 10]>());
+}
+
+#[test]
+fn array_gen_test() {
+    let _ = generator_mutate_test!([gen::<u8>(), gen::<u8>()]);
 }

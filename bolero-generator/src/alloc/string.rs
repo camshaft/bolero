@@ -1,41 +1,118 @@
 use crate::{
-    alloc_generators::CharsGenerator, Driver, TypeGenerator, TypeGeneratorWithParams,
-    ValueGenerator,
+    alloc_generators::{CollectionMutator, DEFAULT_LEN_RANGE},
+    Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator,
 };
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::ops::RangeInclusive;
 
-pub struct StringGenerator<L>(CharsGenerator<L>);
+pub struct StringGenerator<C, L> {
+    chars: C,
+    len: L,
+}
 
-impl<L> StringGenerator<L> {
+impl<C, L> StringGenerator<C, L> {
+    pub fn chars<Gen: ValueGenerator<Output = char>>(self, chars: Gen) -> StringGenerator<Gen, L> {
+        StringGenerator {
+            chars,
+            len: self.len,
+        }
+    }
+
+    pub fn map_chars<Gen: ValueGenerator<Output = char>, F: Fn(C) -> Gen>(
+        self,
+        map: F,
+    ) -> StringGenerator<Gen, L> {
+        StringGenerator {
+            chars: map(self.chars),
+            len: self.len,
+        }
+    }
+
     pub fn len<Gen: ValueGenerator<Output = Len>, Len: Into<usize>>(
         self,
         len: Gen,
-    ) -> StringGenerator<Gen> {
-        StringGenerator(self.0.len(len))
+    ) -> StringGenerator<C, Gen> {
+        StringGenerator {
+            chars: self.chars,
+            len,
+        }
     }
 
     pub fn map_len<Gen: ValueGenerator<Output = Len>, F: Fn(L) -> Gen, Len: Into<usize>>(
         self,
         map: F,
-    ) -> StringGenerator<Gen> {
-        StringGenerator(self.0.map_len(map))
+    ) -> StringGenerator<C, Gen> {
+        StringGenerator {
+            chars: self.chars,
+            len: map(self.len),
+        }
     }
 }
 
-impl<L: ValueGenerator<Output = Len>, Len: Into<usize>> ValueGenerator for StringGenerator<L> {
+impl<G: ValueGenerator<Output = char>, L: ValueGenerator<Output = Len>, Len: Into<usize>>
+    ValueGenerator for StringGenerator<G, L>
+{
     type Output = String;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        Some(to_string(self.0.generate(driver)?))
+        let len = ValueGenerator::generate(&self.len, driver)?.into();
+
+        Iterator::map(0..len, |_| ValueGenerator::generate(&self.chars, driver)).collect()
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        let len = ValueGenerator::generate(&self.len, driver)?.into();
+        CollectionMutator::mutate_collection(value, driver, len, &self.chars)
+    }
+}
+
+impl CollectionMutator for String {
+    type Item = char;
+
+    fn mutate_collection<D: Driver, G>(
+        &mut self,
+        driver: &mut D,
+        new_len: usize,
+        item_gen: &G,
+    ) -> Option<()>
+    where
+        G: ValueGenerator<Output = Self::Item>,
+    {
+        let prev = core::mem::replace(self, String::new());
+
+        let to_mutate = self.len().min(new_len);
+
+        for mut c in prev.chars().take(to_mutate) {
+            item_gen.mutate(driver, &mut c)?;
+            self.push(c);
+        }
+
+        let to_add = new_len.saturating_sub(to_mutate);
+        for _ in 0..to_add {
+            self.push(item_gen.generate(driver)?);
+        }
+
+        #[cfg(test)]
+        assert_eq!(self.chars().count(), new_len);
+
+        Some(())
+    }
+}
+
+impl TypeGenerator for String {
+    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+        String::gen_with().generate(driver)
     }
 }
 
 impl TypeGeneratorWithParams for String {
-    type Output = StringGenerator<RangeInclusive<usize>>;
+    type Output = StringGenerator<TypeValueGenerator<char>, RangeInclusive<usize>>;
 
     fn gen_with() -> Self::Output {
-        StringGenerator(Vec::gen_with())
+        StringGenerator {
+            chars: Default::default(),
+            len: DEFAULT_LEN_RANGE,
+        }
     }
 }
 
@@ -47,19 +124,13 @@ impl ValueGenerator for String {
     }
 }
 
-impl TypeGenerator for String {
-    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(to_string(driver.gen()?))
-    }
-}
-
-fn to_string(mut vec: Vec<char>) -> String {
-    vec.drain(..).collect()
+#[test]
+fn string_type_test() {
+    let _ = generator_test!(gen::<String>());
 }
 
 #[test]
-fn string_test() {
-    let _ = generator_test!(gen::<String>());
+fn string_with_test() {
     let string = generator_test!(gen::<String>().with().len(32usize)).unwrap();
-    assert_eq!(string.chars().map(|_| 1usize).sum::<usize>(), 32usize);
+    assert_eq!(string.chars().count(), 32usize);
 }

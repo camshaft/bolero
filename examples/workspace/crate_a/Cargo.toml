@@ -9,5 +9,5 @@ bolero = { path = "../../../bolero" }
 
 [[test]]
 name = "fuzz_a"
-path = "tests/fuzz_a/main.rs"
+path = "tests/fuzz_a/fuzz_target.rs"
 harness = false

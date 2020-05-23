@@ -83,7 +83,7 @@ static pid_t arch_clone(uintptr_t flags) {
 }
 
 pid_t arch_fork(run_t* run) {
-    pid_t pid = run->global->linux.useClone ? arch_clone(CLONE_UNTRACED | SIGCHLD) : fork();
+    pid_t pid = run->global->arch_linux.useClone ? arch_clone(CLONE_UNTRACED | SIGCHLD) : fork();
     if (pid == -1) {
         return pid;
     }
@@ -98,21 +98,28 @@ pid_t arch_fork(run_t* run) {
 }
 
 bool arch_launchChild(run_t* run) {
-    if ((run->global->linux.cloneFlags & CLONE_NEWNET) && (nsIfaceUp("lo") == false)) {
+    if ((run->global->arch_linux.cloneFlags & CLONE_NEWNET) && !nsIfaceUp("lo")) {
         LOG_W("Cannot bring interface 'lo' up");
     }
 
-    /*
-     * Make it attach-able by ptrace()
-     */
+    /* Try to enable network namespacing if requested */
+    if (run->global->arch_linux.useNetNs == HF_MAYBE) {
+        if (unshare(CLONE_NEWUSER | CLONE_NEWNET) == -1) {
+            PLOG_D("unshare((CLONE_NEWUSER|CLONE_NEWNS) failed");
+        } else if (!nsIfaceUp("lo")) {
+            LOG_E("Network namespacing enabled, but couldn't bring interface 'lo' up");
+            return false;
+        }
+        LOG_D("Network namespacing enabled, and the 'lo' interface is set up");
+    }
+
+    /* Make it attach-able by ptrace() */
     if (prctl(PR_SET_DUMPABLE, 1UL, 0UL, 0UL, 0UL) == -1) {
         PLOG_E("prctl(PR_SET_DUMPABLE, 1)");
         return false;
     }
 
-    /*
-     * Kill a process which corrupts its own heap (with ABRT)
-     */
+    /* Kill rocess which corrupts its own heap (with ABRT) */
     if (setenv("MALLOC_CHECK_", "7", 0) == -1) {
         PLOG_E("setenv(MALLOC_CHECK_=7) failed");
         return false;
@@ -123,9 +130,7 @@ bool arch_launchChild(run_t* run) {
     }
 
     /* Increase our OOM score, so fuzzed processes die faster */
-    static const char score100[] = "+500";
-    if (!files_writeBufToFile(
-            "/proc/self/oom_score_adj", (uint8_t*)score100, strlen(score100), O_WRONLY)) {
+    if (!files_writeStrToFile("/proc/self/oom_score_adj", "+500", O_WRONLY)) {
         LOG_W("Couldn't increase our oom_score");
     }
 
@@ -134,35 +139,12 @@ bool arch_launchChild(run_t* run) {
      * This might fail in Docker, as Docker blocks __NR_personality. Consequently
      * it's just a debug warning
      */
-    if (run->global->linux.disableRandomization &&
+    if (run->global->arch_linux.disableRandomization &&
         syscall(__NR_personality, ADDR_NO_RANDOMIZE) == -1) {
         PLOG_D("personality(ADDR_NO_RANDOMIZE) failed");
     }
 
-#define ARGS_MAX 512
-    const char* args[ARGS_MAX + 2];
-    char argData[PATH_MAX];
-    const char inputFile[] = "/dev/fd/" HF_XSTR(_HF_INPUT_FD);
-
-    int x = 0;
-    for (x = 0; x < ARGS_MAX && x < run->global->exe.argc; x++) {
-        if (!strcmp(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            args[x] = inputFile;
-        } else if (strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER)) {
-            const char* off = strstr(run->global->exe.cmdline[x], _HF_FILE_PLACEHOLDER);
-            snprintf(argData, sizeof(argData), "%.*s%s", (int)(off - run->global->exe.cmdline[x]),
-                run->global->exe.cmdline[x], inputFile);
-            args[x] = argData;
-        } else {
-            args[x] = run->global->exe.cmdline[x];
-        }
-    }
-    args[x++] = NULL;
-
-    LOG_D("Launching '%s' on file '%s'", args[0],
-        run->global->exe.persistent ? "PERSISTENT_MODE" : inputFile);
-
-    /* alarms persist across execve(), so disable it here */
+    /* Alarms persist across execve(), so disable them here */
     alarm(0);
 
     /* Wait for the ptrace to attach now */
@@ -170,13 +152,14 @@ bool arch_launchChild(run_t* run) {
         LOG_F("Couldn't stop itself");
     }
 #if defined(__NR_execveat)
-    syscall(__NR_execveat, run->global->linux.exeFd, "", args, environ, AT_EMPTY_PATH);
+    syscall(__NR_execveat, run->global->arch_linux.exeFd, "", run->args, environ, AT_EMPTY_PATH);
 #endif /* defined__NR_execveat) */
-    execve(args[0], (char* const*)args, environ);
+    execve(run->args[0], (char* const*)run->args, environ);
     int errno_cpy = errno;
     alarm(1);
 
-    LOG_E("execve('%s', fd=%d): %s", args[0], run->global->linux.exeFd, strerror(errno_cpy));
+    LOG_E("execve('%s', fd=%d): %s", run->args[0], run->global->arch_linux.exeFd,
+        strerror(errno_cpy));
 
     return false;
 }
@@ -268,36 +251,21 @@ void arch_reapChild(run_t* run) {
 
         const struct timespec ts = {
             .tv_sec = 0ULL,
-            .tv_nsec = (1000ULL * 1000ULL * 250ULL),
+            .tv_nsec = (1000ULL * 1000ULL * 100ULL),
         };
         /* Return with SIGIO, SIGCHLD */
-        int sig = sigtimedwait(&run->global->exe.waitSigSet, NULL, &ts /* 0.25s */);
+        int sig = sigtimedwait(&run->global->exe.waitSigSet, NULL, &ts /* 0.1s */);
         if (sig == -1 && (errno != EAGAIN && errno != EINTR)) {
             PLOG_F("sigwaitinfo(SIGIO|SIGCHLD)");
         }
 
-        if (arch_checkWait(run)) {
+        if (sig != SIGIO && arch_checkWait(run)) {
             run->pid = 0;
             break;
         }
         if (run->global->socketFuzzer.enabled) {
             // Do not wait for new events
             break;
-        }
-    }
-    if (run->global->sanitizer.enable) {
-        char crashReport[PATH_MAX];
-        snprintf(crashReport, sizeof(crashReport), "%s/%s.%d", run->global->io.workDir, kLOGPREFIX,
-            run->pid);
-        if (files_exists(crashReport)) {
-            if (run->backtrace) {
-                unlink(crashReport);
-            } else {
-                LOG_W("Un-handled ASan report due to compiler-rt internal error - retry with '%s'",
-                    crashReport);
-                /* Try to parse report file */
-                arch_traceExitAnalyze(run, run->pid);
-            }
         }
     }
 
@@ -312,7 +280,7 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
         PLOG_E("File '%s' doesn't seem to be executable", hfuzz->exe.cmdline[0]);
         return false;
     }
-    if ((hfuzz->linux.exeFd =
+    if ((hfuzz->arch_linux.exeFd =
                 TEMP_FAILURE_RETRY(open(hfuzz->exe.cmdline[0], O_RDONLY | O_CLOEXEC))) == -1) {
         PLOG_E("Cannot open the executable binary: %s)", hfuzz->exe.cmdline[0]);
         return false;
@@ -339,7 +307,7 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
             break;
         }
         LOG_D("Glibc version:'%s', OK", gversion);
-        hfuzz->linux.useClone = false;
+        hfuzz->arch_linux.useClone = false;
         break;
     }
 
@@ -407,17 +375,8 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
     /* Updates the important signal array based on input args */
     arch_traceSignalsInit(hfuzz);
 
-    /*
-     * If sanitizer fuzzing enabled and SIGABRT is monitored (abort_on_error=1),
-     * increase number of major frames, since top 7-9 frames will be occupied
-     * with sanitizer runtime library & libc symbols
-     */
-    if (hfuzz->sanitizer.enable && hfuzz->cfg.monitorSIGABRT) {
-        hfuzz->linux.numMajorFrames = 14;
-    }
-
-    if (hfuzz->linux.cloneFlags && unshare(hfuzz->linux.cloneFlags) == -1) {
-        LOG_E("unshare(%tx)", hfuzz->linux.cloneFlags);
+    if (hfuzz->arch_linux.cloneFlags && unshare(hfuzz->arch_linux.cloneFlags) == -1) {
+        LOG_E("unshare(%tx)", hfuzz->arch_linux.cloneFlags);
         return false;
     }
 
@@ -425,11 +384,11 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
 }
 
 bool arch_archThreadInit(run_t* run) {
-    run->linux.perfMmapBuf = NULL;
-    run->linux.perfMmapAux = NULL;
-    run->linux.cpuInstrFd = -1;
-    run->linux.cpuBranchFd = -1;
-    run->linux.cpuIptBtsFd = -1;
+    run->arch_linux.perfMmapBuf = NULL;
+    run->arch_linux.perfMmapAux = NULL;
+    run->arch_linux.cpuInstrFd = -1;
+    run->arch_linux.cpuBranchFd = -1;
+    run->arch_linux.cpuIptBtsFd = -1;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1UL, 0UL, 0UL, 0UL) == -1) {
         PLOG_W("prctl(PR_SET_CHILD_SUBREAPER, 1)");

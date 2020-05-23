@@ -118,20 +118,19 @@ __attribute__((hot)) inline static void perf_ptAnalyzePkt(run_t* run, struct pt_
             return;
     }
 
-    if (ip >= run->global->linux.dynamicCutOffAddr) {
+    if (ip >= run->global->arch_linux.dynamicCutOffAddr) {
         return;
     }
 
     ip &= _HF_PERF_BITMAP_BITSZ_MASK;
-    register uint8_t prev = ATOMIC_BTS(run->global->feedback.feedbackMap->bbMapPc, ip);
+    register bool prev = ATOMIC_BITMAP_SET(run->global->feedback.covFeedbackMap->bbMapPc, ip);
     if (!prev) {
-        run->linux.hwCnts.newBBCnt++;
+        run->hwCnts.newBBCnt++;
     }
-    return;
 }
 
 void arch_ptAnalyze(run_t* run) {
-    struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)run->linux.perfMmapBuf;
+    struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)run->arch_linux.perfMmapBuf;
 
     uint64_t aux_tail = ATOMIC_GET(pem->aux_tail);
     uint64_t aux_head = ATOMIC_GET(pem->aux_head);
@@ -141,8 +140,8 @@ void arch_ptAnalyze(run_t* run) {
 
     struct pt_config ptc;
     pt_config_init(&ptc);
-    ptc.begin = &run->linux.perfMmapAux[aux_tail];
-    ptc.end = &run->linux.perfMmapAux[aux_head];
+    ptc.begin = &run->arch_linux.perfMmapAux[aux_tail];
+    ptc.end = &run->arch_linux.perfMmapAux[aux_head];
     ptc.cpu = ptCpu;
 
     int errcode = pt_cpu_errata(&ptc.errata, &ptc.cpu);

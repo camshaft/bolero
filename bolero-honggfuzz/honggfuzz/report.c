@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -38,7 +39,7 @@ static int reportFD = -1;
 
 #if defined(_HF_ARCH_LINUX)
 static void report_printdynFileMethod(run_t* run) {
-    dprintf(reportFD, " dynFileMethod: ");
+    dprintf(reportFD, " dynFileMethod   : ");
     if (run->global->feedback.dynFileMethod == 0)
         dprintf(reportFD, "NONE\n");
     else {
@@ -57,14 +58,14 @@ static void report_printdynFileMethod(run_t* run) {
 #endif
 
 static void report_printTargetCmd(run_t* run) {
-    dprintf(reportFD, " fuzzTarget   : ");
+    dprintf(reportFD, " fuzzTarget      : ");
     for (int x = 0; run->global->exe.cmdline[x]; x++) {
         dprintf(reportFD, "%s ", run->global->exe.cmdline[x]);
     }
     dprintf(reportFD, "\n");
 }
 
-void report_Report(run_t* run) {
+void report_saveReport(run_t* run) {
     if (run->report[0] == '\0') {
         return;
     }
@@ -87,7 +88,7 @@ void report_Report(run_t* run) {
         }
     }
 
-    char localtmstr[PATH_MAX];
+    char localtmstr[HF_STR_LEN];
     util_getLocalTime("%F.%H:%M:%S", localtmstr, sizeof(localtmstr), time(NULL));
 
     dprintf(reportFD,
@@ -110,9 +111,9 @@ void report_Report(run_t* run) {
         run->global->exe.externalCommand == NULL ? "NULL" : run->global->exe.externalCommand,
         run->global->exe.fuzzStdin ? "TRUE" : "FALSE", run->global->timing.tmOut,
 #if defined(_HF_ARCH_LINUX)
-        run->global->linux.ignoreAddr,
+        run->global->arch_linux.ignoreAddr,
 #elif defined(_HF_ARCH_NETBSD)
-        run->global->netbsd.ignoreAddr,
+        run->global->arch_netbsd.ignoreAddr,
 #endif
         run->global->exe.asLimit, run->global->exe.rssLimit, run->global->exe.dataLimit,
         run->global->mutate.dictionaryFile == NULL ? "NULL" : run->global->mutate.dictionaryFile);
@@ -127,4 +128,37 @@ void report_Report(run_t* run) {
         "%s"
         "=====================================================================\n",
         run->report);
+}
+
+void report_appendReport(pid_t pid, run_t* run, funcs_t* funcs, size_t funcCnt, uint64_t pc,
+    uint64_t crashAddr, int signo, const char* instr, const char description[HF_STR_LEN]) {
+    util_ssnprintf(run->report, sizeof(run->report), "CRASH:\n");
+    util_ssnprintf(run->report, sizeof(run->report), "DESCRIPTION: %s\n", description);
+    util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->dynfile->path);
+    util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
+    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", pid);
+    util_ssnprintf(
+        run->report, sizeof(run->report), "SIGNAL: %s (%d)\n", util_sigName(signo), signo);
+    util_ssnprintf(run->report, sizeof(run->report), "PC: 0x%" PRIx64 "\n", pc);
+    util_ssnprintf(run->report, sizeof(run->report), "FAULT ADDRESS: 0x%" PRIx64 "\n", crashAddr);
+    util_ssnprintf(run->report, sizeof(run->report), "INSTRUCTION: %s\n", instr);
+    util_ssnprintf(
+        run->report, sizeof(run->report), "STACK HASH: %016" PRIx64 "\n", run->backtrace);
+    util_ssnprintf(run->report, sizeof(run->report), "STACK:\n");
+    for (size_t i = 0; i < funcCnt; i++) {
+        util_ssnprintf(run->report, sizeof(run->report), " <0x%016tx> ", (uintptr_t)funcs[i].pc);
+        util_ssnprintf(run->report, sizeof(run->report), "[func:%s file:%s line:%zu module:%s]\n",
+            funcs[i].func, funcs[i].file, funcs[i].line, funcs[i].module);
+    }
+
+// libunwind is not working for 32bit targets in 64bit systems
+#if defined(__aarch64__)
+    if (funcCnt == 0) {
+        util_ssnprintf(run->report, sizeof(run->report),
+            " !ERROR: If 32bit fuzz target"
+            " in aarch64 system, try ARM 32bit build\n");
+    }
+#endif
+
+    return;
 }

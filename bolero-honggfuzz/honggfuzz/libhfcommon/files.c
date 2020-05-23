@@ -29,8 +29,12 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#if defined(_HF_ARCH_LINUX)
+#include <linux/memfd.h>
+#endif /* defined(_HF_ARCH_LINUX) */
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +42,7 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #if defined(_HF_ARCH_LINUX)
 #include <sys/syscall.h>
 #endif /* defined(_HF_ARCH_LINUX) */
@@ -49,40 +54,44 @@
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
 
-ssize_t files_readFileToBufMax(const char* fileName, uint8_t* buf, size_t fileMaxSz) {
-    int fd = TEMP_FAILURE_RETRY(open(fileName, O_RDONLY | O_CLOEXEC));
+ssize_t files_readFileToBufMax(const char* fname, uint8_t* buf, size_t fileMaxSz) {
+    int fd = TEMP_FAILURE_RETRY(open(fname, O_RDONLY | O_CLOEXEC));
     if (fd == -1) {
-        PLOG_W("Couldn't open '%s' for R/O", fileName);
+        PLOG_W("Couldn't open '%s' for R/O", fname);
         return -1;
     }
 
     ssize_t readSz = files_readFromFd(fd, buf, fileMaxSz);
     if (readSz < 0) {
-        LOG_W("Couldn't read '%s' to a buf", fileName);
+        LOG_W("Couldn't read '%s' to a buf", fname);
     }
     close(fd);
 
-    LOG_D("Read '%zu' bytes from '%s'", readSz, fileName);
+    LOG_D("Read %zu bytes (%zu requested) from '%s'", (size_t)readSz, fileMaxSz, fname);
     return readSz;
 }
 
-bool files_writeBufToFile(const char* fileName, const uint8_t* buf, size_t fileSz, int flags) {
-    int fd = TEMP_FAILURE_RETRY(open(fileName, flags, 0644));
+bool files_writeBufToFile(const char* fname, const uint8_t* buf, size_t fileSz, int flags) {
+    int fd = TEMP_FAILURE_RETRY(open(fname, flags, 0644));
     if (fd == -1) {
-        PLOG_W("Couldn't create/open '%s' for R/W", fileName);
+        PLOG_W("Couldn't create/open '%s' for R/W", fname);
         return false;
     }
 
     bool ret = files_writeToFd(fd, buf, fileSz);
     if (ret == false) {
-        PLOG_W("Couldn't write '%zu' bytes to file '%s' (fd='%d')", fileSz, fileName, fd);
-        unlink(fileName);
+        PLOG_W("Couldn't write '%zu' bytes to file '%s' (fd='%d')", fileSz, fname, fd);
+        unlink(fname);
     } else {
-        LOG_D("Written '%zu' bytes to '%s'", fileSz, fileName);
+        LOG_D("Written '%zu' bytes to '%s'", fileSz, fname);
     }
 
     close(fd);
     return ret;
+}
+
+bool files_writeStrToFile(const char* fname, const char* str, int flags) {
+    return files_writeBufToFile(fname, (uint8_t*)str, strlen(str), flags);
 }
 
 int files_writeBufToTmpFile(const char* dir, const uint8_t* buf, size_t fileSz, int flags) {
@@ -148,8 +157,8 @@ ssize_t files_readFromFdSeek(int fd, uint8_t* buf, size_t fileSz, off_t off) {
     return files_readFromFd(fd, buf, fileSz);
 }
 
-bool files_exists(const char* fileName) {
-    return (access(fileName, F_OK) != -1);
+bool files_exists(const char* fname) {
+    return (access(fname, F_OK) != -1);
 }
 
 bool files_writePatternToFd(int fd, off_t size, unsigned char p) {
@@ -204,6 +213,27 @@ const char* files_basename(const char* path) {
     return base ? base + 1 : path;
 }
 
+/* Zero all bytes in the file */
+bool files_resetFile(int fd, size_t sz) {
+#if defined(_HF_ARCH_LINUX)
+    if (fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, (off_t)0, (off_t)sz) != -1) {
+        return true;
+    }
+    PLOG_W("fallocate(fd=%d, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, sz=%zu)", fd, sz);
+#endif /* defined(_HF_ARCH_LINUX) */
+
+    /* Fallback mode */
+    if (ftruncate(fd, (off_t)0) == -1) {
+        PLOG_W("ftruncate(fd=%d, sz=0)", fd);
+        return false;
+    }
+    if (ftruncate(fd, (off_t)sz) == -1) {
+        PLOG_W("ftruncate(fd=%d, sz=%zu)", fd, sz);
+        return false;
+    }
+    return true;
+}
+
 /*
  * Reads symbols from src file (one per line) and append them to filterList. The
  * total number of added symbols is returned.
@@ -251,27 +281,27 @@ size_t files_parseSymbolFilter(const char* srcFile, char*** filterList) {
     return symbolsRead;
 }
 
-uint8_t* files_mapFile(const char* fileName, off_t* fileSz, int* fd, bool isWritable) {
+uint8_t* files_mapFile(const char* fname, off_t* fileSz, int* fd, bool isWritable) {
     int mmapProt = PROT_READ;
     if (isWritable) {
         mmapProt |= PROT_WRITE;
     }
 
-    if ((*fd = TEMP_FAILURE_RETRY(open(fileName, O_RDONLY))) == -1) {
-        PLOG_W("Couldn't open() '%s' file in R/O mode", fileName);
+    if ((*fd = TEMP_FAILURE_RETRY(open(fname, O_RDONLY))) == -1) {
+        PLOG_W("Couldn't open() '%s' file in R/O mode", fname);
         return NULL;
     }
 
     struct stat st;
     if (fstat(*fd, &st) == -1) {
-        PLOG_W("Couldn't stat() the '%s' file", fileName);
+        PLOG_W("Couldn't stat() the '%s' file", fname);
         close(*fd);
         return NULL;
     }
 
     uint8_t* buf;
     if ((buf = mmap(NULL, st.st_size, mmapProt, MAP_PRIVATE, *fd, 0)) == MAP_FAILED) {
-        PLOG_W("Couldn't mmap() the '%s' file", fileName);
+        PLOG_W("Couldn't mmap() the '%s' file", fname);
         close(*fd);
         return NULL;
     }
@@ -293,13 +323,6 @@ int files_getTmpMapFlags(int flag, bool nocore) {
     /* Our shared/mmap'd pages can have mutexes in them */
     flag |= MAP_HASSEMAPHORE;
 #endif /* defined(MAP_HASSEMAPHORE) */
-       /* Avoid mapping the memory lazily */
-#if defined(MAP_PREFAULT_READ)
-    flag |= MAP_PREFAULT_READ;
-#endif /* defined(MAP_PREFAULT_READ) */
-#if defined(MAP_POPULATE)
-    flag |= MAP_POPULATE;
-#endif /* defined(MAP_POPULATE) */
     if (nocore) {
 #if defined(MAP_CONCEAL)
         flag |= MAP_CONCEAL;
@@ -311,65 +334,76 @@ int files_getTmpMapFlags(int flag, bool nocore) {
     return flag;
 }
 
-void* files_mapSharedMem(size_t sz, int* fd, const char* name, bool nocore) {
-    *fd = -1;
+int files_createSharedMem(size_t sz, const char* name, bool exportmap) {
+    int fd = -1;
+
+    if (exportmap) {
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "./%s", name);
+        if ((fd = open(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0644)) == -1) {
+            PLOG_W("open('%s')", path);
+            return -1;
+        }
+    }
 
 #if defined(_HF_ARCH_LINUX)
-
-#if !defined(MFD_CLOEXEC) /* sys/memfd.h is not always present */
-#define MFD_CLOEXEC 0x0001U
-#endif /* !defined(MFD_CLOEXEC) */
-
-#if !defined(__NR_memfd_create)
-#if defined(__x86_64__)
-#define __NR_memfd_create 319
-#endif /* defined(__x86_64__) */
-#endif /* !defined(__NR_memfd_create) */
-
-#if defined(__NR_memfd_create)
-    *fd = syscall(__NR_memfd_create, name, (uintptr_t)MFD_CLOEXEC);
-#endif /* defined__NR_memfd_create) */
-
+    if (fd == -1) {
+        fd = syscall(__NR_memfd_create, name, (uintptr_t)(MFD_CLOEXEC));
+    }
 #endif /* defined(_HF_ARCH_LINUX) */
 
 /* SHM_ANON is available with some *BSD OSes */
 #if defined(SHM_ANON)
-    if (*fd == -1) {
-        if ((*fd = shm_open(SHM_ANON, O_RDWR | O_CLOEXEC, 0600)) == -1) {
-            PLOG_W("shm_open(SHM_ANON, O_RDWR|O_CLOEXEC, 0600)");
+    if (fd == -1) {
+        if ((fd = shm_open(SHM_ANON, O_RDWR, 0600)) == -1) {
+            PLOG_W("shm_open(SHM_ANON, O_RDWR, 0600)");
         }
     }
 #endif /* defined(SHM_ANON) */
+
+/* Use regular shm_open */
 #if !defined(_HF_ARCH_DARWIN) && !defined(__ANDROID__)
     /* shm objects under MacOSX are 'a-typical' */
-    if (*fd == -1) {
+    if (fd == -1) {
         char tmpname[PATH_MAX];
         struct timeval tv;
         gettimeofday(&tv, NULL);
         snprintf(tmpname, sizeof(tmpname), "/%s%lx%lx%d", name, (unsigned long)tv.tv_sec,
             (unsigned long)tv.tv_usec, (int)getpid());
-        if ((*fd = shm_open(tmpname, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600)) == -1) {
-            PLOG_W("shm_open('%s', O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0600)", tmpname);
+        if ((fd = shm_open(tmpname, O_RDWR | O_CREAT | O_EXCL, 0600)) == -1) {
+            PLOG_W("shm_open('%s', O_RDWR|O_CREAT|O_EXCL, 0600)", tmpname);
         } else {
             shm_unlink(tmpname);
         }
     }
 #endif /* !defined(_HF_ARCH_DARWIN) && !defined(__ANDROID__) */
-    if (*fd == -1) {
+
+    /* As the last resort, create a file in /tmp */
+    if (fd == -1) {
         char template[PATH_MAX];
         snprintf(template, sizeof(template), "/tmp/%s.XXXXXX", name);
-        if ((*fd = mkostemp(template, O_CLOEXEC)) == -1) {
+        if ((fd = mkostemp(template, O_CLOEXEC)) == -1) {
             PLOG_W("mkstemp('%s')", template);
-            return NULL;
+            return -1;
         }
         unlink(template);
     }
-    if (TEMP_FAILURE_RETRY(ftruncate(*fd, sz)) == -1) {
-        PLOG_W("ftruncate(%d, %zu)", *fd, sz);
-        close(*fd);
-        *fd = -1;
+
+    if (TEMP_FAILURE_RETRY(ftruncate(fd, sz)) == -1) {
+        PLOG_W("ftruncate(%d, %zu)", fd, sz);
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}
+
+void* files_mapSharedMem(size_t sz, int* fd, const char* name, bool nocore, bool exportmap) {
+    *fd = files_createSharedMem(sz, name, exportmap);
+    if (*fd == -1) {
         return NULL;
     }
+
     int mflags = files_getTmpMapFlags(MAP_SHARED, /* nocore= */ true);
     void* ret = mmap(NULL, sz, PROT_READ | PROT_WRITE, mflags, *fd, 0);
     if (ret == MAP_FAILED) {
@@ -408,7 +442,7 @@ sa_family_t files_sockFamily(int sock) {
     return addr.sa_family;
 }
 
-const char* files_sockAddrToStr(const struct sockaddr* sa) {
+const char* files_sockAddrToStr(const struct sockaddr* sa, const socklen_t len) {
     static __thread char str[4096];
 
     if (sa->sa_family == AF_INET) {
@@ -427,6 +461,33 @@ const char* files_sockAddrToStr(const struct sockaddr* sa) {
         } else {
             snprintf(str, sizeof(str), "IPv6 addr conversion failed");
         }
+        return str;
+    }
+
+    if (sa->sa_family == AF_UNIX) {
+        if ((size_t)len <= offsetof(struct sockaddr_un, sun_path)) {
+            snprintf(str, sizeof(str), "unix:<struct too short at %u bytes>", (unsigned)len);
+            return str;
+        }
+
+        struct sockaddr_un* sun = (struct sockaddr_un*)sa;
+        int pathlen;
+
+        if (sun->sun_path[0] == '\0') {
+            /* Abstract socket
+             *
+             * TODO: Handle null bytes in sun->sun_path (they have no
+             * special significance unlike in C char arrays, see unix(7))
+             */
+            pathlen = strnlen(&sun->sun_path[1], len - offsetof(struct sockaddr_un, sun_path) - 1);
+
+            snprintf(str, sizeof(str), "unix:abstract:%-*s", pathlen, &sun->sun_path[1]);
+            return str;
+        }
+
+        pathlen = strnlen(sun->sun_path, len - offsetof(struct sockaddr_un, sun_path));
+
+        snprintf(str, sizeof(str), "unix:%-*s", pathlen, sun->sun_path);
         return str;
     }
 

@@ -28,7 +28,7 @@ $ cargo bolero new fibonacci_test --generator
 ```
 
 ```rust
-// tests/fibonacci_test/main.rs
+// tests/fibonacci_test/fuzz_target.rs
 use bolero::fuzz;
 use my_fibonacci::fibonacci;
 
@@ -49,7 +49,7 @@ $ cargo bolero fuzz fibonacci_test
     Finished test [unoptimized + debuginfo] target(s) in 0.10s
      Running target/fuzz/build_62a8ab526939db81/x86_64-apple-darwin/debug/deps/fibonacci_test-f9f8f1dcc806b6b6
 ...
-thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/main.rs:8:9
+thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/fuzz_target.rs:8:9
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 ======================== Test Failure ========================
@@ -58,7 +58,7 @@ Input:
 93
 
 Error:
-panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/main.rs:8:9
+panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/fuzz_target.rs:8:9
 
 ==============================================================
 ```

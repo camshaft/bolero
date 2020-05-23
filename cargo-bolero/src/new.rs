@@ -1,5 +1,5 @@
 use crate::manifest::Package;
-use failure::Error;
+use anyhow::Result;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -26,38 +26,15 @@ pub struct New {
     generator: bool,
 }
 
-const FUZZ_FILE: &str = r#"
-use bolero::fuzz;
-
-fn main() {
-    fuzz!().for_each(|input| {
-        if input.len() < 3 {
-            return;
-        }
-
-        if input[0] == 0 && input[1] == 1 && input[2] == 2 {
-            panic!("you found me!");
-        }
-    });
-}
-"#;
-
-const GENERATOR_FILE: &str = r#"
-use bolero::fuzz;
-
-fn main() {
-    fuzz!().with_type().for_each(|value: u8| {
-        assert!(value * 2 > value);
-    });
-}
-"#;
+const BYTES_FILE: &str = include_str!("../tests/fuzz_bytes/fuzz_target.rs");
+const GENERATOR_FILE: &str = include_str!("../tests/fuzz_generator/fuzz_target.rs");
 
 impl New {
-    pub fn exec(&self) -> Result<(), Error> {
+    pub fn exec(&self) -> Result<()> {
         let file = if self.generator {
             GENERATOR_FILE
         } else {
-            FUZZ_FILE
+            BYTES_FILE
         }
         .trim_start();
 
@@ -69,7 +46,7 @@ impl New {
         let target_dir = manifest_dir.join("tests").join(&self.test);
 
         mkdir(&target_dir);
-        write(target_dir.join("main.rs"), file);
+        write(target_dir.join("fuzz_target.rs"), file);
 
         mkdir(target_dir.join("corpus"));
         write(target_dir.join("corpus").join(".gitkeep"), "");
@@ -87,7 +64,7 @@ impl New {
                     r#"
 [[test]]
 name = "{name}"
-path = "tests/{name}/main.rs"
+path = "tests/{name}/fuzz_target.rs"
 harness = false
 "#,
                     name = self.test
