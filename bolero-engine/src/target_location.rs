@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 #[doc(hidden)]
 /// Information about the location of a test target
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct TargetLocation {
     /// Path to the integration test binary
     pub package_name: &'static str,
@@ -19,6 +19,9 @@ pub struct TargetLocation {
 
     /// The line number at which the test target is defined
     pub line: u32,
+
+    /// The path to the current test
+    pub item_path: String,
 }
 
 lazy_static! {
@@ -49,6 +52,50 @@ fn is_harnessed() -> bool {
     });
 
     is_harnessed
+}
+
+#[inline(never)]
+pub fn __item_path__() -> String {
+    let mut test_name = None;
+
+    // search the backtrace for the current __item_path__ function and get the caller
+    // TODO replace this with something better?
+    let mut is_next = false;
+    backtrace::trace(|frame| {
+        let mut is_done = false;
+
+        backtrace::resolve_frame(frame, |symbol| {
+            if is_next {
+                let name = symbol.name().expect("symbol name missing").to_string();
+                let mut parts = name.split("::");
+                let _ = parts.next().expect("symbol should include crate name");
+                let mut parts = parts.collect::<Vec<_>>();
+                let _ = parts.pop().expect("unique symbol");
+                test_name = Some(parts.join("::"));
+                is_done = true;
+                return;
+            }
+
+            if symbol
+                .filename()
+                .and_then(|file| file.to_str())
+                .map(|file| file.ends_with(file!()))
+                .unwrap_or(false)
+            {
+                is_next = true;
+            }
+        });
+
+        !is_done
+    });
+
+    test_name.expect("test name not found")
+}
+
+#[test]
+fn item_path_test() {
+    let test_name = __item_path__();
+    assert_eq!(test_name, "target_location::item_path_test");
 }
 
 impl TargetLocation {
@@ -123,20 +170,13 @@ impl TargetLocation {
         Some(work_dir)
     }
 
-    fn test_name(&self) -> String {
-        if !self.is_harnessed() {
-            return self.module_path.to_string();
+    fn test_name(&self) -> &str {
+        if self.is_harnessed() {
+            &self.item_path
+        } else {
+            // if unharnessed, the test name is just the crate
+            self.module_path
         }
-
-        let current_thread = std::thread::current();
-
-        let thread_name = current_thread.name().expect("thread must have a name");
-
-        if thread_name == "main" {
-            panic!("test selection must be run in threaded mode");
-        }
-
-        thread_name.to_string()
     }
 
     pub fn is_harnessed(&self) -> bool {

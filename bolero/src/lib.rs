@@ -22,7 +22,7 @@ pub mod generator {
 }
 
 #[doc(hidden)]
-pub use bolero_engine::TargetLocation;
+pub use bolero_engine::{TargetLocation, __item_path__};
 
 pub use bolero_engine::{rng::RngEngine, Driver, DriverMode, Engine, Test};
 
@@ -121,6 +121,7 @@ macro_rules! fuzz {
             module_path: module_path!(),
             file: file!(),
             line: line!(),
+            item_path: $crate::__item_path__(),
         };
 
         if !location.should_run() {
