@@ -23,4 +23,8 @@ impl Reduce {
 }
 
 #[derive(Debug, StructOpt)]
-pub struct ReduceArgs {}
+pub struct ReduceArgs {
+    /// Additional arguments to pass to the selected fuzzer enging
+    #[structopt(short = "F", long = "fuzzer-args")]
+    pub fuzzer_args: Vec<String>,
+}

@@ -1,3 +1,7 @@
+/// Doctest to make sure it compiles
+/// ```
+/// assert_eq!(basic::add(1, 2, false), 3);
+/// ```
 pub fn add(a: u8, b: u8, should_panic: bool) -> u8 {
     if should_panic {
         a + b

@@ -77,7 +77,7 @@ impl Project {
 
         cmd.arg(call).arg("--target").arg(&self.target);
 
-        if self.release && fuzzer.is_some() {
+        if self.release {
             cmd.arg("--release");
         }
 
@@ -102,7 +102,7 @@ impl Project {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = self.rustflags(flags);
+            let rustflags = self.rustflags("RUSTFLAGS", flags);
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
@@ -117,13 +117,15 @@ impl Project {
                 cmd.arg("-Zbuild-std");
             }
 
-            cmd.env("RUSTFLAGS", rustflags).env("BOLERO_FUZZER", fuzzer);
+            cmd.env("RUSTFLAGS", rustflags)
+                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags))
+                .env("BOLERO_FUZZER", fuzzer);
         }
 
         cmd
     }
 
-    fn rustflags(&self, flags: &[&str]) -> String {
+    fn rustflags(&self, inherits: &str, flags: &[&str]) -> String {
         [
             "--cfg fuzzing",
             "-Cpasses=sancov",
@@ -138,7 +140,7 @@ impl Project {
         .cloned()
         .map(String::from)
         .chain(self.sanitizer_flags())
-        .chain(std::env::var("RUSTFLAGS").ok())
+        .chain(std::env::var(inherits).ok())
         // https://github.com/rust-lang/rust/issues/53945
         .chain(if cfg!(target_os = "linux") {
             Some("-Clink-arg=-fuse-ld=gold".to_string())

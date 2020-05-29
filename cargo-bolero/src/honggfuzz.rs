@@ -21,6 +21,15 @@ fn bin() -> String {
         .to_string()
 }
 
+macro_rules! optional_arg {
+    ($cmd:ident, $arg:expr, $harg:expr) => {
+        if let Some(value) = $arg {
+            $cmd.push($harg.to_string());
+            $cmd.push(format!("{}", value));
+        }
+    };
+}
+
 pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
@@ -36,12 +45,16 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         corpus_dir.to_str().unwrap().to_string(),
         "--workspace".to_string(),
         crashes_dir.to_str().unwrap().to_string(),
+        "--timeout".to_string(),
+        format!("{}", fuzz.timeout_as_secs()),
     ];
 
-    if let Some(runs) = fuzz.runs {
-        args.push("--iterations".to_string());
-        args.push(format!("{}", runs));
-    }
+    optional_arg!(args, fuzz.time_as_secs(), "--run_timeout");
+    optional_arg!(args, fuzz.runs, "--iterations");
+    optional_arg!(args, fuzz.jobs, "--threads");
+    optional_arg!(args, fuzz.max_input_length, "--max_file_size");
+
+    args.extend(fuzz.fuzzer_args.iter().cloned());
 
     args.push("--".to_string());
     args.push(test_target.exe.to_string());
@@ -52,7 +65,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reduce(selection: &Selection, _reduce: &ReduceArgs) -> Result<()> {
+pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
@@ -68,10 +81,12 @@ pub(crate) fn reduce(selection: &Selection, _reduce: &ReduceArgs) -> Result<()> 
         "--workspace".to_string(),
         crashes_dir.to_str().unwrap().to_string(),
         "-M".to_string(),
-        "--".to_string(),
-        test_target.exe.to_string(),
     ];
 
+    args.extend(reduce.fuzzer_args.iter().cloned());
+
+    args.push("--".to_string());
+    args.push(test_target.exe.to_string());
     args.extend(test_target.command_args().map(String::from));
 
     unsafe { bolero_honggfuzz::exec(args.into_iter()) };

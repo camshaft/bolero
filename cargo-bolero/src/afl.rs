@@ -36,9 +36,12 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         corpus_dir.to_str().unwrap().to_string(),
         "-o".to_string(),
         afl_state.to_str().unwrap().to_string(),
-        "--".to_string(),
-        test_target.exe.to_string(),
     ];
+
+    args.extend(fuzz.fuzzer_args.iter().cloned());
+
+    args.push("--".to_string());
+    args.push(test_target.exe.to_string());
 
     args.extend(test_target.command_args().map(String::from));
 

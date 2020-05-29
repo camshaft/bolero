@@ -14,7 +14,7 @@ pub struct Selection {
 
 impl Selection {
     pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut target = self.select_target()?;
+        let mut target = self.select_target(flags, fuzzer)?;
 
         if target.is_harnessed {
             target = self.build_harnessed_test_target(flags, fuzzer)?;
@@ -25,15 +25,15 @@ impl Selection {
         Ok(target)
     }
 
-    fn select_target(&self) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", &[], None);
+    fn select_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
+        let mut build_command = self.cmd("test", flags, Some(fuzzer));
         build_command
             .arg("--no-run")
             .env("CARGO_BOLERO_BOOTSTRAP", "1");
         exec(build_command)?;
 
         let output = self
-            .cmd("test", &[], None)
+            .cmd("test", flags, Some(fuzzer))
             .arg(&self.test)
             .arg("--")
             .arg("--nocapture")
