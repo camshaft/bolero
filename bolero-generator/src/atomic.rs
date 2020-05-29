@@ -61,7 +61,7 @@ macro_rules! impl_atomic_integer {
 
 #[test]
 fn atomicu8_test() {
-    let _ = generator_test!(gen::<AtomicU8>());
+    let _ = generator_no_clone_test!(gen::<AtomicU8>());
 }
 
 // #[test]

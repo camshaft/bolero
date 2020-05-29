@@ -8,14 +8,18 @@ use core::ops::{Range, RangeBounds};
 impl TypeGenerator for char {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
         if driver.mode() == DriverMode::Forced {
-            Some(coerce_char(TypeGenerator::generate(driver)?).unwrap_or_default())
+            Some(
+                TypeGenerator::generate(driver)
+                    .and_then(coerce_char)
+                    .unwrap_or_default(),
+            )
         } else {
             core::char::from_u32(TypeGenerator::generate(driver)?)
         }
     }
 }
 
-impl<R: RangeBounds<Self>> BoundedValue<R> for char {
+impl<R: RangeBounds<Self> + core::fmt::Debug> BoundedValue<R> for char {
     type BoundValue = char;
 
     fn is_within(&self, range_bounds: &R) -> bool {
@@ -75,10 +79,10 @@ fn coerce_char(mut value: u32) -> Option<char> {
 
 #[test]
 fn char_type_test() {
-    let _ = generator_mutate_test!(gen::<char>());
+    let _ = generator_test!(gen::<char>());
 }
 
 #[test]
 fn char_bounds_test() {
-    let _ = generator_mutate_test!(gen::<char>().with().bounds('a'..='f'));
+    let _ = generator_test!(gen::<char>().with().bounds('a'..='f'));
 }

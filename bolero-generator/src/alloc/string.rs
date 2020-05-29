@@ -1,5 +1,5 @@
 use crate::{
-    alloc_generators::{CollectionMutator, DEFAULT_LEN_RANGE},
+    alloc_generators::{CollectionGenerator, DEFAULT_LEN_RANGE},
     Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator,
 };
 use alloc::string::String;
@@ -62,11 +62,11 @@ impl<G: ValueGenerator<Output = char>, L: ValueGenerator<Output = Len>, Len: Int
 
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
         let len = ValueGenerator::generate(&self.len, driver)?.into();
-        CollectionMutator::mutate_collection(value, driver, len, &self.chars)
+        CollectionGenerator::mutate_collection(value, driver, len, &self.chars)
     }
 }
 
-impl CollectionMutator for String {
+impl CollectionGenerator for String {
     type Item = char;
 
     fn mutate_collection<D: Driver, G>(
@@ -81,17 +81,18 @@ impl CollectionMutator for String {
         let prev = core::mem::replace(self, String::new());
 
         let to_mutate = self.len().min(new_len);
+        let to_append = new_len.saturating_sub(to_mutate);
 
         for mut c in prev.chars().take(to_mutate) {
             item_gen.mutate(driver, &mut c)?;
             self.push(c);
         }
 
-        let to_add = new_len.saturating_sub(to_mutate);
-        for _ in 0..to_add {
+        for _ in 0..to_append {
             self.push(item_gen.generate(driver)?);
         }
 
+        // make sure the char count is correct
         #[cfg(test)]
         assert_eq!(self.chars().count(), new_len);
 

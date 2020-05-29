@@ -1,6 +1,6 @@
 use crate::{driver::Driver, ValueGenerator};
 
-pub trait CollectionMutator: Sized {
+pub trait CollectionGenerator: Sized {
     type Item;
 
     fn mutate_collection<D: Driver, G>(
@@ -77,32 +77,41 @@ macro_rules! impl_values_collection_generator {
             type Output = $ty<V::Output>;
 
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
-
-                Iterator::map(0..len, |_| {
-                    $crate::ValueGenerator::generate(&self.values, driver)
-                })
-                .collect()
+                let mut value = Self::Output::new();
+                Self::mutate(self, driver, &mut value)?;
+                Some(value)
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
                 let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
 
-                $crate::alloc_generators::CollectionMutator::mutate_collection(value, driver, len, &self.values)
+                $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &self.values)?;
+
+                if value.len() != len {
+                    None
+                } else {
+                    Some(())
+                }
             }
         }
 
         impl<V: $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGenerator for $ty<V> {
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
-                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
-
-                Iterator::map(0..len, |_| V::generate(driver)).collect()
+                let mut value = Self::new();
+                Self::mutate(&mut value, driver)?;
+                Some(value)
             }
 
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
                 let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
 
-                $crate::alloc_generators::CollectionMutator::mutate_collection(self, driver, len, &V::gen())
+                $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
+
+                if self.len() != len {
+                    None
+                } else {
+                    Some(())
+                }
             }
         }
 
@@ -124,16 +133,10 @@ macro_rules! impl_values_collection_generator {
             type Output = $ty<V::Output>;
 
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                assert!(!self.is_empty());
-
-                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
-                let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
-                let gen_item = $crate::one_of(&generators[..]);
-
-                Iterator::map(0..len, |_| {
-                    $crate::ValueGenerator::generate(&gen_item, driver)
-                })
-                .collect()
+                assert!(!self.is_empty(), "cannot generate values from an empty collection");
+                let mut value = Self::Output::new();
+                Self::mutate(self, driver, &mut value)?;
+                Some(value)
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
@@ -141,7 +144,15 @@ macro_rules! impl_values_collection_generator {
                 let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                 let gen_item = $crate::one_of(&generators[..]);
 
-                $crate::alloc_generators::CollectionMutator::mutate_collection(value, driver, len, &gen_item)
+                $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &gen_item)?;
+
+                // The value generator may have not produced enough unique
+                // values to fill the collection to the desired length.
+                if value.len() != len {
+                    None
+                } else {
+                    Some(())
+                }
             }
         }
     };

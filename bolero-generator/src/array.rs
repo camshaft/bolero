@@ -120,10 +120,10 @@ impl_array!(
 
 #[test]
 fn array_type_test() {
-    let _ = generator_mutate_test!(gen::<[u8; 10]>());
+    let _ = generator_test!(gen::<[u8; 10]>());
 }
 
 #[test]
 fn array_gen_test() {
-    let _ = generator_mutate_test!([gen::<u8>(), gen::<u8>()]);
+    let _ = generator_test!([gen::<u8>(), gen::<u8>()]);
 }

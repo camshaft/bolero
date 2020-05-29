@@ -64,15 +64,15 @@ pub enum RangeOperation {
 
 #[test]
 fn derive_struct_test() {
-    let _ = generator_mutate_test!(Struct::gen());
+    let _ = generator_test!(Struct::gen());
 }
 
 #[test]
 fn derive_enum_test() {
-    let _ = generator_mutate_test!(Enum::gen());
+    let _ = generator_test!(Enum::gen());
 }
 
 #[test]
 fn derive_union_test() {
-    let _ = generator_test!(Union::gen());
+    let _ = generator_no_clone_test!(Union::gen());
 }

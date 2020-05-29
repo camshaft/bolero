@@ -241,11 +241,11 @@ fn one_of_array_test() {
     use crate::gen;
 
     let options = [gen::<u8>(), gen(), gen()];
-    let _ = generator_mutate_test!(one_of(options));
-    let _ = generator_mutate_test!(options.one_of());
-    let _ = generator_mutate_test!(one_of(&options[..]));
+    let _ = generator_test!(one_of(options));
+    let _ = generator_test!(options.one_of());
+    let _ = generator_test!(one_of(&options[..]));
 
-    let _ = generator_mutate_test!([1u8, 2, 3].one_of());
+    let _ = generator_test!([1u8, 2, 3].one_of());
 }
 
 #[test]
@@ -259,17 +259,17 @@ fn one_of_slice_test() {
         constant(Ordering::Greater),
     ];
 
-    let _ = generator_mutate_test!(one_of(&options[..]));
+    let _ = generator_test!(one_of(&options[..]));
 }
 
 #[test]
 fn one_of_tuple_test() {
-    let _ = generator_mutate_test!(one_of((gen::<u8>(), 0..4, 8..9)));
+    let _ = generator_test!(one_of((gen::<u8>(), 0..4, 8..9)));
 }
 
 #[test]
 fn one_value_of_test() {
     use core::cmp::Ordering;
 
-    generator_mutate_test!([Ordering::Equal, Ordering::Less, Ordering::Greater].one_value_of());
+    generator_test!([Ordering::Equal, Ordering::Less, Ordering::Greater].one_value_of());
 }

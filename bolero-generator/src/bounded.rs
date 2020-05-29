@@ -42,27 +42,26 @@ macro_rules! range_generator {
             type Output = T;
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+                let mut value = T::generate(driver)?;
                 if driver.mode() == DriverMode::Forced {
-                    let mut value = T::generate(driver)?;
                     value.bind_within(self);
                     Some(value)
+                } else if value.is_within(self) {
+                    Some(value)
                 } else {
-                    T::generate(driver).filter(|value| value.is_within(self))
+                    None
                 }
             }
 
             fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+                T::mutate(value, driver)?;
                 if driver.mode() == DriverMode::Forced {
-                    T::mutate(value, driver)?;
                     value.bind_within(self);
                     Some(())
+                } else if value.is_within(self) {
+                    Some(())
                 } else {
-                    T::mutate(value, driver)?;
-                    if value.is_within(self) {
-                        Some(())
-                    } else {
-                        None
-                    }
+                    None
                 }
             }
         }
@@ -104,16 +103,34 @@ impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundV
 {
     type Output = T;
 
-    fn generate<D: Driver>(&self, driver: &mut D) -> Option<T> {
-        self.generator
-            .generate(driver)
-            .filter(|value| value.is_within(&self.range_bounds))
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        let mut value = self.generator.generate(driver)?;
+        if driver.mode() == DriverMode::Forced {
+            value.bind_within(&self.range_bounds);
+            Some(value)
+        } else if value.is_within(&self.range_bounds) {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        self.generator.mutate(driver, value)?;
+        if driver.mode() == DriverMode::Forced {
+            value.bind_within(&self.range_bounds);
+            Some(())
+        } else if value.is_within(&self.range_bounds) {
+            Some(())
+        } else {
+            None
+        }
     }
 }
 
 #[test]
 fn with_bounds_test() {
-    let _ = generator_mutate_test!(gen::<u8>().with().bounds(0..32));
+    let _ = generator_test!(gen::<u8>().with().bounds(0..32));
 }
 
 #[test]

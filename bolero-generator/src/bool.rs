@@ -52,10 +52,10 @@ impl TypeGenerator for bool {
 
 #[test]
 fn bool_test() {
-    let _ = generator_mutate_test!(gen::<bool>());
+    let _ = generator_test!(gen::<bool>());
 }
 
 #[test]
 fn bool_with_test() {
-    let _ = generator_mutate_test!(gen::<bool>().with().weight(0.1));
+    let _ = generator_test!(gen::<bool>().with().weight(0.1));
 }
