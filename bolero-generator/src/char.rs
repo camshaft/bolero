@@ -19,7 +19,7 @@ impl TypeGenerator for char {
     }
 }
 
-impl<R: RangeBounds<Self> + core::fmt::Debug> BoundedValue<R> for char {
+impl<R: RangeBounds<Self>> BoundedValue<R> for char {
     type BoundValue = char;
 
     fn is_within(&self, range_bounds: &R) -> bool {

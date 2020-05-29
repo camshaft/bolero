@@ -16,19 +16,19 @@ macro_rules! generator_test {
             .generate(&mut rng_driver)
             .unwrap();
 
-    // for input in inputs.iter() {
-    //     if let Some(value) =
-    //         ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
-    //     {
-    //         let mut mutated = value.clone();
-    //         ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut mutated)
-    //             .expect("mutation with same driver should produce a value");
-    //         assert_eq!(
-    //             value, mutated,
-    //             "a mutation with the same input should produce the original"
-    //         );
-    //     }
-    // }
+        for input in inputs.iter() {
+            if let Some(value) =
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
+            {
+                let mut mutated = value.clone();
+                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut mutated)
+                    .expect("mutation with same driver should produce a value");
+                assert_eq!(
+                    value, mutated,
+                    "a mutation with the same input should produce the original"
+                );
+            }
+        }
 
         // keep track of failed forced inputs and make sure they didn't all fail
         let mut failed_forced = 0;
