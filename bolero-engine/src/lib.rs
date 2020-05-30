@@ -5,6 +5,7 @@ pub use bolero_generator::{
 };
 
 pub mod panic;
+#[cfg(feature = "rng")]
 pub mod rng;
 pub mod shrink;
 mod test;

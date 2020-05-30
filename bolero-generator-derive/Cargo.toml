@@ -14,5 +14,5 @@ readme = "../bolero-generator/README.md"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1.0", features = ["full"] }
+syn = "1.0"
 quote = "1.0"

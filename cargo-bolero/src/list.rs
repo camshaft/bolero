@@ -13,9 +13,7 @@ pub struct List {
 impl List {
     pub fn exec(&self) -> Result<()> {
         let mut build_command = self.cmd("test", &[], None);
-        build_command
-            .arg("--no-run")
-            .env("CARGO_BOLERO_BOOTSTRAP", "1");
+        build_command.arg("--no-run");
         exec(build_command)?;
 
         let output = self

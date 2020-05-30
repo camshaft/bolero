@@ -11,15 +11,15 @@ edition = "2018"
 readme = "README.md"
 
 [features]
-default = ["alloc", "either"]
+default = ["either", "std"]
 std = ["alloc", "either/use_std"]
-alloc = []
+alloc = ["rand_core/alloc"]
 
 [dependencies]
 bolero-generator-derive = { version = "0.5.0", path = "../bolero-generator-derive" }
-byteorder = "1.3"
+byteorder = { version = "1.3", default-features = false }
 either = { version = "1.5", default-features = false, optional = true }
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
+rand_core = { version = "0.5", default-features = false }
 
 [dev-dependencies]
 rand = "0.7"

@@ -11,8 +11,8 @@ edition = "2018"
 readme = "../README.md"
 
 [features]
-default = ["rand", "panic_hook"]
-panic_hook = []
+default = ["rng"]
+rng = ["rand"]
 
 [dependencies]
 anyhow = "1.0"

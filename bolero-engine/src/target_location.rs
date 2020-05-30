@@ -100,11 +100,6 @@ fn item_path_test() {
 
 impl TargetLocation {
     pub fn should_run(&self) -> bool {
-        // cargo-bolero needs to compile everything
-        if ::std::env::var("CARGO_BOLERO_BOOTSTRAP").is_ok() {
-            return false;
-        }
-
         // cargo-bolero needs to resolve information about the target
         if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
             match mode.as_str() {

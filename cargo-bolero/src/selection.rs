@@ -14,22 +14,12 @@ pub struct Selection {
 
 impl Selection {
     pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut target = self.select_target(flags, fuzzer)?;
-
-        if target.is_harnessed {
-            target = self.build_harnessed_test_target(flags, fuzzer)?;
-        } else {
-            target = self.build_unharnessed_test_target(flags, fuzzer)?;
-        }
-
-        Ok(target)
-    }
-
-    fn select_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
         let mut build_command = self.cmd("test", flags, Some(fuzzer));
         build_command
+            .arg(&self.test)
             .arg("--no-run")
-            .env("CARGO_BOLERO_BOOTSTRAP", "1");
+            .arg("--")
+            .arg("--exact");
         exec(build_command)?;
 
         let output = self
@@ -43,54 +33,6 @@ impl Selection {
             .status_as_result()?;
 
         TestTarget::from_stdout(&output.stdout)
-    }
-
-    fn build_harnessed_test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", flags, Some(fuzzer));
-        build_command
-            .arg("--lib")
-            .arg("--no-run")
-            .env("CARGO_BOLERO_BOOTSTRAP", "1");
-        exec(build_command)?;
-
-        let output = self
-            .cmd("test", flags, Some(fuzzer))
-            .arg(&self.test)
-            .arg("--lib")
-            .arg("--")
-            .arg("--nocapture")
-            .arg("--exact")
-            .env("CARGO_BOLERO_SELECT", "one")
-            .output()?
-            .status_as_result()?;
-
-        let target = TestTarget::from_stdout(&output.stdout)?;
-
-        Ok(target)
-    }
-
-    fn build_unharnessed_test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", flags, Some(fuzzer));
-        build_command
-            .arg("--test")
-            .arg(&self.test)
-            .env("CARGO_BOLERO_BOOTSTRAP", "1");
-        exec(build_command)?;
-
-        let output = self
-            .project
-            .cmd("test", flags, Some(fuzzer))
-            .arg("--test")
-            .arg(&self.test)
-            .arg("--")
-            .arg(&self.test)
-            .env("CARGO_BOLERO_SELECT", "one")
-            .output()?
-            .status_as_result()?;
-
-        let target = TestTarget::from_stdout(&output.stdout)?;
-
-        Ok(target)
     }
 }
 
