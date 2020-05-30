@@ -1,4 +1,4 @@
-use crate::{exec, project::Project, test_target::TestTarget, StatusAsResult};
+use crate::{exec, project::Project, test_target::TestTarget};
 use anyhow::Result;
 use core::ops::Deref;
 use structopt::StructOpt;
@@ -21,8 +21,9 @@ impl List {
             .arg("--")
             .arg("--nocapture")
             .env("CARGO_BOLERO_SELECT", "all")
-            .output()?
-            .status_as_result()?;
+            .output()?;
+
+        // ignore the status in case any tests failed
 
         for target in TestTarget::all_from_stdout(&output.stdout)? {
             println!("{}", target);
