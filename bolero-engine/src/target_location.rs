@@ -28,7 +28,18 @@ lazy_static! {
     static ref IS_HARNESSED: bool = is_harnessed();
 }
 
+macro_rules! thread_name {
+    () => {
+        std::thread::current().name().filter(|name| name != &"main")
+    };
+}
+
 fn is_harnessed() -> bool {
+    // if there's a thread name, then libtest has spawned a test thread
+    if thread_name!().is_some() {
+        return true;
+    }
+
     let mut is_harnessed = false;
 
     // search the stack to find if libtest was included
@@ -45,6 +56,7 @@ fn is_harnessed() -> bool {
             {
                 is_harnessed = true;
                 is_done = true;
+                return;
             }
         });
 
@@ -54,47 +66,102 @@ fn is_harnessed() -> bool {
     is_harnessed
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __item_path__ {
+    () => {
+        $crate::target_location::__item_path__(module_path!());
+    };
+}
+
+#[doc(hidden)]
 #[inline(never)]
-pub fn __item_path__() -> String {
+pub fn __item_path__(module_path: &str) -> String {
+    // Initialize the harness check as soon as possible
+    let _ = *IS_HARNESSED;
+
+    // if there's a thread name, then libtest has spawned a test thread
+    if let Some(thread_name) = thread_name!() {
+        return thread_name.to_string();
+    }
+
     let mut test_name = None;
 
     // search the backtrace for the current __item_path__ function and get the caller
     // TODO replace this with something better?
-    let mut is_next = false;
     backtrace::trace(|frame| {
         let mut is_done = false;
 
         backtrace::resolve_frame(frame, |symbol| {
-            if is_next {
-                let name = symbol.name().expect("symbol name missing").to_string();
-                let mut parts = name.split("::");
-                let _ = parts.next().expect("symbol should include crate name");
-                let mut parts = parts.collect::<Vec<_>>();
-                let _ = parts.pop().expect("unique symbol");
-                test_name = Some(parts.join("::"));
+            if let Some(name) = symbol
+                .name()
+                .map(|name| name.to_string())
+                .filter(|name| name.starts_with(module_path))
+            {
+                let mut parts: Vec<_> = name.split("::").collect();
+                parts.pop().expect("unique symbol");
+
+                match parts.last().cloned() {
+                    Some("main") if parts.len() == 2 => {
+                        parts.pop().expect("main symbol");
+                    }
+                    Some("{{closure}}") => {
+                        parts.pop().expect("unused symbol");
+                    }
+                    _ => {}
+                }
+
+                test_name = Some(if parts.len() == 1 {
+                    parts.pop().unwrap().to_string()
+                } else {
+                    parts[1..].join("::")
+                });
+
                 is_done = true;
                 return;
-            }
-
-            if symbol
-                .filename()
-                .and_then(|file| file.to_str())
-                .map(|file| file.ends_with(file!()))
-                .unwrap_or(false)
-            {
-                is_next = true;
             }
         });
 
         !is_done
     });
 
-    test_name.expect("test name not found")
+    if let Some(test_name) = test_name {
+        return test_name;
+    }
+
+    panic!(
+        r#"
+Could not reliably determine a test name located in {:?}.
+
+This is caused by setting `--test-threads=1` and removing debug symbols.
+
+This can be fixed by:
+
+* Increasing the number of test-threads to at least 2
+* Explicitly setting the test name:
+
+  ```rust
+  #[test]
+  fn my_test() {{
+      fuzz!(name = "my_test").for_each(|input| {{
+          // checks here
+      }})
+  }}
+  ```
+* Enabling debug symbols in the project's `Cargo.toml`:
+
+  ```toml
+  [profile.bench]
+  debug = true
+  ```
+"#,
+        module_path
+    );
 }
 
 #[test]
 fn item_path_test() {
-    let test_name = __item_path__();
+    let test_name = __item_path__!();
     assert_eq!(test_name, "target_location::item_path_test");
 }
 

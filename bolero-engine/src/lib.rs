@@ -17,7 +17,8 @@ pub use crate::test_failure::TestFailure;
 mod test_input;
 pub use test_input::*;
 
-mod target_location;
+#[doc(hidden)]
+pub mod target_location;
 #[doc(hidden)]
 pub use target_location::{TargetLocation, __item_path__};
 

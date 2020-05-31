@@ -27,3 +27,6 @@ harness = false
 name = "fuzz_operations"
 path = "tests/fuzz_operations/fuzz_target.rs"
 harness = false
+
+[profile.bench]
+debug = true
