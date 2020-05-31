@@ -46,7 +46,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         "--workspace".to_string(),
         crashes_dir.to_str().unwrap().to_string(),
         "--timeout".to_string(),
-        format!("{}", fuzz.timeout_as_secs()),
+        format!("{}", fuzz.timeout_as_secs() * 10),
     ];
 
     optional_arg!(args, "--run_timeout", fuzz.time_as_secs());
