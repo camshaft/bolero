@@ -9,6 +9,31 @@ on:
 name: ci
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Ubuntu Dependencies
+      run: sudo apt-get install binutils-dev libunwind-dev
+
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: stable
+        components: rustfmt, clippy
+
+    - uses: actions/checkout@master
+
+    - name: Format
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check
+
+    - name: Clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: -- -D warnings
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -32,23 +57,8 @@ jobs:
     - uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust }}
-        components: rustfmt, clippy
 
     - uses: actions/checkout@master
-
-    - name: Format
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
-
-    - name: Clippy
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: -- -D warnings
 
     - name: tests
       run: make test_bolero
