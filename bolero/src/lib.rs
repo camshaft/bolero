@@ -22,7 +22,7 @@ pub mod generator {
 }
 
 #[doc(hidden)]
-pub use bolero_engine::{TargetLocation, __item_path__};
+pub use bolero_engine::{self, TargetLocation, __item_path__};
 
 pub use bolero_engine::{rng::RngEngine, Driver, DriverMode, Engine, Test};
 

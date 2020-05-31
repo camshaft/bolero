@@ -24,154 +24,6 @@ pub struct TargetLocation {
     pub item_path: String,
 }
 
-lazy_static! {
-    static ref IS_HARNESSED: bool = is_harnessed();
-}
-
-macro_rules! thread_name {
-    () => {
-        std::thread::current().name().filter(|name| name != &"main")
-    };
-}
-
-fn is_harnessed() -> bool {
-    // cargo-bolero passed the harness type
-    if let Ok(harnessed) = std::env::var("BOLERO_LIBTEST_HARNESS") {
-        return harnessed == "1";
-    }
-
-    // if there's a thread name, then libtest has spawned a test thread
-    if thread_name!().is_some() {
-        return true;
-    }
-
-    let mut is_harnessed = false;
-
-    // search the stack to find if libtest was included
-    // TODO find a better way to do this
-    backtrace::trace(|frame| {
-        let mut is_done = false;
-
-        backtrace::resolve_frame(frame, |symbol| {
-            if symbol
-                .filename()
-                .and_then(|file| file.to_str())
-                .map(|file| file.ends_with("src/libtest/lib.rs"))
-                .unwrap_or(false)
-            {
-                is_harnessed = true;
-                is_done = true;
-                return;
-            }
-        });
-
-        !is_done
-    });
-
-    is_harnessed
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __item_path__ {
-    () => {
-        $crate::target_location::__item_path__(module_path!());
-    };
-}
-
-#[doc(hidden)]
-#[inline(never)]
-pub fn __item_path__(module_path: &str) -> String {
-    // cargo-bolero passed the correct test name
-    if let Ok(test_name) = std::env::var("BOLERO_TEST_NAME") {
-        return test_name;
-    }
-
-    // if there's a thread name, then libtest has spawned a test thread
-    if let Some(thread_name) = thread_name!() {
-        return thread_name.to_string();
-    }
-
-    let mut test_name = None;
-
-    // search the backtrace for the current __item_path__ function and get the caller
-    // TODO replace this with something better?
-    backtrace::trace(|frame| {
-        let mut is_done = false;
-
-        backtrace::resolve_frame(frame, |symbol| {
-            if let Some(name) = symbol
-                .name()
-                .map(|name| name.to_string())
-                .filter(|name| name.starts_with(module_path))
-            {
-                let mut parts: Vec<_> = name.split("::").collect();
-                parts.pop().expect("unique symbol");
-
-                match parts.last().cloned() {
-                    Some("main") if parts.len() == 2 => {
-                        parts.pop().expect("main symbol");
-                    }
-                    Some("{{closure}}") => {
-                        parts.pop().expect("unused symbol");
-                    }
-                    _ => {}
-                }
-
-                test_name = Some(if parts.len() == 1 {
-                    parts.pop().unwrap().to_string()
-                } else {
-                    parts[1..].join("::")
-                });
-
-                is_done = true;
-                return;
-            }
-        });
-
-        !is_done
-    });
-
-    if let Some(test_name) = test_name {
-        return test_name;
-    }
-
-    panic!(
-        r#"
-Could not reliably determine a test name located in {:?}.
-
-This is caused by setting `--test-threads=1` and removing debug symbols.
-
-This can be fixed by:
-
-* Increasing the number of test-threads to at least 2
-* Explicitly setting the test name:
-
-  ```rust
-  #[test]
-  fn my_test() {{
-      fuzz!(name = "my_test").for_each(|input| {{
-          // checks here
-      }})
-  }}
-  ```
-* Enabling debug symbols in the project's `Cargo.toml`:
-
-  ```toml
-  [profile.bench]
-  debug = true
-  ```
-"#,
-        module_path
-    );
-}
-
-#[test]
-fn item_path_test() {
-    let test_name = __item_path__!();
-    assert_eq!(test_name, "target_location::item_path_test");
-}
-
 impl TargetLocation {
     pub fn should_run(&self) -> bool {
         // cargo-bolero needs to resolve information about the target
@@ -270,4 +122,174 @@ impl TargetLocation {
 
         components.join("__")
     }
+}
+
+lazy_static! {
+    static ref IS_HARNESSED: bool = is_harnessed();
+}
+
+macro_rules! thread_name {
+    () => {
+        std::thread::current().name().filter(|name| name != &"main")
+    };
+}
+
+fn is_harnessed() -> bool {
+    // cargo-bolero passed the harness type
+    if let Ok(harnessed) = std::env::var("BOLERO_LIBTEST_HARNESS") {
+        return harnessed == "1";
+    }
+
+    // if there's a thread name, then libtest has spawned a test thread
+    if thread_name!().is_some() {
+        return true;
+    }
+
+    let mut is_harnessed = false;
+
+    // search the stack to find if libtest was included
+    // TODO find a better way to do this
+    backtrace::trace(|frame| {
+        let mut is_done = false;
+
+        backtrace::resolve_frame(frame, |symbol| {
+            if symbol
+                .filename()
+                .and_then(|file| file.to_str())
+                .map(|file| file.ends_with("src/libtest/lib.rs"))
+                .unwrap_or(false)
+            {
+                is_harnessed = true;
+                is_done = true;
+                return;
+            }
+        });
+
+        !is_done
+    });
+
+    is_harnessed
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __item_path__ {
+    () => {
+        $crate::target_location::__item_path__(module_path!());
+    };
+}
+
+#[doc(hidden)]
+#[inline(never)]
+pub fn __item_path__(module_path: &str) -> String {
+    // cargo-bolero passed the correct test name
+    if let Ok(test_name) = std::env::var("BOLERO_TEST_NAME") {
+        return test_name;
+    }
+
+    // if there's a thread name, then libtest has spawned a test thread
+    if let Some(thread_name) = thread_name!() {
+        return thread_name.to_string();
+    }
+
+    let mut test_name = None;
+
+    // search the backtrace for the current __item_path__ function and get the caller
+    // TODO replace this with something better?
+    backtrace::trace(|frame| {
+        let mut is_done = false;
+
+        backtrace::resolve_frame(frame, |symbol| {
+            if let Some(name) = symbol
+                .name()
+                .map(|name| name.to_string())
+                .filter(|name| name.starts_with(module_path))
+                .map(format_symbol_name)
+            {
+                test_name = Some(name);
+                is_done = true;
+                return;
+            }
+        });
+
+        !is_done
+    });
+
+    if let Some(test_name) = test_name {
+        return test_name;
+    }
+
+    panic!(
+        r#"
+Could not reliably determine a test name located in {:?}.
+
+This is caused by setting `--test-threads=1` and removing debug symbols.
+
+This can be fixed by:
+
+* Increasing the number of test-threads to at least 2
+* Explicitly setting the test name:
+
+  ```rust
+  #[test]
+  fn my_test() {{
+      fuzz!(name = "my_test").for_each(|input| {{
+          // checks here
+      }})
+  }}
+  ```
+* Enabling debug symbols in the project's `Cargo.toml`:
+
+  ```toml
+  [profile.bench]
+  debug = true
+  ```
+"#,
+        module_path
+    );
+}
+
+#[test]
+fn item_path_test() {
+    let test_name = __item_path__!();
+    assert_eq!(test_name, "target_location::item_path_test");
+}
+
+fn format_symbol_name<Name: AsRef<str>>(name: Name) -> String {
+    let mut parts: Vec<_> = name.as_ref().split("::").collect();
+
+    if parts
+        .last()
+        .and_then(|part| u64::from_str_radix(part, 16).ok())
+        .is_some()
+    {
+        parts.pop().expect("unique symbol");
+    }
+
+    match parts.last().cloned() {
+        Some("main") if parts.len() == 2 => {
+            parts.pop().expect("main symbol");
+        }
+        Some("{{closure}}") => {
+            parts.pop().expect("unused symbol");
+        }
+        _ => {}
+    }
+
+    if parts.len() == 1 {
+        parts.pop().unwrap().to_string()
+    } else {
+        parts[1..].join("::")
+    }
+}
+
+#[test]
+fn format_symbol_name_test() {
+    assert_eq!(format_symbol_name("crate::main::123"), "crate");
+    assert_eq!(format_symbol_name("crate::test::123"), "test");
+    assert_eq!(format_symbol_name("crate::test::{{closure}}::123"), "test");
+    assert_eq!(
+        format_symbol_name("crate::nested::test::123"),
+        "nested::test"
+    );
 }
