@@ -57,6 +57,10 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     args.extend(fuzz.fuzzer_args.iter().cloned());
 
     args.push("--".to_string());
+
+    for (k, v) in test_target.command_env() {
+        std::env::set_var(k, v);
+    }
     args.push(test_target.exe.to_string());
     args.extend(test_target.command_args().map(String::from));
 

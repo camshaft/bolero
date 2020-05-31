@@ -80,6 +80,11 @@ pub fn __item_path__(module_path: &str) -> String {
     // Initialize the harness check as soon as possible
     let _ = *IS_HARNESSED;
 
+    // cargo-bolero passed the correct test name
+    if let Ok(test_name) = std::env::var("BOLERO_TEST_NAME") {
+        return test_name;
+    }
+
     // if there's a thread name, then libtest has spawned a test thread
     if let Some(thread_name) = thread_name!() {
         return thread_name.to_string();

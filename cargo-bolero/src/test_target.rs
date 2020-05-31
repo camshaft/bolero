@@ -82,7 +82,7 @@ impl TestTarget {
     pub fn command(&self) -> Command {
         let mut cmd = Command::new(&self.exe);
 
-        cmd.args(self.command_args());
+        cmd.args(self.command_args()).envs(self.command_env());
 
         cmd
     }
@@ -97,6 +97,10 @@ impl TestTarget {
             .chain(Some("--test-threads"))
             .chain(Some("1"))
             .filter(move |_| is_harnessed)
+    }
+
+    pub fn command_env(&self) -> impl Iterator<Item = (&str, &str)> {
+        core::iter::empty().chain(Some(("BOLERO_TEST_NAME", self.test_name.as_str())))
     }
 }
 
