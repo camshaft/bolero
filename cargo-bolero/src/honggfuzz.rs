@@ -22,7 +22,7 @@ fn bin() -> String {
 }
 
 macro_rules! optional_arg {
-    ($cmd:ident, $arg:expr, $harg:expr) => {
+    ($cmd:ident, $harg:expr, $arg:expr) => {
         if let Some(value) = $arg {
             $cmd.push($harg.to_string());
             $cmd.push(format!("{}", value));
@@ -49,14 +49,18 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         format!("{}", fuzz.timeout_as_secs()),
     ];
 
-    optional_arg!(args, fuzz.time_as_secs(), "--run_timeout");
-    optional_arg!(args, fuzz.runs, "--iterations");
-    optional_arg!(args, fuzz.jobs, "--threads");
-    optional_arg!(args, fuzz.max_input_length, "--max_file_size");
+    optional_arg!(args, "--run_timeout", fuzz.time_as_secs());
+    optional_arg!(args, "--iterations", fuzz.runs);
+    optional_arg!(args, "--threads", fuzz.jobs);
+    optional_arg!(args, "--max_file_size", fuzz.max_input_length);
 
     args.extend(fuzz.fuzzer_args.iter().cloned());
 
     args.push("--".to_string());
+
+    for (k, v) in test_target.command_env() {
+        std::env::set_var(k, v);
+    }
     args.push(test_target.exe.to_string());
     args.extend(test_target.command_args().map(String::from));
 
@@ -86,6 +90,9 @@ pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
     args.extend(reduce.fuzzer_args.iter().cloned());
 
     args.push("--".to_string());
+    for (k, v) in test_target.command_env() {
+        std::env::set_var(k, v);
+    }
     args.push(test_target.exe.to_string());
     args.extend(test_target.command_args().map(String::from));
 

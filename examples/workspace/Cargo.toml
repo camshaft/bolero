@@ -1,2 +1,5 @@
 [workspace]
 members = ["crate_a", "crate_b"]
+
+[profile.bench]
+debug = true
