@@ -46,7 +46,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         "--workspace".to_string(),
         crashes_dir.to_str().unwrap().to_string(),
         "--timeout".to_string(),
-        format!("{}", fuzz.timeout_as_secs() * 10),
+        format!("{}", fuzz.timeout_as_secs()),
     ];
 
     optional_arg!(args, "--run_timeout", fuzz.time_as_secs());
@@ -90,6 +90,9 @@ pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
     args.extend(reduce.fuzzer_args.iter().cloned());
 
     args.push("--".to_string());
+    for (k, v) in test_target.command_env() {
+        std::env::set_var(k, v);
+    }
     args.push(test_target.exe.to_string());
     args.extend(test_target.command_args().map(String::from));
 

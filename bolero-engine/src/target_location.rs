@@ -35,6 +35,11 @@ macro_rules! thread_name {
 }
 
 fn is_harnessed() -> bool {
+    // cargo-bolero passed the harness type
+    if let Ok(harnessed) = std::env::var("BOLERO_LIBTEST_HARNESS") {
+        return harnessed == "1";
+    }
+
     // if there's a thread name, then libtest has spawned a test thread
     if thread_name!().is_some() {
         return true;
@@ -77,9 +82,6 @@ macro_rules! __item_path__ {
 #[doc(hidden)]
 #[inline(never)]
 pub fn __item_path__(module_path: &str) -> String {
-    // Initialize the harness check as soon as possible
-    let _ = *IS_HARNESSED;
-
     // cargo-bolero passed the correct test name
     if let Ok(test_name) = std::env::var("BOLERO_TEST_NAME") {
         return test_name;

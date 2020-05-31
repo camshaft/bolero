@@ -100,7 +100,12 @@ impl TestTarget {
     }
 
     pub fn command_env(&self) -> impl Iterator<Item = (&str, &str)> {
-        core::iter::empty().chain(Some(("BOLERO_TEST_NAME", self.test_name.as_str())))
+        core::iter::empty()
+            .chain(Some(("BOLERO_TEST_NAME", self.test_name.as_str())))
+            .chain(Some((
+                "BOLERO_LIBTEST_HARNESS",
+                if self.is_harnessed { "1" } else { "0" },
+            )))
     }
 }
 
