@@ -44,7 +44,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// This mode is generally used when testing an implementation that
 /// handles raw bytes, e.g. a parser.
 ///
-/// ```rust,no_run
+/// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -61,7 +61,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// This mode is used for testing an implementation that requires
 /// structured input.
 ///
-/// ```rust,no_run
+/// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -82,7 +82,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// In the following example, we are only interested in generating
 /// two values, one being between 0 and 100, the other: 10 and 50.
 ///
-/// ```rust,no_run
+/// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
@@ -102,7 +102,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// * The test code will be contained inside a macro which can trip up
 ///   some editors and IDEs.
 ///
-/// ```rust,no_run
+/// ```rust
 /// use bolero::fuzz;
 ///
 /// fn main() {
