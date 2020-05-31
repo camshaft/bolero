@@ -1,4 +1,10 @@
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 name: ci
 
@@ -7,8 +13,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
         rust: [stable, beta, nightly]
+        os: [ubuntu-latest, macOS-latest]
+        sanitizer: [NONE]
+        include:
+          - rust: nightly
+            os: ubuntu-latest
+            sanitizer: address
+          - rust: nightly
+            os: macOS-latest
+            sanitizer: address
 
     steps:
     - name: Ubuntu Dependencies
@@ -36,7 +50,24 @@ jobs:
         command: clippy
         args: -- -D warnings
 
-    - name: Test
-      run: make test
+    - name: tests
+      run: make test_bolero
+
+    - name: libFuzzer
+      run: make libfuzzer
+      env:
+        SANITIZER: ${{ matrix.sanitizer }}
+
+    - name: honggfuzz
+      run: make honggfuzz
+      env:
+        SANITIZER: ${{ matrix.sanitizer }}
+
+    - name: afl
+      run: make afl
       env:
         AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
+        SANITIZER: ${{ matrix.sanitizer }}
+
+    - name: examples
+      run: make test_examples
