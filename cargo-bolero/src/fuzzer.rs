@@ -11,6 +11,9 @@ pub enum Fuzzer {
 
     #[cfg(feature = "honggfuzz")]
     Honggfuzz,
+
+    #[cfg(feature = "ravel")]
+    Ravel,
 }
 
 impl Fuzzer {
@@ -23,6 +26,9 @@ impl Fuzzer {
 
             #[cfg(feature = "honggfuzz")]
             Self::Honggfuzz => crate::honggfuzz::fuzz(selection, args),
+
+            #[cfg(feature = "ravel")]
+            Self::Ravel => crate::ravel::fuzz(selection, args),
         }
     }
 
@@ -35,6 +41,9 @@ impl Fuzzer {
 
             #[cfg(feature = "honggfuzz")]
             Self::Honggfuzz => crate::honggfuzz::reduce(selection, args),
+
+            #[cfg(feature = "ravel")]
+            Self::Ravel => crate::ravel::reduce(selection, args),
         }
     }
 }
@@ -51,6 +60,11 @@ impl FromStr for Fuzzer {
 
             #[cfg(feature = "honggfuzz")]
             "honggfuzz" => Ok(Self::Honggfuzz),
+
+            #[cfg(feature = "ravel")]
+            "ravel" => Ok(Self::Ravel),
+            #[cfg(feature = "ravel")]
+            "bolero-ravel" => Ok(Self::Ravel),
 
             _ => Err(format!("invalid fuzzer {:?}", value)),
         }

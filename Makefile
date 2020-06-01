@@ -36,7 +36,7 @@ test_bolero:
 
 test_fuzzers: libfuzzer honggfuzz afl
 
-libfuzzer honggfuzz:
+libfuzzer honggfuzz ravel:
 	@cargo run \
 	    fuzz \
 	    fuzz_bytes \

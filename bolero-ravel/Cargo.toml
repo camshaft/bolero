@@ -1,0 +1,21 @@
+[package]
+name = "bolero-ravel"
+version = "0.5.2"
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+description = "Experimental fuzzing engine"
+homepage = "https://github.com/camshaft/bolero"
+repository = "https://github.com/camshaft/bolero"
+keywords = ["testing", "fuzz", "fuzzing"]
+license = "MIT"
+edition = "2018"
+readme = "README.md"
+
+[features]
+default = ["lib"]
+bin = []
+lib = ["bolero-engine"]
+
+[dependencies]
+anyhow = "1.0"
+bolero-engine = { version = "0.5", path = "../bolero-engine", optional = true }
+tempfile = "3"

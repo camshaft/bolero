@@ -13,6 +13,7 @@ readme = "README.md"
 [features]
 default = ["afl", "honggfuzz"]
 afl = ["bolero-afl"]
+ravel = ["bolero-ravel"]
 honggfuzz = ["bolero-honggfuzz"]
 
 [dependencies]
@@ -20,6 +21,7 @@ anyhow = "1.0"
 bit-set = "0.5"
 bolero-afl = { version = "0.5", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.5", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
+bolero-ravel = { version = "0.5", path = "../bolero-ravel", default-features = false, features = ["bin"], optional = true }
 humantime = "2"
 structopt = "0.3"
 serde = { version = "1.0", features = ["derive"] }

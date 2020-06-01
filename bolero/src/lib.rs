@@ -8,6 +8,9 @@ cfg_if::cfg_if! {
     } else if #[cfg(fuzzing_honggfuzz)] {
         /// The default engine used when defining a test target
         pub use bolero_honggfuzz::HonggfuzzEngine as DefaultEngine;
+    } else if #[cfg(fuzzing_ravel)] {
+        /// The default engine used when defining a test target
+        pub use bolero_ravel::RavelEngine as DefaultEngine;
     } else {
         mod test;
 

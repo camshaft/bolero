@@ -20,6 +20,8 @@ mod list;
 mod manifest;
 mod new;
 mod project;
+#[cfg(feature = "ravel")]
+mod ravel;
 mod reduce;
 mod selection;
 mod test_target;

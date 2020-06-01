@@ -30,6 +30,9 @@ bolero-libfuzzer = { version = "0.5", path = "../bolero-libfuzzer" }
 [target.'cfg(fuzzing_honggfuzz)'.dependencies]
 bolero-honggfuzz = { version = "0.5", path = "../bolero-honggfuzz" }
 
+[target.'cfg(fuzzing_ravel)'.dependencies]
+bolero-ravel = { version = "0.5", path = "../bolero-ravel" }
+
 [target.'cfg(not(fuzzing))'.dependencies]
 libtest-mimic = "0.2.0"
 rand = { version = "0.7", optional = true }
