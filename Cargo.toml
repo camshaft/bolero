@@ -3,6 +3,7 @@ members = [
     "bolero",
     "bolero-*",
     "cargo-bolero",
+    "issues/reduced_bolero_test"
 ]
 
 [profile.release]
