@@ -1,4 +1,3 @@
-use lazy_static::lazy_static;
 use std::path::{Path, PathBuf};
 
 #[doc(hidden)]
@@ -21,7 +20,10 @@ pub struct TargetLocation {
     pub line: u32,
 
     /// The path to the current test
-    pub item_path: String,
+    pub item_path: &'static str,
+
+    /// The name of the test
+    pub test_name: Option<String>,
 }
 
 impl TargetLocation {
@@ -40,7 +42,7 @@ impl TargetLocation {
     }
 
     fn is_exact_match(&self) -> bool {
-        let test_name = self.test_name();
+        let test_name = self.item_path();
         std::env::args().take(2).any(|path| path == test_name)
     }
 
@@ -54,7 +56,7 @@ impl TargetLocation {
             self.work_dir().expect("valid work_dir").display(),
             &self.package_name,
             self.is_harnessed(),
-            self.test_name(),
+            self.item_path(),
         );
     }
 
@@ -86,26 +88,21 @@ impl TargetLocation {
         }
 
         work_dir.push("__fuzz__");
-        work_dir.push(self.fuzz_dir());
+        if let Some(test_name) = self.test_name.as_ref() {
+            work_dir.push(test_name);
+        } else {
+            work_dir.push(self.fuzz_dir());
+        }
 
         Some(work_dir)
     }
 
-    fn test_name(&self) -> &str {
-        if self.is_harnessed() {
-            &self.item_path
-        } else {
-            // if unharnessed, the test name is just the crate
-            self.module_path
-        }
-    }
-
     pub fn is_harnessed(&self) -> bool {
-        *IS_HARNESSED
+        is_harnessed(self.item_path)
     }
 
     fn fuzz_dir(&self) -> String {
-        let test_name = self.test_name();
+        let test_name = self.item_path();
         let mut components: Vec<_> = test_name.split("::").collect();
 
         let last = components.len() - 1;
@@ -122,149 +119,57 @@ impl TargetLocation {
 
         components.join("__")
     }
-}
 
-lazy_static! {
-    static ref IS_HARNESSED: bool = is_harnessed();
-}
-
-macro_rules! thread_name {
-    () => {
-        std::thread::current().name().filter(|name| name != &"main")
-    };
-}
-
-fn is_harnessed() -> bool {
-    // cargo-bolero passed the harness type
-    if let Ok(harnessed) = std::env::var("BOLERO_LIBTEST_HARNESS") {
-        return harnessed == "1";
+    fn item_path(&self) -> String {
+        format_symbol_name(&self.item_path)
     }
+}
 
-    // if there's a thread name, then libtest has spawned a test thread
-    if thread_name!().is_some() {
+fn is_harnessed(name: &str) -> bool {
+    // only harnessed tests spawn threads
+    if std::thread::current()
+        .name()
+        .filter(|name| name != &"main")
+        .is_some()
+    {
         return true;
     }
 
-    let mut is_harnessed = false;
+    let mut parts: Vec<_> = name.split("::").collect();
 
-    // search the stack to find if libtest was included
-    // TODO find a better way to do this
-    backtrace::trace(|frame| {
-        let mut is_done = false;
+    // remove parts up to the path probe
+    while parts.pop().expect("empty path") != "__bolero_item_path__" {}
 
-        backtrace::resolve_frame(frame, |symbol| {
-            if symbol
-                .filename()
-                .and_then(|file| file.to_str())
-                .map(|file| file.ends_with("src/libtest/lib.rs"))
-                .unwrap_or(false)
-            {
-                is_harnessed = true;
-                is_done = true;
-                return;
-            }
-        });
-
-        !is_done
-    });
-
-    is_harnessed
+    // fuzz targets defined in main are not harnessed
+    !matches!(
+        parts.last().cloned(),
+        Some("main") if parts.len() == 2
+    )
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __item_path__ {
-    () => {
-        $crate::target_location::__item_path__(module_path!());
-    };
-}
-
-#[doc(hidden)]
-#[inline(never)]
-pub fn __item_path__(module_path: &str) -> String {
-    // cargo-bolero passed the correct test name
-    if let Ok(test_name) = std::env::var("BOLERO_TEST_NAME") {
-        return test_name;
-    }
-
-    // if there's a thread name, then libtest has spawned a test thread
-    if let Some(thread_name) = thread_name!() {
-        return thread_name.to_string();
-    }
-
-    let mut test_name = None;
-
-    // search the backtrace for the current __item_path__ function and get the caller
-    // TODO replace this with something better?
-    backtrace::trace(|frame| {
-        let mut is_done = false;
-
-        backtrace::resolve_frame(frame, |symbol| {
-            if let Some(name) = symbol
-                .name()
-                .map(|name| name.to_string())
-                .filter(|name| name.starts_with(module_path))
-                .map(format_symbol_name)
-            {
-                test_name = Some(name);
-                is_done = true;
-                return;
-            }
-        });
-
-        !is_done
-    });
-
-    if let Some(test_name) = test_name {
-        return test_name;
-    }
-
-    panic!(
-        r#"
-Could not reliably determine a test name located in {:?}.
-
-This is caused by setting `--test-threads=1` and removing debug symbols.
-
-This can be fixed by:
-
-* Increasing the number of test-threads to at least 2
-* Explicitly setting the test name:
-
-  ```rust
-  #[test]
-  fn my_test() {{
-      fuzz!(name = "my_test").for_each(|input| {{
-          // checks here
-      }})
-  }}
-  ```
-* Enabling debug symbols in the project's `Cargo.toml`:
-
-  ```toml
-  [profile.bench]
-  debug = true
-  ```
-"#,
-        module_path
-    );
+    () => {{
+        fn __bolero_item_path__() {}
+        fn __resolve_item_path__<T>(_: T) -> &'static str {
+            ::core::any::type_name::<T>()
+        }
+        __resolve_item_path__(__bolero_item_path__)
+    }};
 }
 
 #[test]
 fn item_path_test() {
-    let test_name = __item_path__!();
+    let test_name = format_symbol_name(__item_path__!());
     assert_eq!(test_name, "target_location::item_path_test");
 }
 
-fn format_symbol_name<Name: AsRef<str>>(name: Name) -> String {
-    let mut parts: Vec<_> = name.as_ref().split("::").collect();
+fn format_symbol_name(name: &str) -> String {
+    let mut parts: Vec<_> = name.split("::").collect();
 
-    if parts
-        .last()
-        .and_then(|part| u64::from_str_radix(part, 16).ok())
-        .is_some()
-    {
-        parts.pop().expect("unique symbol");
-    }
+    // remove parts up to the path probe
+    while parts.pop().expect("empty path") != "__bolero_item_path__" {}
 
     match parts.last().cloned() {
         Some("main") if parts.len() == 2 => {
@@ -285,11 +190,20 @@ fn format_symbol_name<Name: AsRef<str>>(name: Name) -> String {
 
 #[test]
 fn format_symbol_name_test() {
-    assert_eq!(format_symbol_name("crate::main::123"), "crate");
-    assert_eq!(format_symbol_name("crate::test::123"), "test");
-    assert_eq!(format_symbol_name("crate::test::{{closure}}::123"), "test");
     assert_eq!(
-        format_symbol_name("crate::nested::test::123"),
+        format_symbol_name("crate::main::__bolero_item_path__::123"),
+        "crate"
+    );
+    assert_eq!(
+        format_symbol_name("crate::test::__bolero_item_path__::123"),
+        "test"
+    );
+    assert_eq!(
+        format_symbol_name("crate::test::{{closure}}::__bolero_item_path__::123"),
+        "test"
+    );
+    assert_eq!(
+        format_symbol_name("crate::nested::test::__bolero_item_path__::123"),
         "nested::test"
     );
 }
