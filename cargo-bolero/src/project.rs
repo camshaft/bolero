@@ -52,14 +52,14 @@ pub struct Project {
 
 impl Project {
     fn cargo(&self) -> Command {
+        let mut command = Command::new("cargo");
         match self.toolchain() {
-            "default" => Command::new("cargo"),
+            "default" => {},
             toolchain => {
-                let mut cmd = Command::new("rustup");
-                cmd.arg("run").arg(toolchain).arg("cargo");
-                cmd
+                command.arg(format!("+{}", toolchain.trim_start_matches('+')));
             }
         }
+        command
     }
 
     fn toolchain(&self) -> &str {
