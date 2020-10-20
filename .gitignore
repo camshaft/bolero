@@ -4,5 +4,6 @@ Cargo.lock
 *.log
 crash-*
 *.a
+*.o
 corpus
 crashes
