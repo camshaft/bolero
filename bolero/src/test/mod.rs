@@ -36,7 +36,7 @@ impl TestEngine {
         fuzz_target_path
     }
 
-    fn file_tests<'a, D: Iterator<Item = &'a str>>(
+    fn file_tests<'a, D: Iterator<Item = &'a str> + std::panic::UnwindSafe>(
         &self,
         sub_dirs: D,
     ) -> impl Iterator<Item = LibTest<TestInput>> {
@@ -127,6 +127,9 @@ impl TestEngine {
 
         let result = run_tests(&arguments, tests, |config| {
             let testfn = unsafe { TESTFN.as_mut().expect("uninitialized test function") };
+
+            progress();
+
             if let Err(err) = testfn(&config.data) {
                 Outcome::Failed { msg: Some(err) }
             } else {
@@ -145,12 +148,24 @@ impl TestEngine {
         bolero_engine::panic::forward_panic(false);
 
         for test in tests {
+            progress();
+
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
                 eprintln!("{}", err);
-                panic!();
+                panic!("test failed");
             }
         }
+    }
+}
+
+fn progress() {
+    if cfg!(miri) {
+        use std::io::{stderr, Write};
+
+        // miri doesn't capture explicit writes to stderr
+        #[allow(clippy::explicit_write)]
+        let _ = write!(stderr(), ".");
     }
 }
 
