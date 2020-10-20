@@ -141,7 +141,7 @@ where
                 Err(_) => {
                     let failure = test
                         .shrink(
-                            replace(&mut state.buffer, vec![]),
+                            core::mem::replace(&mut state.buffer, vec![]),
                             Some(self.seed),
                             Some(state.driver_mode),
                         )
