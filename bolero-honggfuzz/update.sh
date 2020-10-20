@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 version=${1:-master}
 project_dir="$(pwd)"
@@ -32,7 +34,8 @@ for f in $SRC
 do
     name=$(basename "$f" .c | sed 's/-/_/g')
     replace "s/int main/int ${name}_main/" $f
-    replace "s/return EXIT_SUCCESS/return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS"
 done
+
+replace "s/return EXIT_SUCCESS/return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS/" $project_dir/honggfuzz/honggfuzz.c
 
 echo -e "libhonggfuzz.a: \$(OBJS) \$(LCOMMON_ARCH) \$(CRASH_REPORT)\n\t\$(AR) rcs libhonggfuzz.a \$(OBJS) \$(CRASH_REPORT)" >> "$project_dir/honggfuzz/Makefile"

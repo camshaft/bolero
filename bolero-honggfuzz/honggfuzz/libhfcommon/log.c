@@ -48,10 +48,10 @@
 #define __hf_pid() getpid()
 #endif
 
-static int hf_log_fd = STDERR_FILENO;
-static bool hf_log_fd_isatty = false;
-enum llevel_t hf_log_level = INFO;
-static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int             hf_log_fd        = STDERR_FILENO;
+static bool            hf_log_fd_isatty = false;
+enum llevel_t          hf_log_level     = INFO;
+static pthread_mutex_t log_mutex        = PTHREAD_MUTEX_INITIALIZER;
 
 __attribute__((constructor)) static void log_init(void) {
     hf_log_fd = fcntl(hf_log_fd, F_DUPFD_CLOEXEC, 0);
@@ -83,16 +83,16 @@ void logInitLogFile(const char* logfile, int fd, enum llevel_t ll) {
 }
 
 void logLog(enum llevel_t ll, const char* fn, int ln, bool perr, const char* fmt, ...) {
-    int saved_errno = errno;
+    int  saved_errno = errno;
     char strerr[512];
-    if (perr == true) {
+    if (perr) {
         snprintf(strerr, sizeof(strerr), "%s", strerror(saved_errno));
     }
     struct ll_t {
         const char* descr;
         const char* prefix;
-        const bool print_funcline;
-        const bool print_time;
+        const bool  print_funcline;
+        const bool  print_time;
     };
     static const struct ll_t logLevels[] = {
         {"F", "\033[7;35m", true, true},
@@ -104,7 +104,7 @@ void logLog(enum llevel_t ll, const char* fn, int ln, bool perr, const char* fmt
         {"HB", "\033[1m", false, false},
     };
 
-    time_t ltstamp = time(NULL);
+    time_t    ltstamp = time(NULL);
     struct tm utctime;
     localtime_r(&ltstamp, &utctime);
     char timestr[32];
@@ -131,7 +131,7 @@ void logLog(enum llevel_t ll, const char* fn, int ln, bool perr, const char* fmt
         vdprintf(hf_log_fd, fmt, args);
         va_end(args);
 
-        if (perr == true) {
+        if (perr) {
             dprintf(hf_log_fd, ": %s", strerr);
         }
         if (hf_log_fd_isatty) {
@@ -154,7 +154,7 @@ void logStop(int sig) {
 }
 
 void logRedirectLogFD(int fd) {
-    hf_log_fd = fd;
+    hf_log_fd        = fd;
     hf_log_fd_isatty = isatty(hf_log_fd);
 }
 

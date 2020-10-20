@@ -26,10 +26,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include <signal.h>
+#include <limits.h>
 #include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "libhfcommon/common.h"
 #include "libhfcommon/log.h"
@@ -70,7 +70,7 @@ void report_saveReport(run_t* run) {
         return;
     }
 
-    MX_SCOPED_LOCK(&run->global->cfg.report_mutex);
+    MX_SCOPED_LOCK(&run->global->mutex.report);
 
     if (reportFD == -1) {
         char reportFName[PATH_MAX];
