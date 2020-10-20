@@ -433,5 +433,5 @@ int honggfuzz_main(int argc, char** argv) {
 
     printSummary(&hfuzz);
 
-    return EXIT_SUCCESS;
+    return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

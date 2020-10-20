@@ -133,18 +133,23 @@ where
 /// Lazily generates a new value for the given driver
 macro_rules! generate_value {
     ($self:ident, $driver:ident) => {{
-        if let Some(value) = $self.value.as_mut() {
+        let forward_panic = crate::panic::forward_panic(true);
+        let value = if let Some(value) = $self.value.as_mut() {
             if $self.gen.mutate($driver, value).is_some() {
                 value
             } else {
+                crate::panic::forward_panic(forward_panic);
                 return Ok(false);
             }
         } else if let Some(value) = $self.gen.generate($driver) {
             $self.value = Some(value);
             $self.value.as_ref().unwrap()
         } else {
+            crate::panic::forward_panic(forward_panic);
             return Ok(false);
-        }
+        };
+        crate::panic::forward_panic(forward_panic);
+        value
     }};
 }
 
