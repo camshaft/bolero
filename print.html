@@ -167,6 +167,9 @@ available the requirement can be relaxed by executing <code>cargo install cargo-
 <h3><a class="header" href="#debianubuntu" id="debianubuntu">Debian/Ubuntu</a></h3>
 <pre><code class="language-bash">$ sudo apt install binutils-dev libunwind-dev
 </code></pre>
+<h3><a class="header" href="#nix" id="nix">Nix</a></h3>
+<pre><code class="language-bash">$ nix-shell -p libbfd libunwind libopcodes
+</code></pre>
 <h1><a class="header" href="#library-installation" id="library-installation">Library Installation</a></h1>
 <p><code>bolero</code> is on <code>crates.io</code> and can be added to a project's dev dependencies like so:</p>
 <pre><code class="language-toml">[dev-dependencies]
