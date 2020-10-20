@@ -20,7 +20,7 @@ pub use test_input::*;
 #[doc(hidden)]
 pub mod target_location;
 #[doc(hidden)]
-pub use target_location::{TargetLocation, __item_path__};
+pub use target_location::TargetLocation;
 
 mod test_result;
 pub use test_result::*;

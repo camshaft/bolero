@@ -115,8 +115,21 @@ use core::{fmt::Debug, marker::PhantomData};
 #[macro_export]
 macro_rules! fuzz {
     () => {{
-        let item_path = $crate::__item_path__!();
-        $crate::fuzz!(name = item_path)
+        let location = $crate::TargetLocation {
+            package_name: env!("CARGO_PKG_NAME"),
+            manifest_dir: env!("CARGO_MANIFEST_DIR"),
+            module_path: module_path!(),
+            file: file!(),
+            line: line!(),
+            item_path: $crate::__item_path__!(),
+            test_name: None,
+        };
+
+        if !location.should_run() {
+            return;
+        }
+
+        $crate::fuzz(location)
     }};
     ($fun:path) => {
         $crate::fuzz!(|input| { $fun(input) })
@@ -134,7 +147,8 @@ macro_rules! fuzz {
             module_path: module_path!(),
             file: file!(),
             line: line!(),
-            item_path: format!("{}", $target_name),
+            item_path: $crate::__item_path__!(),
+            test_name: Some(format!("{}", $target_name)),
         };
 
         if !location.should_run() {
