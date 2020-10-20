@@ -36,7 +36,7 @@ impl TestEngine {
         fuzz_target_path
     }
 
-    fn file_tests<'a, D: Iterator<Item = &'a str>>(
+    fn file_tests<'a, D: Iterator<Item = &'a str> + std::panic::UnwindSafe>(
         &self,
         sub_dirs: D,
     ) -> impl Iterator<Item = LibTest<TestInput>> {
@@ -127,7 +127,15 @@ impl TestEngine {
 
         let result = run_tests(&arguments, tests, |config| {
             let testfn = unsafe { TESTFN.as_mut().expect("uninitialized test function") };
-            if let Err(err) = testfn(&config.data) {
+            let result = testfn(&config.data);
+
+            // show progress for miri
+            if cfg!(miri) {
+                use std::io::{stderr, Write};
+                write!(stderr(), ".").unwrap();
+            }
+
+            if let Err(err) = result {
                 Outcome::Failed { msg: Some(err) }
             } else {
                 Outcome::Passed
@@ -145,10 +153,16 @@ impl TestEngine {
         bolero_engine::panic::forward_panic(false);
 
         for test in tests {
+            // show progress for miri
+            if cfg!(miri) {
+                use std::io::{stderr, Write};
+                write!(stderr(), ".").unwrap();
+            }
+
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
                 eprintln!("{}", err);
-                panic!();
+                panic!("test failed");
             }
         }
     }

@@ -1,6 +1,6 @@
 use crate::{panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
-use core::{fmt::Debug, mem::replace};
+use core::fmt::Debug;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
 /// Test engine implementation using a RNG.
@@ -18,6 +18,21 @@ pub struct RngEngine {
 
 impl Default for RngEngine {
     fn default() -> Self {
+        if cfg!(miri) {
+            // RNG tests are really slow with miri so we limit the number of iterations
+            let iterations = get_var("BOLERO_RANDOM_ITERATIONS").unwrap_or(25);
+            let max_len = get_var("BOLERO_RANDOM_MAX_LEN").unwrap_or(1024);
+            let seed =
+                get_var("BOLERO_RANDOM_SEED").unwrap_or_else(|| rand::thread_rng().next_u64());
+
+            return Self {
+                iterations,
+                max_len,
+                seed,
+                driver_mode: None,
+            };
+        }
+
         let iterations = get_var("BOLERO_RANDOM_ITERATIONS").unwrap_or(1000);
         let max_len = get_var("BOLERO_RANDOM_MAX_LEN").unwrap_or(4096);
         let seed = get_var("BOLERO_RANDOM_SEED").unwrap_or_else(|| rand::thread_rng().next_u64());
@@ -122,6 +137,7 @@ where
                     }
                     continue;
                 }
+                #[cfg(not(miri))]
                 Err(_) => {
                     let failure = test
                         .shrink(
@@ -133,6 +149,12 @@ where
 
                     eprintln!("{}", failure);
 
+                    std::panic::resume_unwind(Box::new(failure));
+                }
+                #[cfg(miri)]
+                Err(failure) => {
+                    // don't shrink in Miri execution
+                    eprintln!("{}", failure);
                     std::panic::resume_unwind(Box::new(failure));
                 }
             }

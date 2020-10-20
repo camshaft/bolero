@@ -8,3 +8,4 @@ Bolero has several features that make testing easy:
 - [Structured Testing](./structured-testing.md)
 - [Unified Interface](./unified-interface.md)
 - [Private Testing](./private-testing.md)
+- [Miri Support](./miri.md)

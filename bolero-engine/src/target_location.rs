@@ -63,6 +63,7 @@ impl TargetLocation {
     pub fn abs_path(&self) -> Option<PathBuf> {
         let file = Path::new(self.file);
 
+        #[cfg(not(miri))] // miri does not currently support this call
         if let Ok(file) = file.canonicalize() {
             return Some(file);
         }
