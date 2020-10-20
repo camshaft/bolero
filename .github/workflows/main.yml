@@ -38,7 +38,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: [stable, beta, nightly]
+        rust: [1.42.0, stable, beta, nightly]
         os: [ubuntu-latest, macOS-latest]
         sanitizer: [NONE]
         include:

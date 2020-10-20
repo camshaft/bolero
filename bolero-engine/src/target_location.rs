@@ -64,8 +64,10 @@ impl TargetLocation {
         let file = Path::new(self.file);
 
         #[cfg(not(miri))] // miri does not currently support this call
-        if let Ok(file) = file.canonicalize() {
-            return Some(file);
+        {
+            if let Ok(file) = file.canonicalize() {
+                return Some(file);
+            }
         }
 
         Path::new(self.manifest_dir)

@@ -256,14 +256,16 @@ impl<'a, T: Test> Shrinker<'a, T> {
         //
         // if not, this would indicate a invalid transform or non-determinsitic test
         #[cfg(test)]
-        if self.execute().is_ok() {
-            eprintln!(
-                "transform created non-failing test: {}\nBEFORE: {:?}\nAFTER: {:?}",
-                transform,
-                &self.snapshot_input,
-                &self.input[..self.end],
-            );
-            panic!();
+        {
+            if self.execute().is_ok() {
+                eprintln!(
+                    "transform created non-failing test: {}\nBEFORE: {:?}\nAFTER: {:?}",
+                    transform,
+                    &self.snapshot_input,
+                    &self.input[..self.end],
+                );
+                panic!();
+            }
         }
 
         let _ = transform;
