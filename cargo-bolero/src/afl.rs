@@ -1,13 +1,23 @@
-use crate::{FuzzArgs, ReduceArgs, Selection};
+use crate::{flags, FuzzArgs, ReduceArgs, Selection};
 use anyhow::Result;
 use std::fs;
 
-const FLAGS: &[&str] = &[
-    "--cfg fuzzing_afl",
-    "-Cllvm-args=-sanitizer-coverage-level=3",
-    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
-];
+pub struct Afl;
+
+impl crate::fuzzer::Env for Afl {
+    const NAME: &'static str = "afl";
+
+    fn sanitizer_flags(&self, _target: &str) -> flags::Flags {
+        flags::Flags {
+            sanitizer_coverage_trace_pc_guard: true,
+            ..flags::Flags::default()
+        }
+    }
+
+    fn build_flags(&self, _: &str) -> std::vec::Vec<&'static str> {
+        ["--cfg fuzzing_afl"].to_vec()
+    }
+}
 
 fn bin() -> String {
     std::env::current_exe()
@@ -17,7 +27,7 @@ fn bin() -> String {
 }
 
 pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "afl")?;
+    let test_target = selection.test_target(Afl)?;
     let corpus_dir = test_target.corpus_dir();
     let afl_state = test_target.workdir().join("afl_state");
 

@@ -1,18 +1,25 @@
-use crate::{FuzzArgs, ReduceArgs, Selection};
+use crate::{flags, FuzzArgs, ReduceArgs, Selection};
 use anyhow::Result;
 use std::fs;
 
-const FLAGS: &[&str] = &[
-    "--cfg fuzzing_honggfuzz",
-    "-Clink-args=-lhfuzz",
-    "-Cllvm-args=-sanitizer-coverage-level=4",
-    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
-    #[cfg(not(target_os = "macos"))]
-    "-Cllvm-args=-sanitizer-coverage-trace-compares",
-    "-Cllvm-args=-sanitizer-coverage-trace-divs",
-    "-Cllvm-args=-sanitizer-coverage-trace-pc",
-    "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-];
+pub struct Honggfuzz;
+
+impl crate::fuzzer::Env for Honggfuzz {
+    const NAME: &'static str = "honggfuzz";
+
+    fn sanitizer_flags(&self, target: &str) -> flags::Flags {
+        flags::Flags {
+            sanitizer_coverage_trace_compares: !target.contains("-apple-"),
+            sanitizer_coverage_trace_divs: true,
+            sanitizer_coverage_trace_pc_guard: true,
+            ..flags::Flags::default()
+        }
+    }
+
+    fn build_flags(&self, _: &str) -> std::vec::Vec<&'static str> {
+        ["--cfg fuzzing_honggfuzz", "-Clink-args=-lhfuzz"].to_vec()
+    }
+}
 
 fn bin() -> String {
     std::env::current_exe()
@@ -31,7 +38,7 @@ macro_rules! optional_arg {
 }
 
 pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "honggfuzz")?;
+    let test_target = selection.test_target(Honggfuzz)?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
@@ -70,7 +77,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
 }
 
 pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "honggfuzz")?;
+    let test_target = selection.test_target(Honggfuzz)?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 

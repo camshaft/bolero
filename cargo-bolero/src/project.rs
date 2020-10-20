@@ -6,55 +6,66 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct Project {
     /// Build with the sanitizer enabled
-    #[structopt(short = "s", long = "sanitizer")]
+    #[structopt(
+        short = "s",
+        long,
+        possible_values(&["address", "leak", "memory", "thread", "NONE"])
+    )]
     sanitizer: Vec<String>,
 
     /// Build for the target triple
-    #[structopt(long = "target", default_value = DEFAULT_TARGET)]
+    #[structopt(long, default_value = DEFAULT_TARGET)]
     target: String,
 
     /// Activate all available features
-    #[structopt(long = "all-features")]
+    #[structopt(
+        long,
+        conflicts_with = "no-default-features",
+        conflicts_with = "features"
+    )]
     all_features: bool,
 
     /// Build artifacts in release mode, with optimizations
-    #[structopt(long = "release")]
+    #[structopt(long)]
     release: bool,
 
     /// Do not activate the `default` feature
-    #[structopt(long = "no-default-features")]
+    #[structopt(long)]
     no_default_features: bool,
 
     /// Space-separated list of features to activate
-    #[structopt(long = "features")]
-    features: Option<String>,
+    #[structopt(long)]
+    features: Vec<String>,
 
     /// Package to run tests for
-    #[structopt(short = "p", long = "package")]
+    #[structopt(short = "p", long)]
     package: Option<String>,
 
     /// Path to Cargo.toml
-    #[structopt(long = "manifest-path")]
+    #[structopt(long)]
     manifest_path: Option<String>,
 
     /// Use a rustup toolchain to execute cargo build
-    #[structopt(long = "toolchain")]
+    #[structopt(long)]
     toolchain: Option<String>,
 
     /// Directory for all generated artifacts
-    #[structopt(long = "target-dir")]
+    #[structopt(long)]
     target_dir: Option<String>,
 
     /// Build the standard library with the provided configuration
-    #[structopt(long = "build-std")]
+    #[structopt(long)]
     build_std: bool,
+
+    #[structopt(flatten)]
+    flags: crate::flags::Args,
 }
 
 impl Project {
     fn cargo(&self) -> Command {
         let mut command = Command::new("cargo");
         match self.toolchain() {
-            "default" => {},
+            "default" => {}
             toolchain => {
                 command.arg(format!("+{}", toolchain.trim_start_matches('+')));
             }
@@ -72,7 +83,7 @@ impl Project {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Command {
+    pub fn cmd<F: crate::fuzzer::Env>(&self, call: &str, fuzzer: Option<&F>) -> Command {
         let mut cmd = self.cargo();
 
         cmd.arg(call).arg("--target").arg(&self.target);
@@ -89,8 +100,8 @@ impl Project {
             cmd.arg("--all-features");
         }
 
-        if let Some(value) = self.features.as_ref() {
-            cmd.arg("--features").arg(value);
+        if !self.features.is_empty() {
+            cmd.arg("--features").arg(self.features.join(" "));
         }
 
         if let Some(value) = self.package.as_ref() {
@@ -102,7 +113,7 @@ impl Project {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = self.rustflags("RUSTFLAGS", flags);
+            let rustflags = self.rustflags("RUSTFLAGS", fuzzer);
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
@@ -118,14 +129,14 @@ impl Project {
             }
 
             cmd.env("RUSTFLAGS", rustflags)
-                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags))
-                .env("BOLERO_FUZZER", fuzzer);
+                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", fuzzer))
+                .env("BOLERO_FUZZER", F::NAME);
         }
 
         cmd
     }
 
-    fn rustflags(&self, inherits: &str, flags: &[&str]) -> String {
+    fn rustflags<F: crate::fuzzer::Env>(&self, inherits: &str, fuzzer: &F) -> String {
         [
             "--cfg fuzzing",
             "-Cpasses=sancov",
@@ -136,13 +147,14 @@ impl Project {
             "-Clink-dead-code",
         ]
         .iter()
-        .chain(flags.iter())
         .cloned()
+        .chain(fuzzer.flags(&self.target, &self.flags))
+        .chain(Some("-Ctarget-cpu=native").filter(|_| self.target == DEFAULT_TARGET))
         .map(String::from)
         .chain(self.sanitizer_flags())
         .chain(std::env::var(inherits).ok())
         // https://github.com/rust-lang/rust/issues/53945
-        .chain(if cfg!(target_os = "linux") {
+        .chain(if self.target.contains("-linux-") {
             Some("-Clink-arg=-fuse-ld=gold".to_string())
         } else {
             None

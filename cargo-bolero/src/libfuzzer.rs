@@ -1,4 +1,4 @@
-use crate::{exec, FuzzArgs, ReduceArgs, Selection};
+use crate::{exec, flags, FuzzArgs, ReduceArgs, Selection};
 use anyhow::{anyhow, Result};
 use bit_set::BitSet;
 use core::cmp::Ordering;
@@ -16,21 +16,29 @@ macro_rules! optional_arg {
     };
 }
 
-const FLAGS: &[&str] = &[
-    "--cfg fuzzing_libfuzzer",
-    "-Cllvm-args=-sanitizer-coverage-inline-8bit-counters",
-    "-Cllvm-args=-sanitizer-coverage-level=4",
-    "-Cllvm-args=-sanitizer-coverage-pc-table",
-    "-Cllvm-args=-sanitizer-coverage-prune-blocks=0",
-    "-Cllvm-args=-sanitizer-coverage-trace-compares",
-    "-Cllvm-args=-sanitizer-coverage-trace-divs",
-    "-Cllvm-args=-sanitizer-coverage-trace-geps",
-    #[cfg(target_os = "linux")]
-    "-Cllvm-args=-sanitizer-coverage-stack-depth",
-];
+pub struct Libfuzzer;
+
+impl crate::fuzzer::Env for Libfuzzer {
+    const NAME: &'static str = "libfuzzer";
+
+    fn sanitizer_flags(&self, target: &str) -> flags::Flags {
+        flags::Flags {
+            sanitizer_coverage_trace_pc_guard: true,
+            sanitizer_coverage_inline_8bit_counters: true,
+            sanitizer_coverage_pc_table: true,
+            sanitizer_coverage_stack_depth: target.contains("-linux-"),
+            sanitizer_coverage_trace_compares: true,
+            ..flags::Flags::default()
+        }
+    }
+
+    fn build_flags(&self, _: &str) -> std::vec::Vec<&'static str> {
+        ["--cfg fuzzing_libfuzzer"].to_vec()
+    }
+}
 
 pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "libfuzzer")?;
+    let test_target = selection.test_target(Libfuzzer)?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
 
@@ -63,7 +71,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
 }
 
 pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "libfuzzer")?;
+    let test_target = selection.test_target(Libfuzzer)?;
     let corpus_dir = test_target.corpus_dir();
     let tmp_corpus = test_target.temp_dir()?;
 

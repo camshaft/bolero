@@ -46,7 +46,7 @@ pub struct FuzzArgs {
     #[structopt(short = "j", long = "jobs")]
     pub jobs: Option<usize>,
 
-    /// Additional arguments to pass to the selected fuzzer enging
+    /// Additional arguments to pass to the selected fuzzer engine
     #[structopt(short = "F", long = "fuzzer-args")]
     pub fuzzer_args: Vec<String>,
 }

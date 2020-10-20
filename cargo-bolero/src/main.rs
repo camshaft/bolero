@@ -11,6 +11,7 @@ use structopt::StructOpt;
 
 #[cfg(feature = "afl")]
 mod afl;
+mod flags;
 mod fuzz;
 mod fuzzer;
 #[cfg(feature = "honggfuzz")]
