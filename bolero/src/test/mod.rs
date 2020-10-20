@@ -127,15 +127,10 @@ impl TestEngine {
 
         let result = run_tests(&arguments, tests, |config| {
             let testfn = unsafe { TESTFN.as_mut().expect("uninitialized test function") };
-            let result = testfn(&config.data);
 
-            // show progress for miri
-            if cfg!(miri) {
-                use std::io::{stderr, Write};
-                write!(stderr(), ".").unwrap();
-            }
+            progress();
 
-            if let Err(err) = result {
+            if let Err(err) = testfn(&config.data) {
                 Outcome::Failed { msg: Some(err) }
             } else {
                 Outcome::Passed
@@ -153,11 +148,7 @@ impl TestEngine {
         bolero_engine::panic::forward_panic(false);
 
         for test in tests {
-            // show progress for miri
-            if cfg!(miri) {
-                use std::io::{stderr, Write};
-                write!(stderr(), ".").unwrap();
-            }
+            progress();
 
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
@@ -165,6 +156,16 @@ impl TestEngine {
                 panic!("test failed");
             }
         }
+    }
+}
+
+fn progress() {
+    if cfg!(miri) {
+        use std::io::{stderr, Write};
+
+        // miri doesn't capture explicit writes to stderr
+        #[allow(clippy::explicit_write)]
+        let _ = write!(stderr(), ".");
     }
 }
 
