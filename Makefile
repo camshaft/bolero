@@ -71,7 +71,7 @@ libfuzzer honggfuzz:
 	    fuzz \
 	    fuzz_operations \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --runs 100000 \
+	    --runs 1000 \
 	    --fuzzer $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
@@ -82,36 +82,49 @@ libfuzzer honggfuzz:
 	    --fuzzer $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
-	@OTHER_SHOULD_PANIC=1 cargo run \
+	@SHOULD_PANIC=1 cargo run \
 	    fuzz \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
-	@OTHER_SHOULD_PANIC=1 cargo run \
+	    --sanitizer $(SANITIZER) \
+	    && exit 1 || true
+	@SHOULD_PANIC=1 cargo run \
 	    reduce \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
-	@ADD_SHOULD_PANIC=1 cargo run \
+	    --sanitizer $(SANITIZER) \
+	    || true # TODO make this consistent
+	@SHOULD_PANIC=1 cargo run \
 	    fuzz \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
-	@ADD_SHOULD_PANIC=1 cargo run \
+	    --sanitizer $(SANITIZER) \
+	    && exit 1 || true
+	@SHOULD_PANIC=1 cargo run \
 	    reduce \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
+	    --sanitizer $(SANITIZER) \
+	    || true # TODO make this consistent
+	@SHOULD_PANIC=1 cargo run \
+	    fuzz \
+	    tests::panicking_generator_test \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 1000 \
+	    --fuzzer $@ \
+	    --release \
+	    --sanitizer $(SANITIZER) \
+	    || true # TODO make this consistent
 
 afl:
 	@cargo run \
@@ -130,22 +143,24 @@ afl:
 	    --fuzzer $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
-	@OTHER_SHOULD_PANIC=1 cargo run \
+	@SHOULD_PANIC=1 cargo run \
 	    fuzz \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
-	@ADD_SHOULD_PANIC=1 cargo run \
+	    --sanitizer $(SANITIZER) \
+	    && exit 1 || true
+	@SHOULD_PANIC=1 cargo run \
 	    fuzz \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --fuzzer $@ \
 	    --release \
-	    --sanitizer $(SANITIZER)
+	    --sanitizer $(SANITIZER) \
+	    && exit 1 || true
 
 book:
 	@mdbook build book

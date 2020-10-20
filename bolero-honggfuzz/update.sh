@@ -32,6 +32,7 @@ for f in $SRC
 do
     name=$(basename "$f" .c | sed 's/-/_/g')
     replace "s/int main/int ${name}_main/" $f
+    replace "s/return EXIT_SUCCESS/return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS"
 done
 
 echo -e "libhonggfuzz.a: \$(OBJS) \$(LCOMMON_ARCH) \$(CRASH_REPORT)\n\t\$(AR) rcs libhonggfuzz.a \$(OBJS) \$(CRASH_REPORT)" >> "$project_dir/honggfuzz/Makefile"

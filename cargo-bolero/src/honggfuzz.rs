@@ -47,6 +47,8 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         crashes_dir.to_str().unwrap().to_string(),
         "--timeout".to_string(),
         format!("{}", fuzz.timeout_as_secs()),
+        // make it consistent with libfuzzer
+        "--exit_upon_crash".to_string(),
     ];
 
     optional_arg!(args, "--run_timeout", fuzz.time_as_secs());

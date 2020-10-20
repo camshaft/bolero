@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn add_test() {
-        let should_panic = std::env::var("ADD_SHOULD_PANIC").is_ok();
+        let should_panic = std::env::var("SHOULD_PANIC").is_ok();
 
         fuzz!()
             .with_generator((0..254).map_gen(|a: u8| (a, a + 1)))
@@ -29,7 +29,7 @@ mod tests {
 
     #[test]
     fn other_test() {
-        let should_panic = std::env::var("OTHER_SHOULD_PANIC").is_ok();
+        let should_panic = std::env::var("SHOULD_PANIC").is_ok();
 
         fuzz!()
             .with_generator((0..254).map_gen(|a: u8| (a, a + 1)))
@@ -37,5 +37,25 @@ mod tests {
             .for_each(|(a, b)| {
                 assert!(add(a, b, should_panic) >= a);
             });
+    }
+
+    #[test]
+    fn panicking_generator_test() {
+        #[derive(Debug)]
+        struct T;
+
+        impl TypeGenerator for T {
+            fn generate<R: bolero_generator::Driver>(_: &mut R) -> Option<Self> {
+                if std::env::var("SHOULD_PANIC").is_ok() {
+                    panic!("generator panicked!");
+                } else {
+                    Some(Self)
+                }
+            }
+        }
+
+        fuzz!().with_type::<T>().for_each(|_| {
+            // nothing to assert
+        })
     }
 }
