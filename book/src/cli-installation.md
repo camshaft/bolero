@@ -16,3 +16,9 @@ available the requirement can be relaxed by executing `cargo install cargo-boler
 ```bash
 $ sudo apt install binutils-dev libunwind-dev
 ```
+
+### Nix
+
+```bash
+$ nix-shell -p libbfd libunwind libopcodes
+```
