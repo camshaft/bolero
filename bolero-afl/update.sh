@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 version=${1:-master}
 project_dir="$(pwd)"

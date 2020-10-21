@@ -29,6 +29,7 @@
 */
 
 #define AFL_MAIN
+#include "android-ashmem.h"
 
 #include "config.h"
 #include "types.h"
@@ -162,7 +163,7 @@ static void setup_shm(void) {
 
   trace_bits = shmat(shm_id, NULL, 0);
   
-  if (!trace_bits) PFATAL("shmat() failed");
+  if (trace_bits == (void *)-1) PFATAL("shmat() failed");
 
 }
 
