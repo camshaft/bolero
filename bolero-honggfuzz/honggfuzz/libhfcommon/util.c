@@ -96,7 +96,7 @@ char* util_StrDup(const char* s) {
 }
 
 static __thread pthread_once_t rndThreadOnce = PTHREAD_ONCE_INIT;
-static __thread uint64_t rndState[2];
+static __thread uint64_t       rndState[2];
 
 static void util_rndInitThread(void) {
     int fd = TEMP_FAILURE_RETRY(open("/dev/urandom", O_RDONLY | O_CLOEXEC));
@@ -117,8 +117,8 @@ static inline uint64_t util_RotL(const uint64_t x, int k) {
 }
 
 static inline uint64_t util_InternalRnd64(void) {
-    const uint64_t s0 = rndState[0];
-    uint64_t s1 = rndState[1];
+    const uint64_t s0     = rndState[0];
+    uint64_t       s1     = rndState[1];
     const uint64_t result = s0 + s1;
     s1 ^= s0;
     rndState[0] = util_RotL(s0, 55) ^ s1 ^ (s1 << 14);
@@ -257,7 +257,7 @@ void util_sleepForMSec(uint64_t msec) {
         return;
     }
     struct timespec ts = {
-        .tv_sec = msec / 1000U,
+        .tv_sec  = msec / 1000U,
         .tv_nsec = (msec % 1000U) * 1000000U,
     };
     TEMP_FAILURE_RETRY(nanosleep(&ts, &ts));
@@ -306,7 +306,7 @@ void util_mutexRWUnlock(pthread_rwlock_t* mutex, const char* func, int line) {
 }
 
 int64_t fastArray64Search(uint64_t* array, size_t arraySz, uint64_t key) {
-    size_t low = 0;
+    size_t low  = 0;
     size_t high = arraySz - 1;
     size_t mid;
 
@@ -369,7 +369,7 @@ size_t util_decodeCString(char* s) {
                     case 'x': {
                         if (s[i + 1] && s[i + 2]) {
                             char hex[] = {s[i + 1], s[i + 2], 0};
-                            s[o] = strtoul(hex, NULL, 16);
+                            s[o]       = strtoul(hex, NULL, 16);
                             i += 2;
                         } else {
                             s[o] = s[i];
@@ -673,7 +673,7 @@ uint64_t util_CRC64Rev(const uint8_t* buf, size_t len) {
 }
 
 static const struct {
-    const int signo;
+    const int         signo;
     const char* const signame;
 } sigNames[] = {
 #if defined(SIGHUP)
@@ -832,6 +832,29 @@ static int addrStatic_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, 
 lhfc_addr_t util_getProgAddr(const void* addr) {
     return (lhfc_addr_t)dl_iterate_phdr(addrStatic_cb, (void*)addr);
 }
+static uint64_t* values64InBinary      = NULL;
+static size_t    values64InBinary_size = 0;
+static size_t    values64InBinary_cap  = 0;
+
+static uint32_t* values32InBinary      = NULL;
+static size_t    values32InBinary_size = 0;
+static size_t    values32InBinary_cap  = 0;
+
+static int cmp_u64(const void* pa, const void* pb) {
+    uint64_t a = *(uint64_t*)pa;
+    uint64_t b = *(uint64_t*)pb;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
+
+static int cmp_u32(const void* pa, const void* pb) {
+    uint32_t a = *(uint32_t*)pa;
+    uint32_t b = *(uint32_t*)pb;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
 
 static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
     uint32_t v = *(uint32_t*)data;
@@ -844,7 +867,7 @@ static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
         if (info->dlpi_phdr[i].p_type != PT_LOAD) {
             continue;
         }
-        if (!(info->dlpi_phdr[i].p_flags & PF_R)) {
+        if (!(info->dlpi_phdr[i].p_flags & PF_W)) {
             continue;
         }
         uint32_t* start = (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
@@ -861,10 +884,6 @@ static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
     return 0;
 }
 
-bool util_32bitValInBinary(uint32_t v) {
-    return (dl_iterate_phdr(check32_cb, &v) == 1);
-}
-
 static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
     uint64_t v = *(uint64_t*)data;
 
@@ -876,7 +895,7 @@ static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
         if (info->dlpi_phdr[i].p_type != PT_LOAD) {
             continue;
         }
-        if (!(info->dlpi_phdr[i].p_flags & PF_R)) {
+        if (!(info->dlpi_phdr[i].p_flags & PF_W)) {
             continue;
         }
         uint64_t* start = (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
@@ -893,7 +912,150 @@ static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
     return 0;
 }
 
-bool util_64bitValInBinary(uint32_t v) {
+static int collectValuesInBinary_cb(
+    struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data HF_ATTR_UNUSED) {
+    for (size_t i = 0; i < info->dlpi_phnum; i++) {
+        /* Look only in the actual binary, and not in libraries */
+        if (info->dlpi_name[0] != '\0') {
+            continue;
+        }
+        if (info->dlpi_phdr[i].p_type != PT_LOAD) {
+            continue;
+        }
+        // collect values from readonly segments
+        if ((!(info->dlpi_phdr[i].p_flags & PF_R)) || (info->dlpi_phdr[i].p_flags & PF_W)) {
+            continue;
+        }
+        uint32_t* start_32 = (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+        uint32_t* end_32 =
+            (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr +
+                        HF_MIN(info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_filesz));
+
+        for (; start_32 < end_32; start_32++) {
+            if (*start_32 == 0 || *start_32 == (uint32_t)-1) continue;
+            // make enough capcity
+            if (values32InBinary_size > values32InBinary_cap) {
+                LOG_F("32values size(%zu) > cap(%zu)", values32InBinary_size, values32InBinary_cap);
+            }
+            if (values32InBinary_size == values32InBinary_cap) {
+                if (values32InBinary_cap == 0) {
+                    values32InBinary_cap = 1024;
+                }
+                values32InBinary_cap *= 2;
+                values32InBinary =
+                    util_Realloc(values32InBinary, values32InBinary_cap * sizeof(uint32_t));
+            }
+            values32InBinary[values32InBinary_size++] = *start_32;
+        }
+
+        uint64_t* start_64 = (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+        uint64_t* end_64 =
+            (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr +
+                        HF_MIN(info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_filesz));
+
+        for (; start_64 < end_64; start_64++) {
+            if (*start_64 == 0 || *start_64 == (uint64_t)-1) continue;
+            // make enough capcity
+            if (values64InBinary_size > values64InBinary_cap) {
+                LOG_F("64values size(%zu) > cap(%zu)", values64InBinary_size, values64InBinary_cap);
+            }
+            if (values64InBinary_size == values64InBinary_cap) {
+                if (values64InBinary_cap == 0) {
+                    values64InBinary_cap = 1024;
+                }
+                values64InBinary_cap *= 2;
+                values64InBinary =
+                    util_Realloc(values64InBinary, values64InBinary_cap * sizeof(uint64_t));
+            }
+            values64InBinary[values64InBinary_size++] = *start_64;
+        }
+    }
+
+    return 0;
+}
+
+static void collectValuesInBinary() {
+    // collect values
+    dl_iterate_phdr(collectValuesInBinary_cb, NULL);
+
+    // sort values
+    qsort(values32InBinary, values32InBinary_size, sizeof(uint32_t), cmp_u32);
+    qsort(values64InBinary, values64InBinary_size, sizeof(uint64_t), cmp_u64);
+
+    // remove duplicated values
+    if (values32InBinary_size) {
+        uint32_t previous_value = values32InBinary[0];
+        size_t   new_size       = 1;
+        for (size_t i = 1; i < values32InBinary_size; i++) {
+            uint32_t current_value = values32InBinary[i];
+            if (current_value != previous_value) {
+                // a new non-duplicated value
+                values32InBinary[new_size++] = current_value;
+            }
+            previous_value = current_value;
+        }
+        values32InBinary_size = new_size;
+    }
+    if (values64InBinary_size) {
+        uint64_t previous_value = values64InBinary[0];
+        size_t   new_size       = 1;
+        for (size_t i = 1; i < values64InBinary_size; i++) {
+            uint64_t current_value = values64InBinary[i];
+            if (current_value != previous_value) {
+                // a new non-duplicated value
+                values64InBinary[new_size++] = current_value;
+            }
+            previous_value = current_value;
+        }
+        values64InBinary_size = new_size;
+    }
+
+    // reduce memory
+    values32InBinary_cap = values32InBinary_size;
+    values32InBinary     = util_Realloc(values32InBinary, values32InBinary_cap * sizeof(uint32_t));
+    values64InBinary_cap = values64InBinary_size;
+    values64InBinary     = util_Realloc(values64InBinary, values64InBinary_cap * sizeof(uint64_t));
+}
+
+static pthread_once_t collectValuesInBinary_InitOnce = PTHREAD_ONCE_INIT;
+
+bool util_32bitValInBinary(uint32_t v) {
+    pthread_once(&collectValuesInBinary_InitOnce, collectValuesInBinary);
+    // check if it in read-only values
+    if (values32InBinary_size != 0) {
+        size_t l = 0, r = values32InBinary_size - 1;
+        // binary search
+        while (l != r) {
+            size_t mid = (l + r) / 2;
+            if (values32InBinary[mid] < v) {
+                l = mid + 1;
+            } else {
+                r = mid;
+            }
+        }
+        if (values32InBinary[l] == v) return true;
+    }
+    // check if it's in writable values
+    return (dl_iterate_phdr(check32_cb, &v) == 1);
+}
+
+bool util_64bitValInBinary(uint64_t v) {
+    pthread_once(&collectValuesInBinary_InitOnce, collectValuesInBinary);
+    // check if it in read-only values
+    if (values64InBinary_size != 0) {
+        size_t l = 0, r = values64InBinary_size - 1;
+        // binary search
+        while (l != r) {
+            size_t mid = (l + r) / 2;
+            if (values64InBinary[mid] < v) {
+                l = mid + 1;
+            } else {
+                r = mid;
+            }
+        }
+        if (values64InBinary[l] == v) return true;
+    }
+    // check if it's in writable values
     return (dl_iterate_phdr(check64_cb, &v) == 1);
 }
 #else  /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
@@ -904,7 +1066,7 @@ lhfc_addr_t util_getProgAddr(const void* addr HF_ATTR_UNUSED) {
 bool util_32bitValInBinary(uint32_t v HF_ATTR_UNUSED) {
     return false;
 }
-bool util_64bitValInBinary(uint32_t v HF_ATTR_UNUSED) {
+bool util_64bitValInBinary(uint64_t v HF_ATTR_UNUSED) {
     return false;
 }
 #endif /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */

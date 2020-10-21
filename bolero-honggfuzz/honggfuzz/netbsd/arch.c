@@ -127,15 +127,13 @@ static bool arch_checkWait(run_t* run) {
 
         arch_traceAnalyze(run, status, pid);
 
-        char statusStr[4096];
-        LOG_D("pid=%d returned with status: %s", pid,
-            subproc_StatusToStr(status, statusStr, sizeof(statusStr)));
+        LOG_D("pid=%d returned with status: %s", pid, subproc_StatusToStr(status));
 
         if (pid == run->pid && (WIFEXITED(status) || WIFSIGNALED(status))) {
             if (run->global->exe.persistent) {
                 if (!fuzz_isTerminating()) {
                     LOG_W("Persistent mode: PID %d exited with status: %s", pid,
-                        subproc_StatusToStr(status, statusStr, sizeof(statusStr)));
+                        subproc_StatusToStr(status));
                 }
             }
             return true;
@@ -154,7 +152,7 @@ void arch_reapChild(run_t* run) {
 
         if (run->global->exe.persistent) {
             struct pollfd pfd = {
-                .fd = run->persistentSock,
+                .fd     = run->persistentSock,
                 .events = POLLIN,
             };
             int r = poll(&pfd, 1, 250 /* 0.25s */);
@@ -164,7 +162,7 @@ void arch_reapChild(run_t* run) {
         } else {
             /* Return with SIGIO, SIGCHLD */
             const struct timespec ts = {
-                .tv_sec = 0ULL,
+                .tv_sec  = 0ULL,
                 .tv_nsec = (1000ULL * 1000ULL * 250ULL),
             };
             int sig = sigtimedwait(&run->global->exe.waitSigSet, NULL, &ts /* 0.25s */);
@@ -195,12 +193,6 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
     return true;
 }
 
-bool arch_archThreadInit(run_t* run) {
-    run->arch_netbsd.perfMmapBuf = NULL;
-    run->arch_netbsd.perfMmapAux = NULL;
-    run->arch_netbsd.cpuInstrFd = -1;
-    run->arch_netbsd.cpuBranchFd = -1;
-    run->arch_netbsd.cpuIptBtsFd = -1;
-
+bool arch_archThreadInit(run_t* run HF_ATTR_UNUSED) {
     return true;
 }

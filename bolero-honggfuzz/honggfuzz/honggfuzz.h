@@ -28,6 +28,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/param.h>
@@ -37,8 +38,8 @@
 
 #include "libhfcommon/util.h"
 
-#define PROG_NAME "honggfuzz"
-#define PROG_VERSION "2.2"
+#define PROG_NAME    "honggfuzz"
+#define PROG_VERSION "2.3"
 
 /* Name of the template which will be replaced with the proper name of the file */
 #define _HF_FILE_PLACEHOLDER "___FILE___"
@@ -65,7 +66,7 @@
 #define _HF_REPORT_SIZE 32768
 
 /* Perf bitmap size */
-#define _HF_PERF_BITMAP_SIZE_16M (1024U * 1024U * 16U)
+#define _HF_PERF_BITMAP_SIZE_16M   (1024U * 1024U * 16U)
 #define _HF_PERF_BITMAP_BITSZ_MASK 0x7FFFFFFULL
 /* Maximum number of PC guards (=trace-pc-guard) we support */
 #define _HF_PC_GUARD_MAX (1024ULL * 1024ULL * 64ULL)
@@ -86,7 +87,7 @@
 #define _HF_INPUT_FD 1021
 /* FD used to pass coverage feedback from the fuzzed process */
 #define _HF_COV_BITMAP_FD 1022
-#define _HF_BITMAP_FD _HF_COV_BITMAP_FD /* Old name for _HF_COV_BITMAP_FD */
+#define _HF_BITMAP_FD     _HF_COV_BITMAP_FD /* Old name for _HF_COV_BITMAP_FD */
 /* FD used to pass data to a persistent process */
 #define _HF_PERSISTENT_FD 1023
 
@@ -94,7 +95,7 @@
 #define _HF_INPUT_FILE_PATH "/dev/fd/" HF_XSTR(_HF_INPUT_FD)
 
 /* Maximum number of supported execve() args */
-#define _HF_ARGS_MAX 512
+#define _HF_ARGS_MAX 2048
 
 /* Message indicating that the fuzzed process is ready for new data */
 static const uint8_t HFReadyTag = 'R';
@@ -111,12 +112,12 @@ static const uint8_t HFReadyTag = 'R';
 #define _HF_NONMON_SEP "'"
 
 typedef enum {
-    _HF_DYNFILE_NONE = 0x0,
-    _HF_DYNFILE_INSTR_COUNT = 0x1,
+    _HF_DYNFILE_NONE         = 0x0,
+    _HF_DYNFILE_INSTR_COUNT  = 0x1,
     _HF_DYNFILE_BRANCH_COUNT = 0x2,
-    _HF_DYNFILE_BTS_EDGE = 0x10,
-    _HF_DYNFILE_IPT_BLOCK = 0x20,
-    _HF_DYNFILE_SOFT = 0x40,
+    _HF_DYNFILE_BTS_EDGE     = 0x10,
+    _HF_DYNFILE_IPT_BLOCK    = 0x20,
+    _HF_DYNFILE_SOFT         = 0x40,
 } dynFileMethod_t;
 
 typedef struct {
@@ -139,20 +140,20 @@ typedef enum {
 
 typedef enum {
     HF_MAYBE = -1,
-    HF_NO = 0,
-    HF_YES = 1,
+    HF_NO    = 0,
+    HF_YES   = 1,
 } tristate_t;
 
 struct _dynfile_t {
-    size_t size;
-    uint64_t cov[4];
-    size_t idx;
-    int fd;
-    uint64_t timeExecUSecs;
-    char path[PATH_MAX];
+    size_t             size;
+    uint64_t           cov[4];
+    size_t             idx;
+    int                fd;
+    uint64_t           timeExecUSecs;
+    char               path[PATH_MAX];
     struct _dynfile_t* src;
-    uint32_t refs;
-    uint8_t* data;
+    uint32_t           refs;
+    uint8_t*           data;
     TAILQ_ENTRY(_dynfile_t) pointers;
 };
 
@@ -165,8 +166,8 @@ struct strings_t {
 };
 
 typedef struct {
-    uint8_t pcGuardMap[_HF_PC_GUARD_MAX];
-    uint8_t bbMapPc[_HF_PERF_BITMAP_SIZE_16M];
+    uint8_t  pcGuardMap[_HF_PC_GUARD_MAX];
+    uint8_t  bbMapPc[_HF_PERF_BITMAP_SIZE_16M];
     uint32_t bbMapCmp[_HF_PERF_BITMAP_SIZE_16M];
     uint64_t pidNewPC[_HF_THREAD_MAX];
     uint64_t pidNewEdge[_HF_THREAD_MAX];
@@ -180,114 +181,111 @@ typedef struct {
 typedef struct {
     uint32_t cnt;
     struct {
-        uint8_t val[32];
+        uint8_t  val[32];
         uint32_t len;
     } valArr[1024 * 16];
 } cmpfeedback_t;
 
 typedef struct {
     struct {
-        size_t threadsMax;
-        size_t threadsFinished;
-        uint32_t threadsActiveCnt;
+        size_t    threadsMax;
+        size_t    threadsFinished;
+        uint32_t  threadsActiveCnt;
         pthread_t mainThread;
-        pid_t mainPid;
+        pid_t     mainPid;
         pthread_t threads[_HF_THREAD_MAX];
     } threads;
     struct {
         const char* inputDir;
         const char* outputDir;
-        DIR* inputDirPtr;
-        size_t fileCnt;
-        size_t testedFileCnt;
+        DIR*        inputDirPtr;
+        size_t      fileCnt;
+        size_t      testedFileCnt;
         const char* fileExtn;
-        size_t maxFileSz;
-        size_t newUnitsAdded;
-        char workDir[PATH_MAX];
+        size_t      maxFileSz;
+        size_t      newUnitsAdded;
+        char        workDir[PATH_MAX];
         const char* crashDir;
         const char* covDirNew;
-        bool saveUnique;
-        size_t dynfileqMaxSz;
-        size_t dynfileqCnt;
-        pthread_rwlock_t dynfileq_mutex;
-        dynfile_t* dynfileqCurrent;
-        dynfile_t* dynfileq2Current;
+        bool        saveUnique;
+        size_t      dynfileqMaxSz;
+        size_t      dynfileqCnt;
+        dynfile_t*  dynfileqCurrent;
+        dynfile_t*  dynfileq2Current;
         TAILQ_HEAD(dyns_t, _dynfile_t) dynfileq;
         bool exportFeedback;
     } io;
     struct {
-        int argc;
+        int                argc;
         const char* const* cmdline;
-        bool nullifyStdio;
-        bool fuzzStdin;
-        const char* externalCommand;
-        const char* postExternalCommand;
-        const char* feedbackMutateCommand;
-        bool netDriver;
-        bool persistent;
-        uint64_t asLimit;
-        uint64_t rssLimit;
-        uint64_t dataLimit;
-        uint64_t coreLimit;
-        uint64_t stackLimit;
-        bool clearEnv;
-        char* env_ptrs[128];
-        char env_vals[128][4096];
-        sigset_t waitSigSet;
+        bool               nullifyStdio;
+        bool               fuzzStdin;
+        const char*        externalCommand;
+        const char*        postExternalCommand;
+        const char*        feedbackMutateCommand;
+        bool               netDriver;
+        bool               persistent;
+        uint64_t           asLimit;
+        uint64_t           rssLimit;
+        uint64_t           dataLimit;
+        uint64_t           coreLimit;
+        uint64_t           stackLimit;
+        bool               clearEnv;
+        char*              env_ptrs[128];
+        char               env_vals[128][4096];
+        sigset_t           waitSigSet;
     } exe;
     struct {
-        time_t timeStart;
-        time_t runEndTime;
-        time_t tmOut;
-        time_t lastCovUpdate;
+        time_t  timeStart;
+        time_t  runEndTime;
+        time_t  tmOut;
+        time_t  lastCovUpdate;
         int64_t timeOfLongestUnitUSecs;
-        bool tmoutVTALRM;
+        bool    tmoutVTALRM;
     } timing;
     struct {
         struct {
             uint8_t val[256];
-            size_t len;
+            size_t  len;
         } dictionary[1024];
-        size_t dictionaryCnt;
+        size_t      dictionaryCnt;
         const char* dictionaryFile;
-        size_t mutationsMax;
-        unsigned mutationsPerRun;
-        size_t maxInputSz;
+        size_t      mutationsMax;
+        unsigned    mutationsPerRun;
+        size_t      maxInputSz;
     } mutate;
     struct {
-        bool useScreen;
-        char cmdline_txt[65];
+        bool    useScreen;
+        char    cmdline_txt[65];
         int64_t lastDisplayUSecs;
     } display;
     struct {
-        bool useVerifier;
-        bool exitUponCrash;
+        bool        useVerifier;
+        bool        exitUponCrash;
         const char* reportFile;
-        pthread_mutex_t report_mutex;
-        size_t dynFileIterExpire;
-        bool only_printable;
-        bool minimize;
-        bool switchingToFDM;
+        size_t      dynFileIterExpire;
+        bool        only_printable;
+        bool        minimize;
+        bool        switchingToFDM;
     } cfg;
     struct {
         bool enable;
         bool del_report;
     } sanitizer;
     struct {
-        fuzzState_t state;
-        feedback_t* covFeedbackMap;
-        int covFeedbackFd;
-        pthread_mutex_t covFeedback_mutex;
-        cmpfeedback_t* cmpFeedbackMap;
-        int cmpFeedbackFd;
-        bool cmpFeedback;
-        const char* blacklistFile;
-        uint64_t* blacklist;
-        size_t blacklistCnt;
-        bool skipFeedbackOnTimeout;
-        uint64_t maxCov[4];
+        fuzzState_t     state;
+        feedback_t*     covFeedbackMap;
+        int             covFeedbackFd;
+        cmpfeedback_t*  cmpFeedbackMap;
+        int             cmpFeedbackFd;
+        bool            cmpFeedback;
+        const char*     blacklistFile;
+        uint64_t*       blacklist;
+        size_t          blacklistCnt;
+        bool            skipFeedbackOnTimeout;
+        uint64_t        maxCov[4];
         dynFileMethod_t dynFileMethod;
-        hwcnt_t hwCnts;
+        hwcnt_t         hwCnts;
     } feedback;
     struct {
         size_t mutationsCnt;
@@ -299,155 +297,89 @@ typedef struct {
     } cnts;
     struct {
         bool enabled;
-        int serverSocket;
-        int clientSocket;
+        int  serverSocket;
+        int  clientSocket;
     } socketFuzzer;
+    struct {
+        pthread_rwlock_t dynfileq;
+        pthread_mutex_t  feedback;
+        pthread_mutex_t  report;
+        pthread_mutex_t  state;
+        pthread_mutex_t  input;
+        pthread_mutex_t  timing;
+    } mutex;
+
     /* For the Linux code */
     struct {
-        int exeFd;
-        uint64_t dynamicCutOffAddr;
-        bool disableRandomization;
-        void* ignoreAddr;
+        int         exeFd;
+        uint64_t    dynamicCutOffAddr;
+        bool        disableRandomization;
+        void*       ignoreAddr;
         const char* symsBlFile;
-        char** symsBl;
-        size_t symsBlCnt;
+        char**      symsBl;
+        size_t      symsBlCnt;
         const char* symsWlFile;
-        char** symsWl;
-        size_t symsWlCnt;
-        uintptr_t cloneFlags;
-        tristate_t useNetNs;
-        bool kernelOnly;
-        bool useClone;
+        char**      symsWl;
+        size_t      symsWlCnt;
+        uintptr_t   cloneFlags;
+        tristate_t  useNetNs;
+        bool        kernelOnly;
+        bool        useClone;
     } arch_linux;
     /* For the NetBSD code */
     struct {
-        void* ignoreAddr;
+        void*       ignoreAddr;
         const char* symsBlFile;
-        char** symsBl;
-        size_t symsBlCnt;
+        char**      symsBl;
+        size_t      symsBlCnt;
         const char* symsWlFile;
-        char** symsWl;
-        size_t symsWlCnt;
+        char**      symsWl;
+        size_t      symsWlCnt;
     } arch_netbsd;
 } honggfuzz_t;
 
 typedef enum {
-    _HF_RS_UNKNOWN = 0,
+    _HF_RS_UNKNOWN                   = 0,
     _HF_RS_WAITING_FOR_INITIAL_READY = 1,
-    _HF_RS_WAITING_FOR_READY = 2,
-    _HF_RS_SEND_DATA = 3,
+    _HF_RS_WAITING_FOR_READY         = 2,
+    _HF_RS_SEND_DATA                 = 3,
 } runState_t;
 
 typedef struct {
     honggfuzz_t* global;
-    pid_t pid;
-    int64_t timeStartedUSecs;
-    char crashFileName[PATH_MAX];
-    uint64_t pc;
-    uint64_t backtrace;
-    uint64_t access;
-    int exception;
-    char report[_HF_REPORT_SIZE];
-    bool mainWorker;
-    unsigned mutationsPerRun;
-    dynfile_t* dynfile;
-    bool staticFileTryMore;
-    uint32_t fuzzNo;
-    int persistentSock;
-    bool waitingForReady;
-    runState_t runState;
-    bool tmOutSignaled;
-    char* args[_HF_ARGS_MAX + 1];
-    int perThreadCovFeedbackFd;
-    unsigned triesLeft;
-    dynfile_t* current;
+    pid_t        pid;
+    int64_t      timeStartedUSecs;
+    char         crashFileName[PATH_MAX];
+    uint64_t     pc;
+    uint64_t     backtrace;
+    uint64_t     access;
+    int          exception;
+    char         report[_HF_REPORT_SIZE];
+    bool         mainWorker;
+    unsigned     mutationsPerRun;
+    dynfile_t*   dynfile;
+    bool         staticFileTryMore;
+    uint32_t     fuzzNo;
+    int          persistentSock;
+    runState_t   runState;
+    bool         tmOutSignaled;
+    char*        args[_HF_ARGS_MAX + 1];
+    int          perThreadCovFeedbackFd;
+    unsigned     triesLeft;
+    dynfile_t*   current;
 #if !defined(_HF_ARCH_DARWIN)
     timer_t timerId;
-#endif  // !defined(_HF_ARCH_DARWIN)
+#endif    // !defined(_HF_ARCH_DARWIN)
     hwcnt_t hwCnts;
 
     struct {
         /* For Linux code */
         uint8_t* perfMmapBuf;
         uint8_t* perfMmapAux;
-        int cpuInstrFd;
-        int cpuBranchFd;
-        int cpuIptBtsFd;
+        int      cpuInstrFd;
+        int      cpuBranchFd;
+        int      cpuIptBtsFd;
     } arch_linux;
-
-    struct {
-        /* For NetBSD code */
-        uint8_t* perfMmapBuf;
-        uint8_t* perfMmapAux;
-        int cpuInstrFd;
-        int cpuBranchFd;
-        int cpuIptBtsFd;
-    } arch_netbsd;
 } run_t;
-
-/*
- * Go-style defer scoped implementation
- *
- * When compiled with clang, use: -fblocks -lBlocksRuntime
- *
- * Example of use:
- *
- * {
- *   int fd = open(fname, O_RDONLY);
- *   if (fd == -1) {
- *     error(....);
- *     return;
- *   }
- *   defer { close(fd); };
- *   ssize_t sz = read(fd, buf, sizeof(buf));
- *   ...
- *   ...
- * }
- *
- */
-
-#define __STRMERGE(a, b) a##b
-#define _STRMERGE(a, b) __STRMERGE(a, b)
-#ifdef __clang__
-#if __has_extension(blocks)
-static void __attribute__((unused)) __clang_cleanup_func(void (^*dfunc)(void)) {
-    (*dfunc)();
-}
-
-#define defer                                        \
-    void (^_STRMERGE(__defer_f_, __COUNTER__))(void) \
-        __attribute__((cleanup(__clang_cleanup_func))) __attribute__((unused)) = ^
-
-#else /* __has_extension(blocks) */
-#define defer UNIMPLEMENTED - NO - SUPPORT - FOR - BLOCKS - IN - YOUR - CLANG - ENABLED
-#endif /*  __has_extension(blocks) */
-#else  /* !__clang__, e.g.: gcc */
-
-#define __block
-#define _DEFER(a, count)                                                                      \
-    auto void _STRMERGE(__defer_f_, count)(void* _defer_arg __attribute__((unused)));         \
-    int _STRMERGE(__defer_var_, count) __attribute__((cleanup(_STRMERGE(__defer_f_, count)))) \
-        __attribute__((unused));                                                              \
-    void _STRMERGE(__defer_f_, count)(void* _defer_arg __attribute__((unused)))
-#define defer _DEFER(a, __COUNTER__)
-#endif /* ifdef __clang__ */
-
-/* Block scoped mutexes */
-#define MX_SCOPED_LOCK(m) \
-    MX_LOCK(m);           \
-    defer {               \
-        MX_UNLOCK(m);     \
-    }
-
-#define MX_SCOPED_RWLOCK_READ(m) \
-    MX_RWLOCK_READ(m);           \
-    defer {                      \
-        MX_RWLOCK_UNLOCK(m);     \
-    }
-#define MX_SCOPED_RWLOCK_WRITE(m) \
-    MX_RWLOCK_WRITE(m);           \
-    defer {                       \
-        MX_RWLOCK_UNLOCK(m);      \
-    }
 
 #endif

@@ -23,13 +23,11 @@
  */
 
 #include <errno.h>
-#include <getopt.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <time.h>
@@ -46,8 +44,8 @@
 #include "socketfuzzer.h"
 #include "subproc.h"
 
-static int sigReceived = 0;
-static bool clearWin = false;
+static int  sigReceived = 0;
+static bool clearWin    = false;
 
 /*
  * CygWin/MinGW incorrectly copies stack during fork(), so we need to keep some
@@ -103,7 +101,7 @@ static void setupRLimits(void) {
         LOG_E("RLIMIT_NOFILE max limit < 1024 (%zu). Expect troubles!", (size_t)rlim.rlim_max);
         return;
     }
-    rlim.rlim_cur = MIN(1024, rlim.rlim_max);  // we don't need more
+    rlim.rlim_cur = MIN(1024, rlim.rlim_max);    // we don't need more
     if (setrlimit(RLIMIT_NOFILE, &rlim) == -1) {
         PLOG_E("Couldn't setrlimit(RLIMIT_NOFILE, cur=%zu/max=%zu)", (size_t)rlim.rlim_cur,
             (size_t)rlim.rlim_max);
@@ -114,12 +112,12 @@ static void setupMainThreadTimer(void) {
     const struct itimerval it = {
         .it_value =
             {
-                .tv_sec = 1,
+                .tv_sec  = 1,
                 .tv_usec = 0,
             },
         .it_interval =
             {
-                .tv_sec = 0,
+                .tv_sec  = 0,
                 .tv_usec = 1000ULL * 200ULL,
             },
     };
@@ -149,7 +147,7 @@ static void setupSignalsPreThreads(void) {
 
     struct sigaction sa = {
         .sa_handler = sigHandler,
-        .sa_flags = 0,
+        .sa_flags   = 0,
     };
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
@@ -188,7 +186,7 @@ static void setupSignalsMainThread(void) {
 
 static void printSummary(honggfuzz_t* hfuzz) {
     uint64_t exec_per_sec = 0;
-    uint64_t elapsed_sec = time(NULL) - hfuzz->timing.timeStart;
+    uint64_t elapsed_sec  = time(NULL) - hfuzz->timing.timeStart;
     if (elapsed_sec) {
         exec_per_sec = hfuzz->cnts.mutationsCnt / elapsed_sec;
     }
@@ -198,7 +196,7 @@ static void printSummary(honggfuzz_t* hfuzz) {
     struct rusage usage;
     if (getrusage(RUSAGE_CHILDREN, &usage)) {
         PLOG_W("getrusage  failed");
-        usage.ru_maxrss = 0;  // 0 means something went wrong with rusage
+        usage.ru_maxrss = 0;    // 0 means something went wrong with rusage
     }
 #ifdef _HF_ARCH_DARWIN
     usage.ru_maxrss >>= 20;
@@ -235,7 +233,7 @@ static void* signalThread(void* arg) {
 
     for (;;) {
         int sig = 0;
-        errno = 0;
+        errno   = 0;
         int ret = sigwait(&ss, &sig);
         if (ret == EINTR) {
             continue;
@@ -300,7 +298,7 @@ static const char* strYesNo(bool yes) {
 }
 
 static const char* getGitVersion() {
-    static char version[] = "$Id: 71c712fd2cc2c15e545ca447fc9219a246be82fb $";
+    static char version[] = "$Id: 26017da9da354ef4480d11fe3468f4622fb25223 $";
     if (strlen(version) == 47) {
         version[45] = '\0';
         return &version[5];
@@ -323,7 +321,7 @@ int honggfuzz_main(int argc, char** argv) {
     }
     myargs[i] = NULL;
 
-    if (cmdlineParse(argc, myargs, &hfuzz) == false) {
+    if (!cmdlineParse(argc, myargs, &hfuzz)) {
         LOG_F("Parsing of the cmd-line arguments failed");
     }
     if (hfuzz.io.inputDir && access(hfuzz.io.inputDir, R_OK) == -1) {
@@ -364,11 +362,11 @@ int honggfuzz_main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-    if (hfuzz.mutate.dictionaryFile && (input_parseDictionary(&hfuzz) == false)) {
+    if (hfuzz.mutate.dictionaryFile && !input_parseDictionary(&hfuzz)) {
         LOG_F("Couldn't parse dictionary file ('%s')", hfuzz.mutate.dictionaryFile);
     }
 
-    if (hfuzz.feedback.blacklistFile && (input_parseBlacklist(&hfuzz) == false)) {
+    if (hfuzz.feedback.blacklistFile && !input_parseBlacklist(&hfuzz)) {
         LOG_F("Couldn't parse stackhash blacklist file ('%s')", hfuzz.feedback.blacklistFile);
     }
 #define hfuzzl hfuzz.arch_linux

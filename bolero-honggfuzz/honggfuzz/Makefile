@@ -290,7 +290,7 @@ $(LHFUZZ_ARCH): $(LHFUZZ_OBJS)
 	$(AR) rcs $(LHFUZZ_ARCH) $(LHFUZZ_OBJS)
 
 $(LHFUZZ_SHARED): $(LHFUZZ_OBJS) $(LCOMMON_OBJS)
-	$(LD) -shared $(LDFLAGS) $(LHFUZZ_OBJS) $(LCOMMON_OBJS) -o $@
+	$(LD) -shared $(LHFUZZ_OBJS) $(LCOMMON_OBJS) $(LDFLAGS) -o $@
 
 $(LNETDRIVER_OBJS): $(LNETDRIVER_SRCS)
 	$(CC) -c $(CFLAGS) $(LIBS_CFLAGS) -o $@ $(@:.o=.c)
@@ -304,9 +304,7 @@ clean:
 
 .PHONY: indent
 indent:
-	clang-format \
-	  -style="{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100, AlignAfterOpenBracket: DontAlign, AllowShortFunctionsOnASingleLine: false, AlwaysBreakBeforeMultilineStrings: false}" \
-	  -i -sort-includes  *.c *.h */*.c */*.h
+	clang-format -i -sort-includes  *.c *.h */*.c */*.h
 
 .PHONY: depend
 depend: all
@@ -370,23 +368,25 @@ install: all
 	install -m 755 hfuzz_cc/hfuzz-clang++ $${DESTDIR}$(BIN_PATH)
 	install -m 755 hfuzz_cc/hfuzz-gcc $${DESTDIR}$(BIN_PATH)
 	install -m 755 hfuzz_cc/hfuzz-g++ $${DESTDIR}$(BIN_PATH)
-	install -m 755 -t $${DESTDIR}$(INC_PATH)/libhfcommon -D includes/libhfcommon/*.h
-	install -m 755 -t $${DESTDIR}$(INC_PATH)/libhfuzz -D includes/libhfuzz/*.h
-	install -m 755 -t $${DESTDIR}$(INC_PATH)/libhnetdriver -D includes/libhfnetdriver/*.h
+	install -d $${DESTDIR}$(INC_PATH)/libhfcommon
+	install -d $${DESTDIR}$(INC_PATH)/libhfuzz
+	install -d $${DESTDIR}$(INC_PATH)/libhnetdriver
+	install -m 755 includes/libhfcommon/*.h $${DESTDIR}$(INC_PATH)/libhfcommon
+	install -m 755 includes/libhfuzz/*.h $${DESTDIR}$(INC_PATH)/libhfuzz
+	install -m 755 includes/libhfnetdriver/*.h $${DESTDIR}$(INC_PATH)/libhnetdriver
 
 # DO NOT DELETE
 
-cmdline.o: cmdline.h honggfuzz.h libhfcommon/util.h libhfcommon/common.h
-cmdline.o: display.h libhfcommon/files.h libhfcommon/common.h
+cmdline.o: cmdline.h honggfuzz.h libhfcommon/util.h display.h
+cmdline.o: libhfcommon/common.h libhfcommon/files.h libhfcommon/common.h
 cmdline.o: libhfcommon/log.h
 display.o: display.h honggfuzz.h libhfcommon/util.h libhfcommon/common.h
 display.o: libhfcommon/log.h
 fuzz.o: fuzz.h honggfuzz.h libhfcommon/util.h arch.h input.h
 fuzz.o: libhfcommon/common.h libhfcommon/files.h libhfcommon/common.h
-fuzz.o: libhfcommon/log.h mangle.h report.h sanitizers.h socketfuzzer.h
-fuzz.o: subproc.h
-honggfuzz.o: cmdline.h honggfuzz.h libhfcommon/util.h libhfcommon/common.h
-honggfuzz.o: display.h fuzz.h input.h libhfcommon/files.h
+fuzz.o: libhfcommon/log.h report.h sanitizers.h socketfuzzer.h subproc.h
+honggfuzz.o: cmdline.h honggfuzz.h libhfcommon/util.h display.h fuzz.h
+honggfuzz.o: input.h libhfcommon/common.h libhfcommon/files.h
 honggfuzz.o: libhfcommon/common.h libhfcommon/log.h socketfuzzer.h subproc.h
 input.o: input.h honggfuzz.h libhfcommon/util.h fuzz.h libhfcommon/common.h
 input.o: libhfcommon/files.h libhfcommon/common.h libhfcommon/log.h mangle.h
@@ -396,8 +396,7 @@ mangle.o: libhfcommon/common.h libhfcommon/log.h
 report.o: report.h honggfuzz.h libhfcommon/util.h sanitizers.h
 report.o: libhfcommon/common.h libhfcommon/log.h
 sanitizers.o: sanitizers.h honggfuzz.h libhfcommon/util.h cmdline.h
-sanitizers.o: libhfcommon/common.h libhfcommon/files.h libhfcommon/common.h
-sanitizers.o: libhfcommon/log.h
+sanitizers.o: libhfcommon/common.h libhfcommon/log.h
 socketfuzzer.o: socketfuzzer.h honggfuzz.h libhfcommon/util.h
 socketfuzzer.o: libhfcommon/common.h libhfcommon/files.h libhfcommon/common.h
 socketfuzzer.o: libhfcommon/log.h libhfcommon/ns.h
@@ -421,8 +420,7 @@ libhfnetdriver/netdriver.o: libhfcommon/util.h libhfcommon/common.h
 libhfnetdriver/netdriver.o: libhfcommon/files.h libhfcommon/common.h
 libhfnetdriver/netdriver.o: libhfcommon/log.h libhfcommon/ns.h
 libhfuzz/fetch.o: libhfuzz/fetch.h honggfuzz.h libhfcommon/util.h
-libhfuzz/fetch.o: libhfcommon/common.h libhfcommon/files.h
-libhfuzz/fetch.o: libhfcommon/common.h libhfcommon/log.h
+libhfuzz/fetch.o: libhfcommon/files.h libhfcommon/common.h libhfcommon/log.h
 libhfuzz/instrument.o: libhfuzz/instrument.h honggfuzz.h libhfcommon/util.h
 libhfuzz/instrument.o: libhfcommon/common.h libhfcommon/files.h
 libhfuzz/instrument.o: libhfcommon/common.h libhfcommon/log.h
