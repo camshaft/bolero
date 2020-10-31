@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html" class="active"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html" class="active"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li><li class="expanded "><a href="../features/miri.html"><strong aria-hidden="true">2.7.</strong> Miri Support</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -157,11 +157,11 @@
 <p>LibFuzzer is an in-process, coverage-guided, evolutionary fuzzing engine.</p>
 <p>LibFuzzer is linked with the library under test, and feeds fuzzed inputs to the library via a specific fuzzing entrypoint (aka “target function”); the fuzzer then tracks which areas of the code are reached, and generates mutations on the corpus of input data in order to maximize the code coverage.</p>
 <p>The <code>libfuzzer</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer libfuzzer my_fuzz_target
+<pre><code class="language-bash">$ cargo bolero test --engine libfuzzer my_test_target
 </code></pre>
-<p>Currently, it is also the default engine when fuzzing:</p>
-<pre><code class="language-bash"># will use --fuzzer libfuzzer
-$ cargo bolero fuzz my_fuzz_target
+<p>Currently, it is also the default engine:</p>
+<pre><code class="language-bash"># will use --engine libfuzzer
+$ cargo bolero test my_test_target
 </code></pre>
 <h2><a class="header" href="#afl" id="afl">AFL</a></h2>
 <ul>
@@ -169,7 +169,7 @@ $ cargo bolero fuzz my_fuzz_target
 </ul>
 <p>American fuzzy lop is a security-oriented fuzzer that employs a novel type of compile-time instrumentation and genetic algorithms to automatically discover clean, interesting test cases that trigger new internal states in the targeted binary. This substantially improves the functional coverage for the fuzzed code. The compact synthesized corpora produced by the tool are also useful for seeding other, more labor- or resource-intensive testing regimes down the road.</p>
 <p>The <code>afl</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer afl my_fuzz_target
+<pre><code class="language-bash">$ cargo bolero test --engine afl my_test_target
 </code></pre>
 <h2><a class="header" href="#honggfuzz" id="honggfuzz">Honggfuzz</a></h2>
 <ul>
@@ -177,7 +177,7 @@ $ cargo bolero fuzz my_fuzz_target
 </ul>
 <p>Honggfuzz is a security oriented fuzzer with powerful analysis options. Supports evolutionary, feedback-driven fuzzing based on code coverage (software- and hardware-based)</p>
 <p>The <code>honggfuzz</code> engine can be selected like so:</p>
-<pre><code class="language-bash">$ cargo bolero fuzz --fuzzer honggfuzz my_fuzz_target
+<pre><code class="language-bash">$ cargo bolero test --engine honggfuzz my_test_target
 </code></pre>
 
                     </main>
