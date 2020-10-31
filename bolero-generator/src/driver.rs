@@ -3,7 +3,7 @@ use rand_core::RngCore;
 
 /// Trait for driving the generation of a value
 ///
-/// In fuzzing engine, this is typically backed by
+/// In a test engine, this is typically backed by
 /// a byte slice, but other drivers can be used instead, e.g.
 /// an RNG implementation.
 pub trait Driver: Sized {
@@ -27,7 +27,7 @@ pub enum DriverMode {
     Direct,
 
     /// When the driver bytes are exhausted, the driver will continue to fill input bytes with 0.
-    /// This is useful for fuzz engines that want to maximize the amount of time spent fuzzing.
+    /// This is useful for engines that want to maximize the amount of time spent executing tests.
     Forced,
 }
 

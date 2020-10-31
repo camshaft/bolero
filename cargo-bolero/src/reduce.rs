@@ -1,16 +1,16 @@
-use crate::{fuzzer::Fuzzer, selection::Selection};
+use crate::{engine::Engine, selection::Selection};
 use anyhow::Result;
 use structopt::StructOpt;
 
-/// Reduce the corpus of a test target with a fuzzing engine
+/// Reduce the corpus of a test target with an engine
 #[derive(Debug, StructOpt)]
 pub struct Reduce {
-    /// Run the test with a specific fuzzer
-    #[structopt(short = "f", long = "fuzzer", default_value = "libfuzzer")]
-    fuzzer: Fuzzer,
+    /// Run the test with a specific engine
+    #[structopt(short, long, default_value = "libfuzzer")]
+    engine: Engine,
 
     #[structopt(flatten)]
-    args: ReduceArgs,
+    args: Args,
 
     #[structopt(flatten)]
     selection: Selection,
@@ -18,13 +18,13 @@ pub struct Reduce {
 
 impl Reduce {
     pub fn exec(&self) -> Result<()> {
-        self.fuzzer.reduce(&self.selection, &self.args)
+        self.engine.reduce(&self.selection, &self.args)
     }
 }
 
 #[derive(Debug, StructOpt)]
-pub struct ReduceArgs {
-    /// Additional arguments to pass to the selected fuzzer enging
-    #[structopt(short = "F", long = "fuzzer-args")]
-    pub fuzzer_args: Vec<String>,
+pub struct Args {
+    /// Additional arguments to pass to the selected engine
+    #[structopt(short = "E", long)]
+    pub engine_args: Vec<String>,
 }

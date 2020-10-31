@@ -6,47 +6,47 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct Project {
     /// Build with the sanitizer enabled
-    #[structopt(short = "s", long = "sanitizer")]
+    #[structopt(short, long)]
     sanitizer: Vec<String>,
 
     /// Build for the target triple
-    #[structopt(long = "target", default_value = DEFAULT_TARGET)]
+    #[structopt(long, default_value = DEFAULT_TARGET)]
     target: String,
 
     /// Activate all available features
-    #[structopt(long = "all-features")]
+    #[structopt(long)]
     all_features: bool,
 
     /// Build artifacts in release mode, with optimizations
-    #[structopt(long = "release")]
+    #[structopt(long)]
     release: bool,
 
     /// Do not activate the `default` feature
-    #[structopt(long = "no-default-features")]
+    #[structopt(long)]
     no_default_features: bool,
 
     /// Space-separated list of features to activate
-    #[structopt(long = "features")]
+    #[structopt(long)]
     features: Option<String>,
 
     /// Package to run tests for
-    #[structopt(short = "p", long = "package")]
+    #[structopt(short, long)]
     package: Option<String>,
 
     /// Path to Cargo.toml
-    #[structopt(long = "manifest-path")]
+    #[structopt(long)]
     manifest_path: Option<String>,
 
     /// Use a rustup toolchain to execute cargo build
-    #[structopt(long = "toolchain")]
+    #[structopt(long)]
     toolchain: Option<String>,
 
     /// Directory for all generated artifacts
-    #[structopt(long = "target-dir")]
+    #[structopt(long)]
     target_dir: Option<String>,
 
     /// Build the standard library with the provided configuration
-    #[structopt(long = "build-std")]
+    #[structopt(long)]
     build_std: bool,
 }
 

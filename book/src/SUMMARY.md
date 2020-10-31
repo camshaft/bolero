@@ -10,5 +10,6 @@
     - [Structured Testing](./features/structured-testing.md)
     - [Unified Interface](./features/unified-interface.md)
     - [Private Testing](./features/private-testing.md)
+    - [Miri Support](./features/miri.md)
 - [Tutorials](./tutorials/index.md)
     - [Fibonacci](./tutorials/fibonacci.md)

@@ -45,7 +45,7 @@ fn main() {
 Now let's fuzz our `fibonacci` function:
 
 ```bash
-$ cargo bolero fuzz fibonacci_test
+$ cargo bolero test fibonacci_test
     Finished test [unoptimized + debuginfo] target(s) in 0.10s
      Running target/fuzz/build_62a8ab526939db81/x86_64-apple-darwin/debug/deps/fibonacci_test-f9f8f1dcc806b6b6
 ...
@@ -80,10 +80,10 @@ pub fn fibonacci(number: u64) -> Option<u64> {
 }
 ```
 
-After running the `fuzz` command for a few minutes things are looking better:
+After running the `test` command for a few minutes things are looking better:
 
 ```bash
-$ cargo bolero fuzz fibonacci_test
+$ cargo bolero test fibonacci_test
     Finished test [unoptimized + debuginfo] target(s) in 0.10s
      Running target/fuzz/build_62a8ab526939db81/x86_64-apple-darwin/debug/deps/fibonacci_test-f9f8f1dcc806b6b6
 ...

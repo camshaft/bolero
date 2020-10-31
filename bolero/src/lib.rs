@@ -35,7 +35,7 @@ use core::{fmt::Debug, marker::PhantomData};
 /// Execute fuzz tests for a given target
 ///
 /// This should be executed in a separate test target, for example
-/// `tests/my_fuzz_target/main.rs`.
+/// `tests/my_test_target/main.rs`.
 ///
 /// # Examples
 ///

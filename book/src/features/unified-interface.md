@@ -13,14 +13,14 @@ LibFuzzer is linked with the library under test, and feeds fuzzed inputs to the 
 The `libfuzzer` engine can be selected like so:
 
 ```bash
-$ cargo bolero fuzz --fuzzer libfuzzer my_fuzz_target
+$ cargo bolero test --engine libfuzzer my_test_target
 ```
 
-Currently, it is also the default engine when fuzzing:
+Currently, it is also the default engine:
 
 ```bash
-# will use --fuzzer libfuzzer
-$ cargo bolero fuzz my_fuzz_target
+# will use --engine libfuzzer
+$ cargo bolero test my_test_target
 ```
 
 ## AFL
@@ -32,7 +32,7 @@ American fuzzy lop is a security-oriented fuzzer that employs a novel type of co
 The `afl` engine can be selected like so:
 
 ```bash
-$ cargo bolero fuzz --fuzzer afl my_fuzz_target
+$ cargo bolero test --engine afl my_test_target
 ```
 
 ## Honggfuzz
@@ -44,6 +44,6 @@ Honggfuzz is a security oriented fuzzer with powerful analysis options. Supports
 The `honggfuzz` engine can be selected like so:
 
 ```bash
-$ cargo bolero fuzz --fuzzer honggfuzz my_fuzz_target
+$ cargo bolero test --engine honggfuzz my_test_target
 ```
 

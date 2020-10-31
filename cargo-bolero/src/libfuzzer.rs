@@ -1,4 +1,4 @@
-use crate::{exec, FuzzArgs, ReduceArgs, Selection};
+use crate::{exec, reduce, test, Selection};
 use anyhow::{anyhow, Result};
 use bit_set::BitSet;
 use core::cmp::Ordering;
@@ -29,7 +29,7 @@ const FLAGS: &[&str] = &[
     "-Cllvm-args=-sanitizer-coverage-stack-depth",
 ];
 
-pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
@@ -42,18 +42,18 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     let mut args = vec![
         format!("{}", corpus_dir.display()),
         format!("-artifact_prefix={}/", crashes_dir.display()),
-        format!("-timeout={}", fuzz.timeout_as_secs()),
+        format!("-timeout={}", test_args.timeout_as_secs()),
     ];
 
-    optional_arg!(args, fuzz.seed, "-seed={}");
-    optional_arg!(args, fuzz.runs, "-runs={}");
-    optional_arg!(args, fuzz.time_as_secs(), "-max_total_time={}");
-    optional_arg!(args, fuzz.max_input_length, "-max_len={}");
+    optional_arg!(args, test_args.seed, "-seed={}");
+    optional_arg!(args, test_args.runs, "-runs={}");
+    optional_arg!(args, test_args.time_as_secs(), "-max_total_time={}");
+    optional_arg!(args, test_args.max_input_length, "-max_len={}");
 
     // TODO figure out log file location
-    optional_arg!(args, fuzz.jobs, "-jobs={}");
+    optional_arg!(args, test_args.jobs, "-jobs={}");
 
-    args.extend(fuzz.fuzzer_args.iter().cloned());
+    args.extend(test_args.engine_args.iter().cloned());
 
     cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 
@@ -62,7 +62,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
+pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "libfuzzer")?;
     let corpus_dir = test_target.corpus_dir();
     let tmp_corpus = test_target.temp_dir()?;
@@ -81,7 +81,7 @@ pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
         "-merge_inner=1".to_string(),
     ];
 
-    args.extend(reduce.fuzzer_args.iter().cloned());
+    args.extend(reduce.engine_args.iter().cloned());
 
     cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
 

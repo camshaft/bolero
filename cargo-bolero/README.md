@@ -20,7 +20,7 @@ $ sudo apt install binutils-dev libunwind-dev
 ## fuzz
 
 ```bash
-Run a fuzzing engine for a target
+Run an engine for a target
 
 USAGE:
     cargo-bolero fuzz [FLAGS] [OPTIONS] <test>
@@ -34,17 +34,17 @@ FLAGS:
 
 OPTIONS:
         --features <features>                    Space-separated list of features to activate
-    -f, --fuzzer <fuzzer>                        Run the test with a specific fuzzer [default: libfuzzer]
+    -e, --engine <engine>                        Run the test with a specific engine [default: libfuzzer]
     -j, --jobs <jobs>                            Number of parallel jobs
         --manifest-path <manifest-path>          Path to Cargo.toml
     -l, --max-input-length <max-input-length>    Limit the size of inputs to a specific length
     -p, --package <package>                      Package to run tests for
-    -r, --runs <runs>                            Run the fuzzer for a specified number of runs
+    -r, --runs <runs>                            Run the engine for a specified number of runs
     -s, --sanitizer <sanitizer>...               Build with the sanitizer enabled
-    -S, --seed <seed>                            Run the fuzzer with an initial seed
+    -S, --seed <seed>                            Run the engine with an initial seed
         --target <target>                        Build for the target triple
         --target_dir <target-dir>                Directory for all generated artifacts
-    -T, --time <time>                            Run the fuzzer for a specified number of seconds
+    -T, --time <time>                            Run the engine for a specified number of seconds
         --toolchain <toolchain>                  Use a rustup toolchain to execute cargo build
 
 ARGS:
@@ -54,7 +54,7 @@ ARGS:
 ## reduce
 
 ```bash
-Reduce the corpus of a test target with a fuzzing engine
+Reduce the corpus of a test target with an engine
 
 USAGE:
     cargo-bolero reduce [FLAGS] [OPTIONS] <test>
@@ -68,7 +68,7 @@ FLAGS:
 
 OPTIONS:
         --features <features>              Space-separated list of features to activate
-    -f, --fuzzer <fuzzer>                  Run the test with a specific fuzzer [default: libfuzzer]
+    -e, --engine <engine>                  Run the test with a specific engine [default: libfuzzer]
         --manifest-path <manifest-path>    Path to Cargo.toml
     -p, --package <package>                Package to run tests for
     -s, --sanitizer <sanitizer>...         Build with the sanitizer enabled
