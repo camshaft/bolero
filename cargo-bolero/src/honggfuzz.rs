@@ -1,4 +1,4 @@
-use crate::{FuzzArgs, ReduceArgs, Selection};
+use crate::{reduce, test, Selection};
 use anyhow::Result;
 use std::fs;
 
@@ -30,7 +30,7 @@ macro_rules! optional_arg {
     };
 }
 
-pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
@@ -46,17 +46,17 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         "--workspace".to_string(),
         crashes_dir.to_str().unwrap().to_string(),
         "--timeout".to_string(),
-        format!("{}", fuzz.timeout_as_secs()),
+        format!("{}", test_args.timeout_as_secs()),
         // make it consistent with libfuzzer
         "--exit_upon_crash".to_string(),
     ];
 
-    optional_arg!(args, "--run_timeout", fuzz.time_as_secs());
-    optional_arg!(args, "--iterations", fuzz.runs);
-    optional_arg!(args, "--threads", fuzz.jobs);
-    optional_arg!(args, "--max_file_size", fuzz.max_input_length);
+    optional_arg!(args, "--run_timeout", test_args.time_as_secs());
+    optional_arg!(args, "--iterations", test_args.runs);
+    optional_arg!(args, "--threads", test_args.jobs);
+    optional_arg!(args, "--max_file_size", test_args.max_input_length);
 
-    args.extend(fuzz.fuzzer_args.iter().cloned());
+    args.extend(test_args.engine_args.iter().cloned());
 
     args.push("--".to_string());
 
@@ -71,7 +71,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
+pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
     let corpus_dir = test_target.corpus_dir();
     let crashes_dir = test_target.crashes_dir();
@@ -89,7 +89,7 @@ pub(crate) fn reduce(selection: &Selection, reduce: &ReduceArgs) -> Result<()> {
         "-M".to_string(),
     ];
 
-    args.extend(reduce.fuzzer_args.iter().cloned());
+    args.extend(reduce.engine_args.iter().cloned());
 
     args.push("--".to_string());
     for (k, v) in test_target.command_env() {

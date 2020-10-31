@@ -1,4 +1,4 @@
-use crate::{FuzzArgs, ReduceArgs, Selection};
+use crate::{reduce, test, Selection};
 use anyhow::Result;
 use std::fs;
 
@@ -16,7 +16,7 @@ fn bin() -> String {
         .to_string()
 }
 
-pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
+pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "afl")?;
     let corpus_dir = test_target.corpus_dir();
     let afl_state = test_target.workdir().join("afl_state");
@@ -29,7 +29,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         fs::write(corpus_dir.join("initial"), "file to make AFL happy")?;
     }
 
-    if let Some(runs) = fuzz.runs {
+    if let Some(runs) = test_args.runs {
         std::env::set_var("AFL_EXIT_WHEN_DONE", "1");
         let cycles = runs / 100_000; // a cycle is about 100,000 runs
         std::env::set_var("BOLERO_AFL_MAX_CYCLES", format!("{}", cycles));
@@ -43,7 +43,7 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
         afl_state.to_str().unwrap().to_string(),
     ];
 
-    args.extend(fuzz.fuzzer_args.iter().cloned());
+    args.extend(test_args.engine_args.iter().cloned());
 
     args.push("--".to_string());
 
@@ -58,6 +58,6 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reduce(_selection: &Selection, _shrink: &ReduceArgs) -> Result<()> {
+pub(crate) fn reduce(_selection: &Selection, _reduce_args: &reduce::Args) -> Result<()> {
     todo!()
 }

@@ -38,56 +38,56 @@ test_fuzzers: libfuzzer honggfuzz afl
 
 libfuzzer honggfuzz:
 	@cargo run \
-	    fuzz \
+	    test \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
-	    fuzz \
+	    test \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
-	    fuzz \
+	    test \
 	    fuzz_operations \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 1000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \
 	    fuzz_operations \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@SHOULD_PANIC=1 cargo run \
-	    fuzz \
+	    test \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
@@ -95,16 +95,16 @@ libfuzzer honggfuzz:
 	    reduce \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
-	    fuzz \
+	    test \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
@@ -112,52 +112,52 @@ libfuzzer honggfuzz:
 	    reduce \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
-	    fuzz \
+	    test \
 	    tests::panicking_generator_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 1000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    || true # TODO make this consistent
 
 afl:
 	@cargo run \
-	    fuzz \
+	    test \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
-	    fuzz \
+	    test \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@SHOULD_PANIC=1 cargo run \
-	    fuzz \
+	    test \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
 	@SHOULD_PANIC=1 cargo run \
-	    fuzz \
+	    test \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
-	    --fuzzer $@ \
+	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
