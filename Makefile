@@ -58,7 +58,7 @@ libfuzzer honggfuzz:
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
 	    --engine $@ \
-	    --release \
+	    --release true \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
 	    reduce \

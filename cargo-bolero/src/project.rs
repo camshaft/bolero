@@ -17,9 +17,9 @@ pub struct Project {
     #[structopt(long)]
     all_features: bool,
 
-    /// Build artifacts in release mode, with optimizations
+    /// Build artifacts in release mode, with optimizations [default: true]
     #[structopt(long)]
-    release: bool,
+    release: Option<Option<bool>>,
 
     /// Do not activate the `default` feature
     #[structopt(long)]
@@ -77,7 +77,7 @@ impl Project {
 
         cmd.arg(call).arg("--target").arg(&self.target);
 
-        if self.release {
+        if self.release() {
             cmd.arg("--release");
         }
 
@@ -138,15 +138,20 @@ impl Project {
         .iter()
         .chain(flags.iter())
         .cloned()
-        .map(String::from)
-        .chain(self.sanitizer_flags())
-        .chain(std::env::var(inherits).ok())
         // https://github.com/rust-lang/rust/issues/53945
         .chain(if cfg!(target_os = "linux") {
-            Some("-Clink-arg=-fuse-ld=gold".to_string())
+            Some("-Clink-arg=-fuse-ld=gold")
         } else {
             None
         })
+        .chain(if self.release() {
+            Some("-Ccodegen-units=1")
+        } else {
+            None
+        })
+        .map(String::from)
+        .chain(self.sanitizer_flags())
+        .chain(std::env::var(inherits).ok())
         .collect::<Vec<_>>()
         .join(" ")
     }
@@ -165,5 +170,13 @@ impl Project {
     fn sanitizer_flags(&self) -> impl Iterator<Item = String> + '_ {
         self.sanitizers()
             .map(|sanitizer| format!("-Zsanitizer={}", sanitizer))
+    }
+
+    fn release(&self) -> bool {
+        match self.release {
+            None => true,
+            Some(None) => true,
+            Some(Some(v)) => v,
+        }
     }
 }
