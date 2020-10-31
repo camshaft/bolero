@@ -1,9 +1,9 @@
-use crate::{fuzz::FuzzArgs, reduce::ReduceArgs, selection::Selection};
+use crate::{reduce, selection::Selection, test};
 use anyhow::Error;
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub enum Fuzzer {
+pub enum Engine {
     Libfuzzer,
 
     #[cfg(feature = "afl")]
@@ -13,20 +13,20 @@ pub enum Fuzzer {
     Honggfuzz,
 }
 
-impl Fuzzer {
-    pub fn fuzz(&self, selection: &Selection, args: &FuzzArgs) -> Result<(), Error> {
+impl Engine {
+    pub fn test(&self, selection: &Selection, args: &test::Args) -> Result<(), Error> {
         match self {
-            Self::Libfuzzer => crate::libfuzzer::fuzz(selection, args),
+            Self::Libfuzzer => crate::libfuzzer::test(selection, args),
 
             #[cfg(feature = "afl")]
-            Self::Afl => crate::afl::fuzz(selection, args),
+            Self::Afl => crate::afl::test(selection, args),
 
             #[cfg(feature = "honggfuzz")]
-            Self::Honggfuzz => crate::honggfuzz::fuzz(selection, args),
+            Self::Honggfuzz => crate::honggfuzz::test(selection, args),
         }
     }
 
-    pub fn reduce(&self, selection: &Selection, args: &ReduceArgs) -> Result<(), Error> {
+    pub fn reduce(&self, selection: &Selection, args: &reduce::Args) -> Result<(), Error> {
         match self {
             Self::Libfuzzer => crate::libfuzzer::reduce(selection, args),
 
@@ -39,7 +39,7 @@ impl Fuzzer {
     }
 }
 
-impl FromStr for Fuzzer {
+impl FromStr for Engine {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {

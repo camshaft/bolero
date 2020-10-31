@@ -1,18 +1,11 @@
-use crate::{
-    fuzz::{Fuzz, FuzzArgs},
-    list::List,
-    new::New,
-    reduce::{Reduce, ReduceArgs},
-    selection::Selection,
-};
+use crate::{list::List, new::New, reduce::Reduce, selection::Selection, test::Test};
 use anyhow::{anyhow, Result};
 use std::io::Write;
 use structopt::StructOpt;
 
 #[cfg(feature = "afl")]
 mod afl;
-mod fuzz;
-mod fuzzer;
+mod engine;
 #[cfg(feature = "honggfuzz")]
 mod honggfuzz;
 mod libfuzzer;
@@ -22,12 +15,13 @@ mod new;
 mod project;
 mod reduce;
 mod selection;
+mod test;
 mod test_target;
 
 #[derive(Debug, StructOpt)]
 #[allow(clippy::large_enum_variant)]
 enum Commands {
-    Fuzz(Fuzz),
+    Test(Test),
     Reduce(Reduce),
     New(New),
     List(List),
@@ -36,7 +30,7 @@ enum Commands {
 impl Commands {
     fn exec(&self) -> Result<()> {
         match self {
-            Self::Fuzz(cmd) => cmd.exec(),
+            Self::Test(cmd) => cmd.exec(),
             Self::Reduce(cmd) => cmd.exec(),
             Self::New(cmd) => cmd.exec(),
             Self::List(cmd) => cmd.exec(),
