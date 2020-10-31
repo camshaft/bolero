@@ -2104,7 +2104,7 @@ EXP_ST void init_forkserver(char** argv) {
        falling through. */
 
     *(u32*)trace_bits = EXEC_FAIL_SIG;
-    exit(0);
+    exit(unique_crashes > 0 ? 1 : 0);
 
   }
 
@@ -2367,7 +2367,7 @@ static u8 run_target(char** argv, u32 timeout) {
          falling through. */
 
       *(u32*)trace_bits = EXEC_FAIL_SIG;
-      exit(0);
+      exit(unique_crashes > 0 ? 1 : 0);
 
     }
 
@@ -8155,7 +8155,7 @@ stop_fuzzing:
 
   OKF("We're done here. Have a nice day!\n");
 
-  exit(0);
+  exit(unique_crashes > 0 ? 1 : 0);
 
 }
 

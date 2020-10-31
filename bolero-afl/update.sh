@@ -37,3 +37,8 @@ replace \
 replace \
     's/#include "hash.h"/#include "hash.h"\'$'\n#include "..\/src\/bolero-afl-util.h"/' \
     "$project_dir/afl/afl-fuzz.c"
+
+# make the process exit with a non-zero status code
+replace \
+    's/exit(0)/exit(unique_crashes > 0 ? 1 : 0)/' \
+    "$project_dir/afl/afl-fuzz.c"

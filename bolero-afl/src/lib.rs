@@ -125,7 +125,10 @@ pub mod bin {
             .chain(Some(core::ptr::null())) // add a null pointer to the end
             .collect::<Vec<_>>();
 
-        afl_fuzz_main(args.len() as c_int, c_args.as_ptr());
+        let status = afl_fuzz_main(args.len() as c_int, c_args.as_ptr());
+        if status != 0 {
+            std::process::exit(status);
+        }
     }
 }
 
