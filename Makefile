@@ -1,8 +1,8 @@
 SANITIZER ?= NONE
 
-test: test_bolero test_fuzzers test_examples
+test: unit-tests test_fuzzers examples-tests
 
-test_examples: test_basic_example test_workspace_example
+examples-tests: test_basic_example test_workspace_example
 
 test_basic_example:
 	@$(MAKE) test_example \
@@ -31,7 +31,7 @@ test_example:
 	    -- \
 	    --nocapture $(TEST_THREADS)
 
-test_bolero:
+unit-tests:
 	@cargo test
 
 test_fuzzers: libfuzzer honggfuzz afl
@@ -143,6 +143,7 @@ afl:
 	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER)
+	@rm -rf examples/basic/src/__fuzz__
 	@SHOULD_PANIC=1 cargo run \
 	    test \
 	    tests::add_test \
@@ -152,6 +153,7 @@ afl:
 	    --release \
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
+	@rm -rf examples/basic/src/__fuzz__
 	@SHOULD_PANIC=1 cargo run \
 	    test \
 	    tests::other_test \

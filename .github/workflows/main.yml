@@ -40,19 +40,48 @@ jobs:
       matrix:
         rust: [1.42.0, stable, beta, nightly]
         os: [ubuntu-latest, macOS-latest]
+        test: [unit-tests, libfuzzer, honggfuzz, afl, examples-tests]
         sanitizer: [NONE]
         include:
           - rust: nightly
             os: ubuntu-latest
+            test: libfuzzer
+            sanitizer: address
+          - rust: nightly
+            os: ubuntu-latest
+            test: honggfuzz
+            sanitizer: address
+          - rust: nightly
+            os: ubuntu-latest
+            test: afl
             sanitizer: address
           - rust: nightly
             os: macOS-latest
+            test: libfuzzer
+            sanitizer: address
+          - rust: nightly
+            os: macOS-latest
+            test: honggfuzz
+            sanitizer: address
+          - rust: nightly
+            os: macOS-latest
+            test: afl
             sanitizer: address
 
     steps:
-    - name: Ubuntu Dependencies
+    - name: Ubuntu setup
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install binutils-dev libunwind-dev
+      run: |
+        sudo apt-get install binutils-dev libunwind-dev
+        echo 'core' | sudo tee /proc/sys/kernel/core_pattern
+
+    - name: macOS setup
+      if: matrix.os == 'macOS-latest'
+      run: |
+        export SL=/System/Library
+        export PL=com.apple.ReportCrash
+        launchctl unload -w ${SL}/LaunchAgents/${PL}.plist
+        sudo launchctl unload -w ${SL}/LaunchDaemons/${PL}.Root.plist
 
     - uses: hecrj/setup-rust-action@v1
       with:
@@ -60,24 +89,10 @@ jobs:
 
     - uses: actions/checkout@master
 
-    - name: tests
-      run: make test_bolero
-
-    - name: libFuzzer
-      run: make libfuzzer
-      env:
-        SANITIZER: ${{ matrix.sanitizer }}
-
-    - name: honggfuzz
-      run: make honggfuzz
-      env:
-        SANITIZER: ${{ matrix.sanitizer }}
-
-    - name: afl
-      run: make afl
+    - name: ${{ matrix.test }}
+      run: make ${{ matrix.test }}
       env:
         AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
-        # SANITIZER: ${{ matrix.sanitizer }}
+        AFL_SKIP_CPUFREQ: 1
+        SANITIZER: ${{ matrix.sanitizer }}
 
-    - name: examples
-      run: make test_examples
