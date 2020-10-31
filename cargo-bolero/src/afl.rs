@@ -24,6 +24,11 @@ pub(crate) fn fuzz(selection: &Selection, fuzz: &FuzzArgs) -> Result<()> {
     fs::create_dir_all(&afl_state)?;
     fs::create_dir_all(&corpus_dir)?;
 
+    // if the corpus dir is empty create an initial file to make AFL happy
+    if corpus_dir.read_dir()?.next().is_none() {
+        fs::write(corpus_dir.join("initial"), "file to make AFL happy")?;
+    }
+
     if let Some(runs) = fuzz.runs {
         std::env::set_var("AFL_EXIT_WHEN_DONE", "1");
         let cycles = runs / 100_000; // a cycle is about 100,000 runs
