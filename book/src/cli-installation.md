@@ -1,6 +1,6 @@
 # CLI Installation
 
-`bolero` provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:
+`bolero` provides a CLI program to execute tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:
 
 ```bash
 $ cargo install cargo-bolero -f

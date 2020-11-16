@@ -37,7 +37,7 @@ pub struct Args {
     #[structopt(short = "l", long)]
     pub max_input_length: Option<usize>,
 
-    /// Maximum amount of time to run a fuzz target before
+    /// Maximum amount of time to run a test target before
     /// failing
     #[structopt(short, long, default_value = "10s")]
     pub timeout: Duration,

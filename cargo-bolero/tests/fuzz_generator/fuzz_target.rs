@@ -1,7 +1,7 @@
-use bolero::fuzz;
+use bolero::check;
 
 fn main() {
-    fuzz!().with_type().for_each(|value: &u64| {
+    check!().with_type().for_each(|value: &u64| {
         // TODO implement checks
         let _ = value;
     });

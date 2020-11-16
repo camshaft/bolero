@@ -1,11 +1,11 @@
 use basic::add;
-use bolero::fuzz;
+use bolero::check;
 use std::env;
 
 fn main() {
     let should_panic = env::var("SHOULD_PANIC").is_ok();
 
-    fuzz!().for_each(|input| {
+    check!().for_each(|input| {
         if input.len() < 2 {
             return;
         }

@@ -5,7 +5,7 @@
 [![Documentation](https://docs.rs/bolero/badge.svg)](https://docs.rs/bolero)
 [![License](https://img.shields.io/crates/l/bolero.svg)](https://github.com/camshaft/bolero/blob/master/LICENSE)
 
-fuzz and property testing framework
+fuzz and property testing front-end for Rust
 
 ## Book
 

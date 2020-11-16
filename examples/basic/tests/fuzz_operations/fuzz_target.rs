@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use bolero::{fuzz, generator::*};
+use bolero::{check, generator::*};
 use std::collections::LinkedList;
 
 #[derive(Debug, TypeGenerator)]
@@ -16,7 +16,7 @@ fn main() {
         32
     };
 
-    fuzz!()
+    check!()
         .with_generator(gen::<Vec<Operation>>().with().len(0usize..=len))
         .for_each(|operations| {
             let mut subject: ArrayVec<[_; 32]> = ArrayVec::new();

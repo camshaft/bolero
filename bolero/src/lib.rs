@@ -32,7 +32,7 @@ use bolero_generator::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-/// Execute fuzz tests for a given target
+/// Execute tests for a given target
 ///
 /// This should be executed in a separate test target, for example
 /// `tests/my_test_target/main.rs`.
@@ -45,10 +45,10 @@ use core::{fmt::Debug, marker::PhantomData};
 /// handles raw bytes, e.g. a parser.
 ///
 /// ```rust
-/// use bolero::fuzz;
+/// use bolero::check;
 ///
 /// fn main() {
-///     fuzz!().for_each(|input| {
+///     check!().for_each(|input| {
 ///         // implement checks here
 ///     });
 /// }
@@ -62,10 +62,10 @@ use core::{fmt::Debug, marker::PhantomData};
 /// structured input.
 ///
 /// ```rust
-/// use bolero::fuzz;
+/// use bolero::check;
 ///
 /// fn main() {
-///     fuzz!()
+///     check!()
 ///         .with_type::<(u8, u16)>()
 ///         .for_each(|(a, b)| {
 ///             // implement checks here
@@ -83,10 +83,10 @@ use core::{fmt::Debug, marker::PhantomData};
 /// two values, one being between 0 and 100, the other: 10 and 50.
 ///
 /// ```rust
-/// use bolero::fuzz;
+/// use bolero::check;
 ///
 /// fn main() {
-///     fuzz!()
+///     check!()
 ///         .with_generator((0..100, 10..50))
 ///         .for_each(|(a, b)| {
 ///             // implement checks here
@@ -103,17 +103,17 @@ use core::{fmt::Debug, marker::PhantomData};
 ///   some editors and IDEs.
 ///
 /// ```rust
-/// use bolero::fuzz;
+/// use bolero::check;
 ///
 /// fn main() {
-///     fuzz!(|input| {
+///     check!(|input| {
 ///         // implement checks here
 ///     });
 /// }
 /// ```
 
 #[macro_export]
-macro_rules! fuzz {
+macro_rules! check {
     () => {{
         let location = $crate::TargetLocation {
             package_name: env!("CARGO_PKG_NAME"),
@@ -129,16 +129,16 @@ macro_rules! fuzz {
             return;
         }
 
-        $crate::fuzz(location)
+        $crate::test(location)
     }};
     ($fun:path) => {
-        $crate::fuzz!(|input| { $fun(input) })
+        $crate::check!(|input| { $fun(input) })
     };
     (| $input:ident $(: &[u8])? | $impl:expr) => {
-        $crate::fuzz!().for_each(|$input: &[u8]| $impl)
+        $crate::check!().for_each(|$input: &[u8]| $impl)
     };
     (| $input:ident : $ty:ty | $impl:expr) => {
-        $crate::fuzz!().with_type().for_each(|$input: $ty| $impl)
+        $crate::check!().with_type().for_each(|$input: $ty| $impl)
     };
     (name = $target_name:expr) => {{
         let location = $crate::TargetLocation {
@@ -155,8 +155,16 @@ macro_rules! fuzz {
             return;
         }
 
-        $crate::fuzz(location)
+        $crate::test(location)
     }};
+}
+
+#[macro_export]
+#[deprecated = "`fuzz!` has been deprecated in favor of `check!`."]
+macro_rules! fuzz {
+    ($($arg:tt)*) => {
+        $crate::check!($($arg)*)
+    }
 }
 
 /// Configuration for a test target
@@ -176,7 +184,7 @@ pub struct BorrowedInput;
 pub struct ClonedInput;
 
 #[doc(hidden)]
-pub fn fuzz(
+pub fn test(
     location: TargetLocation,
 ) -> TestTarget<ByteSliceGenerator, DefaultEngine, BorrowedInput> {
     TestTarget::new(DefaultEngine::new(location))
@@ -298,7 +306,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         }
     }
 
-    /// Set the driver mode for the fuzz target
+    /// Set the driver mode for the test target
     pub fn with_driver_mode(self, mode: DriverMode) -> Self {
         TestTarget {
             driver_mode: Some(mode),
@@ -418,7 +426,7 @@ impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
 #[test]
 #[should_panic]
 fn slice_generator_test() {
-    fuzz!().for_each(|input| {
+    check!().for_each(|input| {
         assert!(input.len() > 1000);
     });
 }
@@ -426,7 +434,7 @@ fn slice_generator_test() {
 #[test]
 #[should_panic]
 fn type_generator_test() {
-    fuzz!().with_type().for_each(|input: &u8| {
+    check!().with_type().for_each(|input: &u8| {
         assert!(input < &128);
     });
 }
@@ -434,21 +442,21 @@ fn type_generator_test() {
 #[test]
 #[should_panic]
 fn type_generator_cloned_test() {
-    fuzz!().with_type().cloned().for_each(|input: u8| {
+    check!().with_type().cloned().for_each(|input: u8| {
         assert!(input < 128);
     });
 }
 
 #[test]
 fn range_generator_test() {
-    fuzz!().with_generator(0..=5).for_each(|_input: &u8| {
+    check!().with_generator(0..=5).for_each(|_input: &u8| {
         // println!("{:?}", input);
     });
 }
 
 #[test]
 fn range_generator_cloned_test() {
-    fuzz!()
+    check!()
         .with_generator(0..=5)
         .cloned()
         .for_each(|_input: u8| {
@@ -462,7 +470,7 @@ mod tests {
 
     #[test]
     fn nested_test() {
-        fuzz!().with_generator(0..=5).for_each(|_input: &u8| {
+        check!().with_generator(0..=5).for_each(|_input: &u8| {
             // println!("{:?}", input);
         });
     }
