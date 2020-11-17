@@ -151,14 +151,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1><a class="header" href="#introduction" id="introduction">Introduction</a></h1>
-<p>Bolero is a fuzzing and property testing framework for Rust programs.</p>
+<p>Bolero is a fuzzing and property testing front-end framework for Rust.</p>
 <p>From <a href="https://en.wikipedia.org/wiki/Fuzzing">Wikipedia</a>, fuzzing is described as:</p>
 <blockquote>
 <p>Fuzzing or fuzz testing is an automated software testing technique that involves providing invalid, unexpected, or random data as inputs to a computer program. The program is then monitored for exceptions such as crashes, failing built-in code assertions, or potential memory leaks.</p>
 </blockquote>
 <p><code>bolero</code>'s goal is to make implementing high-quality tests as painless and approachable as possible.</p>
 <h1><a class="header" href="#cli-installation" id="cli-installation">CLI Installation</a></h1>
-<p><code>bolero</code> provides a CLI program to execute fuzz tests, <a href="https://crates.io/crates/cargo-bolero"><code>cargo-bolero</code></a>. It can be installed globally with cargo:</p>
+<p><code>bolero</code> provides a CLI program to execute tests, <a href="https://crates.io/crates/cargo-bolero"><code>cargo-bolero</code></a>. It can be installed globally with cargo:</p>
 <pre><code class="language-bash">$ cargo install cargo-bolero -f
 </code></pre>
 <h2><a class="header" href="#linux-installation" id="linux-installation">Linux Installation</a></h2>
@@ -235,7 +235,7 @@ test result: ok. 1007 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </blockquote>
 <h2><a class="header" href="#example" id="example">Example</a></h2>
 <p>Let's suppose we're testing a <code>MySet</code> data structure:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -246,7 +246,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();
@@ -376,7 +376,7 @@ enum Operation {
 <span class="boring">}
 </span></code></pre></pre>
 <p>Note that we've added <code>TypeGenerator</code> to the list of derives. This enables <code>bolero</code> to generate random values for <code>Operation</code>. We can combine that with a <code>Vec&lt;Operation&gt;</code> and get a list of operations to perform on our <code>MySet</code> data structure.</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -387,7 +387,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();
@@ -409,7 +409,7 @@ fn main() {
 }
 </code></pre></pre>
 <p>This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 use std::collections::HashSet;
 
@@ -421,7 +421,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();
@@ -486,7 +486,7 @@ $ cargo bolero test my_test_target
 </span><span class="boring">fn main() {
 </span>#[test]
 fn my_property_test() {
-    bolero::fuzz!()
+    bolero::check!()
         .with_type()
         .cloned()
         .for_each(|value: u64| {
@@ -528,12 +528,12 @@ pub fn fibonacci(number: u64) -&gt; u64 {
 <p>Now we define a test:</p>
 <pre><code class="language-bash">$ cargo bolero new fibonacci_test --generator
 </code></pre>
-<pre><pre class="playpen"><code class="language-rust">// tests/fibonacci_test/fuzz_target.rs
-use bolero::fuzz;
+<pre><pre class="playpen"><code class="language-rust">// tests/fibonacci_test/test_target.rs
+use bolero::check;
 use my_fibonacci::fibonacci;
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type()
         .cloned()
         .for_each(|number: u64| {
@@ -546,7 +546,7 @@ fn main() {
     Finished test [unoptimized + debuginfo] target(s) in 0.10s
      Running target/fuzz/build_62a8ab526939db81/x86_64-apple-darwin/debug/deps/fibonacci_test-f9f8f1dcc806b6b6
 ...
-thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/fuzz_target.rs:8:9
+thread 'main' panicked at 'attempt to add with overflow', my_fibonacci/tests/fibonacci_test/test_target.rs:8:9
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 ======================== Test Failure ========================

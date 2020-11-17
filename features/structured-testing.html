@@ -172,7 +172,7 @@ enum Operation {
 <span class="boring">}
 </span></code></pre></pre>
 <p>Note that we've added <code>TypeGenerator</code> to the list of derives. This enables <code>bolero</code> to generate random values for <code>Operation</code>. We can combine that with a <code>Vec&lt;Operation&gt;</code> and get a list of operations to perform on our <code>MySet</code> data structure.</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -183,7 +183,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();
@@ -205,7 +205,7 @@ fn main() {
 }
 </code></pre></pre>
 <p>This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 use std::collections::HashSet;
 
@@ -217,7 +217,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();

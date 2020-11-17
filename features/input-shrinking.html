@@ -158,7 +158,7 @@
 </blockquote>
 <h2><a class="header" href="#example" id="example">Example</a></h2>
 <p>Let's suppose we're testing a <code>MySet</code> data structure:</p>
-<pre><pre class="playpen"><code class="language-rust">use bolero::{fuzz, generator::*};
+<pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -169,7 +169,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::&lt;Vec&lt;Operation&gt;&gt;()
         .for_each(|operations| {
             let mut set = MySet::new();
