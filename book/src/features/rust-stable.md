@@ -4,7 +4,7 @@
 
 ```bash
 # does not require nightly
-$ cargo bolero test my_test_target
+$ cargo bolero test my_test_target --sanitizer NONE
 ```
 
 ## Sanitizer support
