@@ -15,7 +15,7 @@ From [PropEr Testing](https://propertesting.com/book_shrinking.html):
 Let's suppose we're testing a `MySet` data structure:
 
 ```rust
-use bolero::{fuzz, generator::*};
+use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -26,7 +26,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::<Vec<Operation>>()
         .for_each(|operations| {
             let mut set = MySet::new();

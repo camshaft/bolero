@@ -5,7 +5,7 @@
 ```rust
 #[test]
 fn my_property_test() {
-    bolero::fuzz!()
+    bolero::check!()
         .with_type()
         .cloned()
         .for_each(|value: u64| {

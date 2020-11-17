@@ -26,7 +26,7 @@ enum Operation {
 Note that we've added `TypeGenerator` to the list of derives. This enables `bolero` to generate random values for `Operation`. We can combine that with a `Vec<Operation>` and get a list of operations to perform on our `MySet` data structure.
 
 ```rust
-use bolero::{fuzz, generator::*};
+use bolero::{check, generator::*};
 use my_set::MySet;
 
 #[derive(Debug, TypeGenerator)]
@@ -37,7 +37,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::<Vec<Operation>>()
         .for_each(|operations| {
             let mut set = MySet::new();
@@ -62,7 +62,7 @@ fn main() {
 This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of `MySet` is actually correct. Here we'll use `HashSet` from the `std` library:
 
 ```rust
-use bolero::{fuzz, generator::*};
+use bolero::{check, generator::*};
 use my_set::MySet;
 use std::collections::HashSet;
 
@@ -74,7 +74,7 @@ enum Operation {
 }
 
 fn main() {
-    fuzz!()
+    check!()
         .with_type::<Vec<Operation>>()
         .for_each(|operations| {
             let mut set = MySet::new();

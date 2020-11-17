@@ -1,6 +1,6 @@
 # Introduction
 
-Bolero is a fuzzing and property testing framework for Rust programs.
+Bolero is a fuzzing and property testing front-end framework for Rust.
 
 From [Wikipedia](https://en.wikipedia.org/wiki/Fuzzing), fuzzing is described as:
 

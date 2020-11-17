@@ -1,8 +1,8 @@
-use bolero::fuzz;
+use bolero::check;
 use crate_b::run;
 
 fn main() {
-    fuzz!().with_type().cloned().for_each(|(a, b)| {
+    check!().with_type().cloned().for_each(|(a, b)| {
         run(a, b);
     });
 }

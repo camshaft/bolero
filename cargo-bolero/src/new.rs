@@ -46,7 +46,7 @@ impl New {
         let target_dir = manifest_dir.join("tests").join(&self.test);
 
         mkdir(&target_dir);
-        write(target_dir.join("fuzz_target.rs"), file);
+        write(target_dir.join("test_target.rs"), file);
 
         mkdir(target_dir.join("corpus"));
         write(target_dir.join("corpus").join(".gitkeep"), "");
@@ -64,7 +64,7 @@ impl New {
                     r#"
 [[test]]
 name = "{name}"
-path = "tests/{name}/fuzz_target.rs"
+path = "tests/{name}/test_target.rs"
 harness = false
 "#,
                     name = self.test

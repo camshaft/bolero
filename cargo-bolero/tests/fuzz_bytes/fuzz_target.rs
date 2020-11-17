@@ -1,7 +1,7 @@
-use bolero::fuzz;
+use bolero::check;
 
 fn main() {
-    fuzz!().for_each(|input: &[u8]| {
+    check!().for_each(|input: &[u8]| {
         // TODO implement checks
         let _ = input;
     });

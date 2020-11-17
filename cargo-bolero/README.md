@@ -23,7 +23,7 @@ $ sudo apt install binutils-dev libunwind-dev
 Run an engine for a target
 
 USAGE:
-    cargo-bolero fuzz [FLAGS] [OPTIONS] <test>
+    cargo bolero test [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features
@@ -57,7 +57,7 @@ ARGS:
 Reduce the corpus of a test target with an engine
 
 USAGE:
-    cargo-bolero reduce [FLAGS] [OPTIONS] <test>
+    cargo bolero reduce [FLAGS] [OPTIONS] <test>
 
 FLAGS:
         --all-features           Activate all available features

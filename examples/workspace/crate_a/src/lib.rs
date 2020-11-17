@@ -8,7 +8,7 @@ pub fn run(a: u8, b: u8) -> u8 {
 
 #[test]
 fn bolero_test() {
-    bolero::fuzz!().with_type().cloned().for_each(|(a, b)| {
+    bolero::check!().with_type().cloned().for_each(|(a, b)| {
         run(a, b);
     });
 }
