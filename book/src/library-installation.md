@@ -4,7 +4,7 @@
 
 ```toml
 [dev-dependencies]
-bolero = "0.5"
+bolero = "0.6"
 ```
 
 ## Structured Test Generation
@@ -13,7 +13,7 @@ If your crate wishes to implement structured test generation on public data stru
 
 ```toml
 [dependencies]
-bolero-generator = "0.5"
+bolero-generator = "0.6"
 ```
 
 The derive attribute can now be used:
