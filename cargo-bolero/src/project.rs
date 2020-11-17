@@ -6,7 +6,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct Project {
     /// Build with the sanitizer enabled
-    #[structopt(short, long)]
+    #[structopt(short, long, default_value = "address")]
     sanitizer: Vec<String>,
 
     /// Build for the target triple
@@ -144,6 +144,7 @@ impl Project {
         } else {
             None
         })
+        // https://github.com/rust-lang/rust/issues/47071
         .chain(if self.release() {
             Some("-Ccodegen-units=1")
         } else {
