@@ -17,7 +17,7 @@ A copy of the Bolero Book can be found here: http://camshaft.github.io/bolero
 
 ```toml
 [dev-dependencies]
-bolero = "0.5"
+bolero = "0.6"
 ```
 
 `bolero` also provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:

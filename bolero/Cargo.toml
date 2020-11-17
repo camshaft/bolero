@@ -1,6 +1,6 @@
 [package]
 name = "bolero"
-version = "0.5.2"
+version = "0.6.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "fuzz and property testing front-end"
 homepage = "https://github.com/camshaft/bolero"
@@ -17,18 +17,18 @@ std = ["alloc", "bolero-generator/std"]
 alloc = ["bolero-generator/alloc"]
 
 [dependencies]
-bolero-engine = { version = "0.5", path = "../bolero-engine" }
-bolero-generator = { version = "0.5", path = "../bolero-generator", default-features = false }
+bolero-engine = { version = "0.6", path = "../bolero-engine" }
+bolero-generator = { version = "0.6", path = "../bolero-generator", default-features = false }
 cfg-if = "0.1"
 
 [target.'cfg(fuzzing_afl)'.dependencies]
-bolero-afl = { version = "0.5", path = "../bolero-afl" }
+bolero-afl = { version = "0.6", path = "../bolero-afl" }
 
 [target.'cfg(fuzzing_libfuzzer)'.dependencies]
-bolero-libfuzzer = { version = "0.5", path = "../bolero-libfuzzer" }
+bolero-libfuzzer = { version = "0.6", path = "../bolero-libfuzzer" }
 
 [target.'cfg(fuzzing_honggfuzz)'.dependencies]
-bolero-honggfuzz = { version = "0.5", path = "../bolero-honggfuzz" }
+bolero-honggfuzz = { version = "0.6", path = "../bolero-honggfuzz" }
 
 [target.'cfg(not(fuzzing))'.dependencies]
 libtest-mimic = "0.2.0"
