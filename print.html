@@ -341,7 +341,7 @@ panicked at 'internal assertion', src/lib.rs:16:17
 <h1><a class="header" href="#works-on-rust-stable" id="works-on-rust-stable">Works on Rust Stable</a></h1>
 <p><code>bolero</code> does not require nightly to execute test targets:</p>
 <pre><code class="language-bash"># does not require nightly
-$ cargo bolero test my_test_target
+$ cargo bolero test my_test_target --sanitizer NONE
 </code></pre>
 <h2><a class="header" href="#sanitizer-support" id="sanitizer-support">Sanitizer support</a></h2>
 <p>Using a sanitizer will improve the number of edge cases caught by the test. As such, the preference should be towards using them. Unfortunately, sanitizers require Rust nightly to compile.</p>
