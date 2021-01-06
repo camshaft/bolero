@@ -71,7 +71,7 @@ impl<T: TypeGenerator> TypeGenerator for Mutex<T> {
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        if let Ok(mut value) = self.lock() {
+        if let Ok(value) = self.get_mut() {
             value.mutate(driver)?;
             return Some(());
         }
