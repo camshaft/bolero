@@ -1,7 +1,8 @@
+use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    export::TokenStream2, parse::Error, parse_quote, spanned::Spanned, Attribute, Expr, Lit, Meta,
-    MetaList, NestedMeta, Type, WhereClause,
+    parse::Error, parse_quote, spanned::Spanned, Attribute, Expr, Lit, Meta, MetaList, NestedMeta,
+    Type, WhereClause,
 };
 
 pub struct GeneratorAttr {

@@ -4,13 +4,11 @@ mod generator_attr;
 
 use generator_attr::GeneratorAttr;
 use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    export::{Span, TokenStream2},
-    parse_macro_input,
-    spanned::Spanned,
-    Attribute, Data, DataEnum, DataStruct, DataUnion, DeriveInput, Error, Fields, FieldsNamed,
-    FieldsUnnamed, Generics, Ident, WhereClause,
+    parse_macro_input, spanned::Spanned, Attribute, Data, DataEnum, DataStruct, DataUnion,
+    DeriveInput, Error, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident, WhereClause,
 };
 
 /// Derive the an implementation of `TypeGenerator` for the given type.
