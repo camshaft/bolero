@@ -21,7 +21,7 @@ impl ValueGenerator for bool {
 
 impl BooleanGenerator {
     pub fn weight(mut self, weight: f32) -> Self {
-        assert!(0.0 <= weight && weight <= 1.0);
+        assert!((0.0..=1.0).contains(&weight));
         self.weight = weight;
         self
     }
