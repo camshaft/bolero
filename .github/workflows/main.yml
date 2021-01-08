@@ -15,9 +15,12 @@ jobs:
     - name: Ubuntu Dependencies
       run: sudo apt-get install binutils-dev libunwind-dev
 
-    - uses: hecrj/setup-rust-action@v1
+    - uses: actions-rs/toolchain@v1
+      id: toolchain
       with:
-        rust-version: stable
+        toolchain: stable
+        profile: minimal
+        override: true
         components: rustfmt, clippy
 
     - uses: actions/checkout@master
@@ -85,11 +88,18 @@ jobs:
         launchctl unload -w ${SL}/LaunchAgents/${PL}.plist
         sudo launchctl unload -w ${SL}/LaunchDaemons/${PL}.Root.plist
 
-    - uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: ${{ matrix.rust }}
-
     - uses: actions/checkout@master
+
+    - uses: actions-rs/toolchain@v1
+      id: toolchain
+      with:
+        toolchain: ${{ matrix.rust }}
+        profile: minimal
+        override: true
+
+    - uses: camshaft/rust-cache@v1
+      with:
+        key: ${{ matrix.test }}-${{ matrix.sanitizer }}
 
     - name: ${{ matrix.test }}
       run: make ${{ matrix.test }}
