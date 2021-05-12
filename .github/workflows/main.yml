@@ -23,7 +23,7 @@ jobs:
         override: true
         components: rustfmt, clippy
 
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v2.3.4
 
     - name: Format
       uses: actions-rs/cargo@v1
@@ -88,7 +88,7 @@ jobs:
         launchctl unload -w ${SL}/LaunchAgents/${PL}.plist
         sudo launchctl unload -w ${SL}/LaunchDaemons/${PL}.Root.plist
 
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v2.3.4
 
     - uses: actions-rs/toolchain@v1
       id: toolchain
