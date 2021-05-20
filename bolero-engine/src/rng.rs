@@ -180,7 +180,7 @@ impl RngState {
     }
 
     fn next_input(&mut self) -> ByteSliceTestInput {
-        let len = self.rng.gen_range(0, self.max_len);
+        let len = self.rng.gen_range(0..self.max_len);
         self.buffer.clear();
         self.buffer.resize(len, 0);
         self.rng.fill_bytes(&mut self.buffer);

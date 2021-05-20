@@ -48,7 +48,7 @@ impl RngTest {
     pub fn read_into(&self, input: &mut Vec<u8>) {
         use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
         let mut rng = StdRng::seed_from_u64(self.seed);
-        let len = rng.gen_range(0, self.max_len);
+        let len = rng.gen_range(0..self.max_len);
         input.resize(len, 0);
         rng.fill_bytes(input);
     }
