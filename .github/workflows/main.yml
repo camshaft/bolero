@@ -15,7 +15,7 @@ jobs:
     - name: Ubuntu Dependencies
       run: sudo apt-get install binutils-dev libunwind-dev
 
-    - uses: actions-rs/toolchain@v1
+    - uses: actions-rs/toolchain@v1.0.7
       id: toolchain
       with:
         toolchain: stable
@@ -90,7 +90,7 @@ jobs:
 
     - uses: actions/checkout@master
 
-    - uses: actions-rs/toolchain@v1
+    - uses: actions-rs/toolchain@v1.0.7
       id: toolchain
       with:
         toolchain: ${{ matrix.rust }}
