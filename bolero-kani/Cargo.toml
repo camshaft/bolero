@@ -1,0 +1,19 @@
+[package]
+name = "bolero-kani"
+version = "0.6.0"
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+description = "kani plugin for bolero"
+homepage = "https://github.com/camshaft/bolero"
+repository = "https://github.com/camshaft/bolero"
+keywords = ["testing", "model", "proof"]
+license = "MIT"
+edition = "2018"
+readme = "../README.md"
+
+[features]
+default = ["lib"]
+bin = []
+lib = ["bolero-engine"]
+
+[dependencies]
+bolero-engine = { version = "0.6", path = "../bolero-engine", optional = true }

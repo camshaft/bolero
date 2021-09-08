@@ -42,8 +42,9 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        rust: [1.52.0, stable, beta, nightly]
+        rust: [1.56.1, stable, beta, nightly]
         os: [ubuntu-latest, macOS-latest]
         # TODO add honggfuzz back
         test: [unit-tests, libfuzzer, afl, examples-tests]
@@ -115,3 +116,26 @@ jobs:
         AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
         AFL_SKIP_CPUFREQ: 1
         SANITIZER: ${{ matrix.sanitizer }}
+
+  kani:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3.0.2
+
+    - uses: actions-rs/toolchain@v1.0.7
+      id: toolchain
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Setup
+      run: |
+        cargo install kani-verifier
+        cargo-kani setup
+
+    - name: Test
+      working-directory: examples/basic
+      run: |
+        cargo kani

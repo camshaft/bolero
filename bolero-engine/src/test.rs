@@ -133,6 +133,7 @@ where
 }
 
 /// Lazily generates a new value for the given driver
+#[cfg(not(kani))]
 macro_rules! generate_value {
     ($self:ident, $driver:ident) => {{
         let forward_panic = crate::panic::forward_panic(true);
@@ -152,6 +153,14 @@ macro_rules! generate_value {
         };
         crate::panic::forward_panic(forward_panic);
         value
+    }};
+}
+#[cfg(kani)]
+macro_rules! generate_value {
+    ($self:ident, $driver:ident) => {{
+        $self.value = $self.gen.generate($driver);
+        kani::assume($self.value.is_some());
+        $self.value.as_ref().unwrap()
     }};
 }
 

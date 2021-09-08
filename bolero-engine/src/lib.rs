@@ -5,8 +5,13 @@ pub use bolero_generator::{
 };
 use core::time::Duration;
 
+#[cfg(not(kani))]
 pub mod panic;
-#[cfg(feature = "rng")]
+#[cfg(kani)]
+#[path = "./noop/panic.rs"]
+pub mod panic;
+
+#[cfg(not(any(fuzzing, kani)))]
 pub mod rng;
 pub mod shrink;
 mod test;

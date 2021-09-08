@@ -10,17 +10,17 @@ license = "MIT"
 edition = "2018"
 readme = "../README.md"
 
-[features]
-default = ["rng"]
-rng = ["rand"]
-
 [dependencies]
-anyhow = "1.0"
-backtrace = "0.3"
+anyhow = "1"
 bolero-generator = { version = "0.6", path = "../bolero-generator", default-features = false }
 lazy_static = "1"
 pretty-hex = "0.2.1"
-rand = { version = "^0.8", optional = true }
+
+[target.'cfg(not(kani))'.dependencies]
+backtrace = { version = "0.3" }
+
+[target.'cfg(not(any(fuzzing, kani)))'.dependencies]
+rand = { version = "^0.8" }
 
 [dev-dependencies]
 bolero-generator = { version = "0.6", path = "../bolero-generator", features = ["std"] }
