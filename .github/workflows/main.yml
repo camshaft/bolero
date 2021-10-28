@@ -48,6 +48,10 @@ jobs:
         # TODO add honggfuzz back
         test: [unit-tests, libfuzzer, afl, examples-tests]
         sanitizer: [NONE]
+        exclude:
+          # honggfuzz is broken on macOS
+          - os: macos-latest
+            test: hongffuzz
         include:
           - rust: nightly
             os: ubuntu-latest
