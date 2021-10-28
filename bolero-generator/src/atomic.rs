@@ -1,10 +1,10 @@
 use crate::{
-    bounded::{BoundedGenerator, BoundedValue},
-    Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator,
+    bounded::{BoundExt, BoundedGenerator, BoundedValue},
+    Driver, TypeGenerator, TypeGeneratorWithParams,
 };
 use core::{
     cell::{Cell, RefCell, UnsafeCell},
-    ops::{RangeBounds, RangeFrom},
+    ops::{Bound, RangeFull},
     sync::atomic::{
         AtomicBool, AtomicI16, AtomicI32, AtomicI64, AtomicI8, AtomicIsize, AtomicU16, AtomicU32,
         AtomicU64, AtomicU8, AtomicUsize, Ordering,
@@ -26,7 +26,7 @@ macro_rules! impl_atomic_integer {
     ($ty:ident, $inner:ident) => {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                Some($ty::new(driver.gen()?))
+                Some(Self::new(driver.gen()?))
             }
 
             fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
@@ -35,25 +35,40 @@ macro_rules! impl_atomic_integer {
             }
         }
 
-        impl<R: RangeBounds<$inner>> BoundedValue<R> for $ty {
-            type BoundValue = $inner;
+        impl BoundedValue for $ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<Self> {
+                let min = BoundExt::map(min, |value| value.load(Ordering::SeqCst));
+                let max = BoundExt::map(max, |value| value.load(Ordering::SeqCst));
 
-            fn is_within(&self, range_bounds: &R) -> bool {
-                self.load(Ordering::SeqCst).is_within(range_bounds)
+                let value = BoundedValue::gen_bounded(
+                    driver,
+                    BoundExt::as_ref(&min),
+                    BoundExt::as_ref(&max),
+                )?;
+                Some(Self::new(value))
             }
+        }
 
-            fn bind_within(&mut self, range_bounds: &R) {
-                let mut value = self.load(Ordering::SeqCst);
-                value.bind_within(range_bounds);
-                self.store(value, Ordering::SeqCst);
+        impl BoundedValue<$inner> for $ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&$inner>,
+                max: Bound<&$inner>,
+            ) -> Option<Self> {
+                let value = BoundedValue::gen_bounded(driver, min, max)?;
+                Some(Self::new(value))
             }
         }
 
         impl TypeGeneratorWithParams for $ty {
-            type Output = BoundedGenerator<TypeValueGenerator<$ty>, RangeFrom<$inner>>;
+            type Output = BoundedGenerator<Self, RangeFull>;
 
             fn gen_with() -> Self::Output {
-                BoundedGenerator::new(Default::default(), core::$inner::MIN..)
+                BoundedGenerator::new(..)
             }
         }
     };
@@ -66,7 +81,9 @@ fn atomicu8_test() {
 
 // #[test]
 // fn atomicu8_with_test() {
-//     let _ = generator_test!(gen::<AtomicU8>().with().bounds(0u8..5));
+//     let _ = generator_test!(gen::<AtomicU8>()
+//         .with()
+//         .bounds(AtomicU8::new(0u8)..AtomicU8::new(5)));
 // }
 
 impl_atomic_integer!(AtomicI8, i8);

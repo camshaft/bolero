@@ -1,6 +1,6 @@
 use crate::{panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use bolero_generator::driver::DriverMode;
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
 /// Test engine implementation using a RNG.
@@ -14,6 +14,7 @@ pub struct RngEngine {
     pub max_len: usize,
     pub seed: u64,
     pub driver_mode: Option<DriverMode>,
+    pub shrink_time: Option<Duration>,
 }
 
 impl Default for RngEngine {
@@ -30,6 +31,7 @@ impl Default for RngEngine {
                 max_len,
                 seed,
                 driver_mode: None,
+                shrink_time: None,
             };
         }
 
@@ -42,6 +44,7 @@ impl Default for RngEngine {
             max_len,
             seed,
             driver_mode: None,
+            shrink_time: None,
         }
     }
 }
@@ -55,41 +58,24 @@ impl RngEngine {
 
     /// Set the number of test iterations
     pub fn with_iterations(self, iterations: usize) -> Self {
-        Self {
-            iterations,
-            max_len: self.max_len,
-            seed: self.seed,
-            driver_mode: self.driver_mode,
-        }
+        Self { iterations, ..self }
     }
 
     /// Set the maximum length of a test input
     pub fn with_max_len(self, max_len: usize) -> Self {
-        Self {
-            iterations: self.iterations,
-            max_len,
-            seed: self.seed,
-            driver_mode: self.driver_mode,
-        }
+        Self { max_len, ..self }
     }
 
     /// Set the seed for the RNG implementation
     pub fn with_seed(self, seed: u64) -> Self {
-        Self {
-            iterations: self.iterations,
-            max_len: self.max_len,
-            seed,
-            driver_mode: self.driver_mode,
-        }
+        Self { seed, ..self }
     }
 
     /// Set the driver mode for the engine
     pub fn with_driver_mode(self, driver_mode: DriverMode) -> Self {
         Self {
-            iterations: self.iterations,
-            max_len: self.max_len,
-            seed: self.seed,
             driver_mode: Some(driver_mode),
+            ..self
         }
     }
 }
@@ -102,6 +88,10 @@ where
 
     fn set_driver_mode(&mut self, mode: DriverMode) {
         self.driver_mode = Some(mode);
+    }
+
+    fn set_shrink_time(&mut self, shrink_time: Duration) {
+        self.shrink_time = Some(shrink_time);
     }
 
     fn run(self, mut test: T) -> Self::Output {
@@ -144,6 +134,7 @@ where
                             core::mem::take(&mut state.buffer),
                             Some(self.seed),
                             Some(state.driver_mode),
+                            self.shrink_time,
                         )
                         .expect("test should fail");
 

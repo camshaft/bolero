@@ -1,3 +1,9 @@
+use bolero_generator::{
+    combinator::{AndThenGenerator, FilterGenerator, FilterMapGenerator, MapGenerator},
+    TypeValueGenerator,
+};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
+
 cfg_if::cfg_if! {
     if #[cfg(fuzzing_libfuzzer)] {
         /// The default engine used when defining a test target
@@ -25,12 +31,6 @@ pub mod generator {
 pub use bolero_engine::{self, TargetLocation, __item_path__};
 
 pub use bolero_engine::{rng::RngEngine, Driver, DriverMode, Engine, Test};
-
-use bolero_generator::{
-    combinator::{AndThenGenerator, FilterGenerator, FilterMapGenerator, MapGenerator},
-    TypeValueGenerator,
-};
-use core::{fmt::Debug, marker::PhantomData};
 
 /// Execute tests for a given target
 ///
@@ -163,6 +163,7 @@ macro_rules! fuzz {
 pub struct TestTarget<Generator, Engine, InputOwnership> {
     generator: Generator,
     driver_mode: Option<DriverMode>,
+    shrink_time: Option<Duration>,
     engine: Engine,
     input_ownership: PhantomData<InputOwnership>,
 }
@@ -191,6 +192,7 @@ impl<Engine> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
     pub fn new(engine: Engine) -> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
         Self {
             driver_mode: None,
+            shrink_time: None,
             generator: ByteSliceGenerator,
             engine,
             input_ownership: PhantomData,
@@ -216,6 +218,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator,
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -235,9 +238,22 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     ) -> TestTarget<TypeValueGenerator<T>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: generator::gen(),
             engine: self.engine,
             input_ownership: self.input_ownership,
+        }
+    }
+
+    /// Set the amount of time that will be spent shrinking an input on failure
+    ///
+    /// Engines can optionally shrink inputs on failures to make it easier to debug
+    /// and identify the failure. Increasing this time can potentially lead to smaller
+    /// values.
+    pub fn with_shrink_time(self, shrink_time: Duration) -> Self {
+        Self {
+            shrink_time: Some(shrink_time),
+            ..self
         }
     }
 }
@@ -250,6 +266,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     ) -> TestTarget<MapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: self.generator.map(map),
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -266,6 +283,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: self.generator.and_then(map),
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -279,6 +297,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     ) -> TestTarget<FilterGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: self.generator.filter(filter),
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -292,6 +311,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     ) -> TestTarget<FilterMapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: self.generator.filter_map(filter_map),
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -302,6 +322,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     pub fn with_driver_mode(self, mode: DriverMode) -> Self {
         TestTarget {
             driver_mode: Some(mode),
+            shrink_time: self.shrink_time,
             generator: self.generator,
             engine: self.engine,
             input_ownership: self.input_ownership,
@@ -313,23 +334,13 @@ impl<G, InputOwnership> TestTarget<G, RngEngine, InputOwnership> {
     /// Set the number of iterations executed
     pub fn with_iterations(mut self, iterations: usize) -> Self {
         self.engine.iterations = iterations;
-        TestTarget {
-            driver_mode: self.driver_mode,
-            generator: self.generator,
-            engine: self.engine,
-            input_ownership: self.input_ownership,
-        }
+        self
     }
 
     /// Set the maximum length of the generated bytes
     pub fn with_max_len(mut self, max_len: usize) -> Self {
         self.engine.max_len = max_len;
-        TestTarget {
-            driver_mode: self.driver_mode,
-            generator: self.generator,
-            engine: self.engine,
-            input_ownership: self.input_ownership,
-        }
+        self
     }
 }
 
@@ -342,6 +353,7 @@ impl<G, Engine> TestTarget<G, Engine, BorrowedInput> {
     pub fn cloned(self) -> TestTarget<G, Engine, ClonedInput> {
         TestTarget {
             driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
             generator: self.generator,
             engine: self.engine,
             input_ownership: PhantomData,
@@ -363,6 +375,9 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
+        if let Some(shrink_time) = self.shrink_time {
+            self.engine.set_shrink_time(shrink_time);
+        }
         self.engine.run(test)
     }
 }
@@ -381,6 +396,9 @@ where
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
+        if let Some(shrink_time) = self.shrink_time {
+            self.engine.set_shrink_time(shrink_time);
+        }
         self.engine.run(test)
     }
 }
@@ -396,6 +414,9 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
         }
+        if let Some(shrink_time) = self.shrink_time {
+            self.engine.set_shrink_time(shrink_time);
+        }
         self.engine.run(test)
     }
 }
@@ -410,6 +431,9 @@ impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
         let test = bolero_engine::ClonedSliceTest::new(test);
         if let Some(mode) = self.driver_mode {
             self.engine.set_driver_mode(mode);
+        }
+        if let Some(shrink_time) = self.shrink_time {
+            self.engine.set_shrink_time(shrink_time);
         }
         self.engine.run(test)
     }

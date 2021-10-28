@@ -3,6 +3,7 @@ pub use bolero_generator::{
     driver::{Driver, DriverMode},
     TypeGenerator, ValueGenerator,
 };
+use core::time::Duration;
 
 pub mod panic;
 #[cfg(feature = "rng")]
@@ -30,6 +31,7 @@ pub trait Engine<T: Test>: Sized {
     type Output;
 
     fn set_driver_mode(&mut self, mode: DriverMode);
+    fn set_shrink_time(&mut self, shrink_time: Duration);
     fn run(self, test: T) -> Self::Output;
 }
 

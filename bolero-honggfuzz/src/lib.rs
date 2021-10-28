@@ -8,6 +8,7 @@ pub mod fuzzer {
     use bolero_engine::{
         panic as bolero_panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
     };
+    use core::time::Duration;
     use std::{mem::MaybeUninit, slice};
 
     extern "C" {
@@ -30,6 +31,11 @@ pub mod fuzzer {
 
         fn set_driver_mode(&mut self, mode: DriverMode) {
             self.driver_mode = Some(mode);
+        }
+
+        fn set_shrink_time(&mut self, shrink_time: Duration) {
+            // we don't shrink with honggfuzz currently
+            let _ = shrink_time;
         }
 
         fn run(self, mut test: T) -> Self::Output {

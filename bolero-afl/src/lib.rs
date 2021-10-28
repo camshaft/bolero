@@ -43,6 +43,11 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
+        fn set_shrink_time(&mut self, shrink_time: core::time::Duration) {
+            // we don't shrink with afl currently
+            let _ = shrink_time;
+        }
+
         fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
 

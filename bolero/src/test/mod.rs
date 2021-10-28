@@ -1,8 +1,11 @@
-use bolero_engine::{rng::RngEngine, ByteSliceTestInput, Engine, Never, TargetLocation, Test};
+use bolero_engine::{
+    rng::RngEngine, test_failure::TestFailure, ByteSliceTestInput, Engine, Never, TargetLocation,
+    Test,
+};
 use bolero_generator::driver::DriverMode;
-use core::iter::empty;
+use core::{iter::empty, time::Duration};
 use libtest_mimic::{run_tests, Arguments, FormatSetting, Outcome, Test as LibTest};
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 mod input;
 use input::*;
@@ -14,6 +17,7 @@ use input::*;
 pub struct TestEngine {
     location: TargetLocation,
     driver_mode: Option<DriverMode>,
+    shrink_time: Option<Duration>,
 }
 
 impl TestEngine {
@@ -22,6 +26,7 @@ impl TestEngine {
         Self {
             location,
             driver_mode: None,
+            shrink_time: None,
         }
     }
 
@@ -182,21 +187,38 @@ where
         self.driver_mode = Some(mode);
     }
 
+    fn set_shrink_time(&mut self, shrink_time: Duration) {
+        self.shrink_time = Some(shrink_time);
+    }
+
     fn run(self, mut test: T) -> Self::Output {
         let driver_mode = self.driver_mode;
+        let shrink_time = self.shrink_time;
         let mut input = vec![];
         let mut testfn = &mut |data: &TestInput| {
             input.clear();
             data.read_into(&mut input);
 
-            test.test(&mut ByteSliceTestInput::new(&input, driver_mode))
-                .map_err(|_| {
-                    let failure = test
-                        .shrink(input.clone(), data.seed(), driver_mode)
-                        .expect("test should fail");
+            let mut input_slice = ByteSliceTestInput::new(&input, driver_mode);
 
-                    format!("{:#}", failure)
-                })
+            test.test(&mut input_slice).map_err(|error| {
+                let _ = writeln!(std::io::stderr(), "test failed; shrinking input...");
+
+                let shrunken = test.shrink(input.clone(), data.seed(), driver_mode, shrink_time);
+
+                if let Some(shrunken) = shrunken {
+                    format!("{}", shrunken)
+                } else {
+                    format!(
+                        "{}",
+                        TestFailure {
+                            seed: data.seed(),
+                            error,
+                            input: input_slice
+                        }
+                    )
+                }
+            })
         };
 
         if self.location.is_harnessed() {

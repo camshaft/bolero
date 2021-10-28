@@ -8,8 +8,9 @@ pub fn shrink<T: Test>(
     input: Vec<u8>,
     seed: Option<u64>,
     driver_mode: Option<DriverMode>,
+    shrink_time: Option<Duration>,
 ) -> Option<TestFailure<T::Value>> {
-    Shrinker::new(test, input, seed, driver_mode).shrink()
+    Shrinker::new(test, input, seed, driver_mode, shrink_time).shrink()
 }
 
 macro_rules! predicate {
@@ -36,6 +37,7 @@ struct Shrinker<'a, T> {
     end: usize,
     seed: Option<u64>,
     driver_mode: Option<DriverMode>,
+    shrink_time: Duration,
     #[cfg(test)]
     snapshot_input: Vec<u8>,
 }
@@ -46,6 +48,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
         input: Vec<u8>,
         seed: Option<u64>,
         driver_mode: Option<DriverMode>,
+        shrink_time: Option<Duration>,
     ) -> Self {
         let len = input.len();
         Self {
@@ -55,6 +58,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
             test,
             seed,
             driver_mode,
+            shrink_time: shrink_time.unwrap_or_else(|| Duration::from_secs(1)),
             #[cfg(test)]
             snapshot_input: vec![],
         }
@@ -100,7 +104,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
             }
 
             // put a time limit on the number of shrink iterations
-            if start_time.elapsed() > Duration::from_secs(1) {
+            if start_time.elapsed() > self.shrink_time {
                 break;
             }
         }
@@ -318,9 +322,15 @@ macro_rules! shrink_test {
             let mut test = crate::ClonedGeneratorTest::new($check, $gen);
             let input = ($input).to_vec();
 
-            let failure = Shrinker::new(&mut test, input, None, Some(DriverMode::Forced))
-                .shrink()
-                .expect("should produce a result");
+            let failure = Shrinker::new(
+                &mut test,
+                input,
+                None,
+                Some(DriverMode::Forced),
+                Some(Duration::from_secs(1)),
+            )
+            .shrink()
+            .expect("should produce a result");
 
             assert_eq!(failure.input, $expected);
         }
