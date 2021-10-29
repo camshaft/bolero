@@ -135,7 +135,7 @@ impl Uniform for char {
         let upper = match max {
             Bound::Excluded(v) => Bound::Excluded(map_to_u32(v)),
             Bound::Included(v) => Bound::Included(map_to_u32(v)),
-            Bound::Unbounded => Bound::Included(char::MAX as u32),
+            Bound::Unbounded => Bound::Included(map_to_u32(&char::MAX)),
         };
 
         let mut value = u32::sample(fill, BoundExt::as_ref(&lower), BoundExt::as_ref(&upper))?;
