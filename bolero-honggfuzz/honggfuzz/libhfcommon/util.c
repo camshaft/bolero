@@ -32,6 +32,9 @@
 #endif /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
 #include <math.h>
 #include <pthread.h>
+#if defined(_HF_ARCH_LINUX)
+#include <sched.h>
+#endif /* defined(_HF_ARCH_LINUX) */
 #include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -39,6 +42,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#if defined(_HF_ARCH_LINUX)
+#include <sys/prctl.h>
+#endif /* defined(_HF_ARCH_LINUX) */
+#if defined(__FreeBSD__)
+#include <sys/procctl.h>
+#endif /* defined(__FreeBSD__) */
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -48,6 +57,60 @@
 #include "libhfcommon/common.h"
 #include "libhfcommon/files.h"
 #include "libhfcommon/log.h"
+
+void util_ParentDeathSigIfAvail(int signo HF_ATTR_UNUSED) {
+#if defined(__FreeBSD__)
+    if (procctl(P_PID, 0, PROC_PDEATHSIG_CTL, &signo) == -1) {
+        PLOG_W("procctl(P_PID, PROC_PDEATHSIG_CTL, signo=%d (%s))", signo, util_sigName(signo));
+    }
+#endif /* defined(__FreeBSD__) */
+#if defined(_HF_ARCH_LINUX)
+    if (prctl(PR_SET_PDEATHSIG, (unsigned long)signo, 0UL, 0UL, 0UL) == -1) {
+        PLOG_W("prctl(PR_SET_PDEATHSIG, signo=%d (%s))", signo, util_sigName(signo));
+    }
+#endif /* defined(_HF_ARCH_LINUX) */
+}
+
+bool util_PinThreadToCPUs(uint32_t threadno, uint32_t cpucnt) {
+    if (cpucnt == 0) {
+        return true;
+    }
+
+    long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    if (num_cpus == -1) {
+        PLOG_W("sysconf(_SC_NPROCESSORS_ONLN) failed");
+        return false;
+    }
+
+    uint32_t start_cpu = (threadno * cpucnt) % (uint32_t)num_cpus;
+    uint32_t end_cpu   = (threadno * cpucnt + cpucnt - 1U) % (uint32_t)num_cpus;
+
+    LOG_D("Setting CPU affinity for the current thread #%" PRIu32 " to %" PRId32
+          " consecutive CPUs, (start:%" PRIu32 "-end:%" PRIu32 ") total_cpus:%ld",
+        threadno, cpucnt, start_cpu, end_cpu, num_cpus);
+
+    if (cpucnt > (uint32_t)num_cpus) {
+        LOG_W("Number of requested CPUs (%" PRId32
+              ") is bigger than number of available CPUs (%ld)",
+            cpucnt, num_cpus);
+        return false;
+    }
+
+#if defined(_HF_ARCH_LINUX)
+    cpu_set_t set;
+    CPU_ZERO(&set);
+
+    for (uint32_t i = 0; i < cpucnt; i++) {
+        CPU_SET((start_cpu + i) % num_cpus, &set);
+    }
+
+    if (sched_setaffinity(gettid(), sizeof(set), &set) == -1) {
+        PLOG_W("sched_setaffinity(tid=%d, sizeof(set)) failed", (int)gettid());
+        return false;
+    }
+#endif /* defined(_HF_ARCH_LINUX) */
+    return true;
+}
 
 void* util_Malloc(size_t sz) {
     void* p = malloc(sz);
@@ -112,7 +175,7 @@ static void util_rndInitThread(void) {
 /*
  * xoroshiro128plus by David Blackman and Sebastiano Vigna
  */
-static inline uint64_t util_RotL(const uint64_t x, int k) {
+static inline uint64_t __attribute__((const)) util_RotL(const uint64_t x, int k) {
     return (x << k) | (x >> (64 - k));
 }
 
@@ -809,6 +872,16 @@ const char* util_sigName(int signo) {
     return signame;
 }
 
+/*
+ * Should we use the more complex algorithm of collecting (once) known 32/64-bit values in RO
+ * sections and then search through them, or shall we simply search through the process' VM?
+ *
+ * 'false' for now, in order to estimate effectiveness of both methods.
+ */
+#if !defined(_HF_COMMON_BIN_COLLECT_VALS)
+#define _HF_COMMON_BIN_COLLECT_VALS false
+#endif /* !defined(_HF_COMMON_BIN_COLLECT_VALS) */
+
 #if !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__)
 static int addrStatic_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
     for (size_t i = 0; i < info->dlpi_phnum; i++) {
@@ -856,8 +929,8 @@ static int cmp_u32(const void* pa, const void* pb) {
     return 0;
 }
 
-static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
-    uint32_t v = *(uint32_t*)data;
+static int check32_cb(struct dl_phdr_info* info, void* data, unsigned elf_flags) {
+    const uint32_t v = *(const uint32_t*)data;
 
     for (size_t i = 0; i < info->dlpi_phnum; i++) {
         /* Look only in the actual binary, and not in libraries */
@@ -867,7 +940,7 @@ static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
         if (info->dlpi_phdr[i].p_type != PT_LOAD) {
             continue;
         }
-        if (!(info->dlpi_phdr[i].p_flags & PF_W)) {
+        if ((info->dlpi_phdr[i].p_flags & elf_flags) != elf_flags) {
             continue;
         }
         uint32_t* start = (uint32_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
@@ -884,8 +957,8 @@ static int check32_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
     return 0;
 }
 
-static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
-    uint64_t v = *(uint64_t*)data;
+static int check64_cb(struct dl_phdr_info* info, void* data, unsigned elf_flags) {
+    const uint64_t v = *(const uint64_t*)data;
 
     for (size_t i = 0; i < info->dlpi_phnum; i++) {
         /* Look only in the actual binary, and not in libraries */
@@ -895,7 +968,7 @@ static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
         if (info->dlpi_phdr[i].p_type != PT_LOAD) {
             continue;
         }
-        if (!(info->dlpi_phdr[i].p_flags & PF_W)) {
+        if ((info->dlpi_phdr[i].p_flags & elf_flags) != elf_flags) {
             continue;
         }
         uint64_t* start = (uint64_t*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
@@ -910,6 +983,22 @@ static int check64_cb(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, voi
         }
     }
     return 0;
+}
+
+static int check32_cb_r(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    return check32_cb(info, data, PF_R);
+}
+
+static int check64_cb_r(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    return check64_cb(info, data, PF_R);
+}
+
+static int check32_cb_w(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    return check32_cb(info, data, PF_W);
+}
+
+static int check64_cb_w(struct dl_phdr_info* info, size_t size HF_ATTR_UNUSED, void* data) {
+    return check64_cb(info, data, PF_W);
 }
 
 static int collectValuesInBinary_cb(
@@ -1020,6 +1109,10 @@ static void collectValuesInBinary() {
 static pthread_once_t collectValuesInBinary_InitOnce = PTHREAD_ONCE_INIT;
 
 bool util_32bitValInBinary(uint32_t v) {
+    if (!(_HF_COMMON_BIN_COLLECT_VALS)) {
+        return (dl_iterate_phdr(check32_cb_r, &v) == 1);
+    }
+
     pthread_once(&collectValuesInBinary_InitOnce, collectValuesInBinary);
     // check if it in read-only values
     if (values32InBinary_size != 0) {
@@ -1036,10 +1129,14 @@ bool util_32bitValInBinary(uint32_t v) {
         if (values32InBinary[l] == v) return true;
     }
     // check if it's in writable values
-    return (dl_iterate_phdr(check32_cb, &v) == 1);
+    return (dl_iterate_phdr(check32_cb_w, &v) == 1);
 }
 
 bool util_64bitValInBinary(uint64_t v) {
+    if (!(_HF_COMMON_BIN_COLLECT_VALS)) {
+        return (dl_iterate_phdr(check64_cb_r, &v) == 1);
+    }
+
     pthread_once(&collectValuesInBinary_InitOnce, collectValuesInBinary);
     // check if it in read-only values
     if (values64InBinary_size != 0) {
@@ -1056,7 +1153,7 @@ bool util_64bitValInBinary(uint64_t v) {
         if (values64InBinary[l] == v) return true;
     }
     // check if it's in writable values
-    return (dl_iterate_phdr(check64_cb, &v) == 1);
+    return (dl_iterate_phdr(check64_cb_w, &v) == 1);
 }
 #else  /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
 /* Darwin doesn't use ELF file format for binaries, so dl_iterate_phdr() cannot be used there */

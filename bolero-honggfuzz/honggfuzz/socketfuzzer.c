@@ -67,7 +67,7 @@ int fuzz_waitforSocketFuzzer(run_t* run) {
     uint8_t buf[16];
 
     // Wait until the external fuzzer did his thing
-    bzero(buf, 16);
+    memset(buf, 0, 16);
     ret = files_readFromFd(run->global->socketFuzzer.clientSocket, buf, 4);
     LOG_D("fuzz_waitforSocketFuzzer: RECV: %s", buf);
 
@@ -117,7 +117,7 @@ bool setupSocketFuzzer(honggfuzz_t* run) {
     socklen_t          t;
     struct sockaddr_un local, remote;
     char               socketPath[512];
-    snprintf(socketPath, sizeof(socketPath), "/tmp/honggfuzz_socket.%i", getpid());
+    snprintf(socketPath, sizeof(socketPath), "/tmp/honggfuzz_socket.%i", (int)getpid());
 
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket");
@@ -154,6 +154,6 @@ bool setupSocketFuzzer(honggfuzz_t* run) {
 
 void cleanupSocketFuzzer() {
     char socketPath[512];
-    snprintf(socketPath, sizeof(socketPath), "/tmp/honggfuzz_socket.%i", getpid());
+    snprintf(socketPath, sizeof(socketPath), "/tmp/honggfuzz_socket.%i", (int)getpid());
     unlink(socketPath);
 }

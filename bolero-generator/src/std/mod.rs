@@ -25,7 +25,7 @@ impl<T: Hash + Eq> CollectionGenerator for HashSet<T> {
     where
         G: ValueGenerator<Output = Self::Item>,
     {
-        let prev = core::mem::replace(self, HashSet::new());
+        let prev = core::mem::take(self);
 
         // mutate the existing items
         for mut item in prev.into_iter().take(new_len) {

@@ -36,6 +36,6 @@ do
     replace "s/int main/int ${name}_main/" $f
 done
 
-replace "s/return EXIT_SUCCESS/return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS/" $project_dir/honggfuzz/honggfuzz.c
+replace "s/return EXIT_SUCCESS/return hfuzz->cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS/" $project_dir/honggfuzz/honggfuzz.c
 
 echo -e "libhonggfuzz.a: \$(OBJS) \$(LCOMMON_ARCH) \$(CRASH_REPORT)\n\t\$(AR) rcs libhonggfuzz.a \$(OBJS) \$(CRASH_REPORT)" >> "$project_dir/honggfuzz/Makefile"

@@ -75,7 +75,7 @@ static void __attribute__((unused)) __clang_cleanup_func(void (^*dfunc)(void)) {
 #define _DEFER(a, count)                                                                            \
     auto void _STRMERGE(__defer_f_, count)(void* _defer_arg __attribute__((unused)));               \
     int       _STRMERGE(__defer_var_, count) __attribute__((cleanup(_STRMERGE(__defer_f_, count)))) \
-        __attribute__((unused));                                                                    \
+    __attribute__((unused));                                                                        \
     void _STRMERGE(__defer_f_, count)(void* _defer_arg __attribute__((unused)))
 #define defer _DEFER(a, __COUNTER__)
 #endif /* ifdef __clang__ */
@@ -161,6 +161,9 @@ typedef enum {
     LHFC_ADDR_RO       = 1,
     LHFC_ADDR_RW       = 2,
 } lhfc_addr_t;
+
+extern void util_ParentDeathSigIfAvail(int signo);
+extern bool util_PinThreadToCPUs(uint32_t startcpu, uint32_t cpucnt);
 
 extern void* util_Malloc(size_t sz);
 extern void* util_Calloc(size_t sz);

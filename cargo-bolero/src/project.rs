@@ -128,7 +128,6 @@ impl Project {
     fn rustflags(&self, inherits: &str, flags: &[&str]) -> String {
         [
             "--cfg fuzzing",
-            "-Cpasses=sancov",
             "-Cdebug-assertions",
             "-Ctarget-cpu=native",
             "-Cdebuginfo=2",
@@ -136,6 +135,21 @@ impl Project {
             "-Clink-dead-code",
         ]
         .iter()
+        .chain({
+            let version_meta = rustc_version::version_meta().unwrap();
+
+            // New LLVM pass manager is enabled when Rust 1.57+ and LLVM 13+
+            // https://github.com/rust-lang/rust/pull/88243
+
+            let is_rust_157 = version_meta.semver.major == 1 && version_meta.semver.minor >= 57;
+            let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
+
+            Some(if is_rust_157 && is_llvm_13 {
+                &"-Cpasses=sancov-module"
+            } else {
+                &"-Cpasses=sancov"
+            })
+        })
         .chain(flags.iter())
         .cloned()
         // https://github.com/rust-lang/rust/issues/53945

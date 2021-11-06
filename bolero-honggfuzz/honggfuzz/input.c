@@ -144,10 +144,7 @@ bool input_getNext(run_t* run, char fname[PATH_MAX], bool rewind) {
             return false;
         }
         if (entry == NULL && rewind) {
-            if (!input_getDirStatsAndRewind(run->global)) {
-                LOG_E("input_getDirStatsAndRewind('%s')", run->global->io.inputDir);
-                return false;
-            }
+            rewinddir(run->global->io.inputDirPtr);
             continue;
         }
         char path[PATH_MAX];
@@ -269,9 +266,9 @@ bool input_parseDictionary(honggfuzz_t* hfuzz) {
 }
 
 bool input_parseBlacklist(honggfuzz_t* hfuzz) {
-    FILE* fBl = fopen(hfuzz->feedback.blacklistFile, "rb");
+    FILE* fBl = fopen(hfuzz->feedback.blocklistFile, "rb");
     if (fBl == NULL) {
-        PLOG_W("Couldn't open '%s' - R/O mode", hfuzz->feedback.blacklistFile);
+        PLOG_W("Couldn't open '%s' - R/O mode", hfuzz->feedback.blocklistFile);
         return false;
     }
     defer {
@@ -289,34 +286,34 @@ bool input_parseBlacklist(honggfuzz_t* hfuzz) {
             break;
         }
 
-        if ((hfuzz->feedback.blacklist = util_Realloc(hfuzz->feedback.blacklist,
-                 (hfuzz->feedback.blacklistCnt + 1) * sizeof(hfuzz->feedback.blacklist[0]))) ==
+        if ((hfuzz->feedback.blocklist = util_Realloc(hfuzz->feedback.blocklist,
+                 (hfuzz->feedback.blocklistCnt + 1) * sizeof(hfuzz->feedback.blocklist[0]))) ==
             NULL) {
             PLOG_W("realloc failed (sz=%zu)",
-                (hfuzz->feedback.blacklistCnt + 1) * sizeof(hfuzz->feedback.blacklist[0]));
+                (hfuzz->feedback.blocklistCnt + 1) * sizeof(hfuzz->feedback.blocklist[0]));
             return false;
         }
 
-        hfuzz->feedback.blacklist[hfuzz->feedback.blacklistCnt] = strtoull(lineptr, 0, 16);
+        hfuzz->feedback.blocklist[hfuzz->feedback.blocklistCnt] = strtoull(lineptr, 0, 16);
         LOG_D("Blacklist: loaded %'" PRIu64 "'",
-            hfuzz->feedback.blacklist[hfuzz->feedback.blacklistCnt]);
+            hfuzz->feedback.blocklist[hfuzz->feedback.blocklistCnt]);
 
         /* Verify entries are sorted so we can use interpolation search */
-        if (hfuzz->feedback.blacklistCnt >= 1) {
-            if (hfuzz->feedback.blacklist[hfuzz->feedback.blacklistCnt - 1] >
-                hfuzz->feedback.blacklist[hfuzz->feedback.blacklistCnt]) {
+        if (hfuzz->feedback.blocklistCnt >= 1) {
+            if (hfuzz->feedback.blocklist[hfuzz->feedback.blocklistCnt - 1] >
+                hfuzz->feedback.blocklist[hfuzz->feedback.blocklistCnt]) {
                 LOG_F("Blacklist file not sorted. Use 'tools/createStackBlacklist.sh' to sort "
                       "records");
                 return false;
             }
         }
-        hfuzz->feedback.blacklistCnt += 1;
+        hfuzz->feedback.blocklistCnt += 1;
     }
 
-    if (hfuzz->feedback.blacklistCnt > 0) {
-        LOG_I("Loaded %zu stack hash(es) from the blacklist file", hfuzz->feedback.blacklistCnt);
+    if (hfuzz->feedback.blocklistCnt > 0) {
+        LOG_I("Loaded %zu stack hash(es) from the blocklist file", hfuzz->feedback.blocklistCnt);
     } else {
-        LOG_F("Empty stack hashes blacklist file '%s'", hfuzz->feedback.blacklistFile);
+        LOG_F("Empty stack hashes blocklist file '%s'", hfuzz->feedback.blocklistFile);
     }
     return true;
 }
@@ -461,24 +458,29 @@ static inline int input_speedFactor(run_t* run, dynfile_t* dynfile) {
 }
 
 static inline int input_skipFactor(run_t* run, dynfile_t* dynfile, int* speed_factor) {
+    /*
+     * TODO: measure impact of the skipFactor on the speed of fuzzing.
+     * It's currently unsure how much it helps, so disable it for now,
+     * and re-enable once proper test has been conducted
+     */
     int penalty = 0;
 
+#if 1
     {
-        *speed_factor = HF_CAP(input_speedFactor(run, dynfile) / 2, -15, 15);
+        *speed_factor = HF_CAP(input_speedFactor(run, dynfile), -10, 5);
         penalty += *speed_factor;
     }
+#endif
 
+#if 0
     {
         /* Inputs with lower total coverage -> lower chance of being tested */
         static const int scaleMap[200] = {
-            [95 ... 199] = -15,
-            [90 ... 94]  = -7,
-            [80 ... 89]  = -3,
-            [60 ... 79]  = -1,
-            [50 ... 59]  = 0,
-            [30 ... 49]  = 5,
-            [11 ... 29]  = 10,
-            [0 ... 10]   = 15,
+            [95 ... 199] = -10,
+            [80 ... 94]  = -2,
+            [50 ... 79]  = 0,
+            [11 ... 49]  = 1,
+            [0 ... 10]   = 2,
         };
 
         uint64_t maxCov0 = ATOMIC_GET(run->global->feedback.maxCov[0]);
@@ -487,34 +489,40 @@ static inline int input_skipFactor(run_t* run, dynfile_t* dynfile, int* speed_fa
             penalty += scaleMap[percentile];
         }
     }
+#endif
 
+#if 1
     {
         /* Older inputs -> lower chance of being tested */
         static const int scaleMap[200] = {
-            [100 ... 199] = -10,
-            [95 ... 99]   = -5,
-            [91 ... 94]   = -1,
-            [81 ... 90]   = 0,
-            [71 ... 80]   = 1,
-            [41 ... 70]   = 2,
-            [0 ... 40]    = 3,
+            [98 ... 199] = -3,
+            [91 ... 97]  = -2,
+            [81 ... 90]  = -1,
+            [71 ... 80]  = 0,
+            [41 ... 70]  = 1,
+            [0 ... 40]   = 2,
         };
 
         const unsigned percentile = (dynfile->idx * 100) / run->global->io.dynfileqCnt;
         penalty += scaleMap[percentile];
     }
+#endif
 
+#if 1
     {
         /* If the input wasn't source of other inputs so far, make it less likely to be tested */
-        penalty += HF_CAP((1 - (int)dynfile->refs) * 3, -30, 5);
+        penalty += HF_CAP((2 - (int)dynfile->refs), -10, 2);
     }
+#endif
 
+#if 1
     {
         /* Add penalty for the input being too big - 0 is for 1kB inputs */
         if (dynfile->size > 0) {
             penalty += HF_CAP(((int)util_Log2(dynfile->size) - 10), -5, 5);
         }
     }
+#endif
 
     return penalty;
 }
@@ -567,11 +575,17 @@ bool input_prepareDynamicInput(run_t* run, bool needs_mangle) {
     return true;
 }
 
-size_t input_getRandomInputAsBuf(run_t* run, const uint8_t** buf) {
+const uint8_t* input_getRandomInputAsBuf(run_t* run, size_t* len) {
+    if (run->global->feedback.dynFileMethod == _HF_DYNFILE_NONE) {
+        LOG_W(
+            "The dynamic input queue is empty because no instrumentation mode (-x) was requested");
+        *len = 0;
+        return NULL;
+    }
+
     if (ATOMIC_GET(run->global->io.dynfileqCnt) == 0) {
-        LOG_E("The dynamic input queue shouldn't be empty");
-        *buf = NULL;
-        return 0;
+        *len = 0;
+        return NULL;
     }
 
     dynfile_t* current = NULL;
@@ -586,8 +600,8 @@ size_t input_getRandomInputAsBuf(run_t* run, const uint8_t** buf) {
         run->global->io.dynfileq2Current = TAILQ_NEXT(run->global->io.dynfileq2Current, pointers);
     }
 
-    *buf = current->data;
-    return current->size;
+    *len = current->size;
+    return current->data;
 }
 
 static bool input_shouldReadNewFile(run_t* run) {

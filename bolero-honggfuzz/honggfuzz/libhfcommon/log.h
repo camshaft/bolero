@@ -23,8 +23,14 @@
 #define _HF_COMMON_LOG_H_
 
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+#ifdef _HF_ARCH_DARWIN
+#pragma push_macro("DEBUG")
+#undef DEBUG
+#endif
 
 enum llevel_t { FATAL = 0, ERROR, WARNING, INFO, DEBUG, HELP, HELP_BOLD };
 
@@ -91,5 +97,14 @@ extern enum llevel_t logGetLevel(void);
 extern pthread_mutex_t* logMutexGet(void);
 
 void logMutexReset(void);
+
+#if defined(__sun)
+void dprintf(int fd, const char*, ...);
+int  vdprintf(int fd, const char*, va_list);
+#endif
+
+#ifdef _HF_ARCH_DARWIN
+#pragma pop_macro("DEBUG")
+#endif
 
 #endif /* ifndef _HF_COMMON_LOG_H_ */

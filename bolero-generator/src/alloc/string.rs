@@ -78,7 +78,7 @@ impl CollectionGenerator for String {
     where
         G: ValueGenerator<Output = Self::Item>,
     {
-        let prev = core::mem::replace(self, String::new());
+        let prev = core::mem::take(self);
 
         let to_mutate = self.len().min(new_len);
         let to_append = new_len.saturating_sub(to_mutate);
@@ -132,6 +132,12 @@ fn string_type_test() {
 
 #[test]
 fn string_with_test() {
-    let string = generator_test!(gen::<String>().with().len(32usize)).unwrap();
-    assert_eq!(string.chars().count(), 32usize);
+    for _ in 0..100 {
+        if let Some(string) = generator_test!(gen::<String>().with().len(32usize)) {
+            assert_eq!(string.chars().count(), 32usize);
+            return;
+        }
+    }
+
+    panic!("failed to generate a valid string");
 }

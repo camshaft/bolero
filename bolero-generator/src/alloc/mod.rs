@@ -30,7 +30,7 @@ impl<T: Ord> CollectionGenerator for BinaryHeap<T> {
     where
         G: ValueGenerator<Output = Self::Item>,
     {
-        let prev = core::mem::replace(self, BinaryHeap::new());
+        let prev = core::mem::take(self);
 
         for mut item in prev.into_iter().take(new_len) {
             item_gen.mutate(driver, &mut item)?;
@@ -64,7 +64,7 @@ impl<T: Ord> CollectionGenerator for BTreeSet<T> {
     where
         G: ValueGenerator<Output = Self::Item>,
     {
-        let prev = core::mem::replace(self, BTreeSet::new());
+        let prev = core::mem::take(self);
         for mut item in prev.into_iter().take(new_len) {
             item_gen.mutate(driver, &mut item)?;
             self.insert(item);
@@ -213,11 +213,7 @@ fn vec_with_values_test() {
 
 #[test]
 fn vec_gen_test() {
-    let _ = generator_test!({
-        let mut vec = Vec::new();
-        vec.push(gen::<u8>());
-        vec
-    });
+    let _ = generator_test!(vec![gen::<u8>()]);
 }
 
 impl_key_values_collection_generator!(BTreeMap, BTreeMapGenerator, DEFAULT_LEN_RANGE, [Ord]);

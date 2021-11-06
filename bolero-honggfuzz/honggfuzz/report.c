@@ -109,7 +109,7 @@ void report_saveReport(run_t* run) {
         " wordlistFile    : %s\n",
         localtmstr, run->global->mutate.mutationsPerRun,
         run->global->exe.externalCommand == NULL ? "NULL" : run->global->exe.externalCommand,
-        run->global->exe.fuzzStdin ? "TRUE" : "FALSE", run->global->timing.tmOut,
+        run->global->exe.fuzzStdin ? "TRUE" : "FALSE", (long)run->global->timing.tmOut,
 #if defined(_HF_ARCH_LINUX)
         run->global->arch_linux.ignoreAddr,
 #elif defined(_HF_ARCH_NETBSD)
@@ -136,7 +136,7 @@ void report_appendReport(pid_t pid, run_t* run, funcs_t* funcs, size_t funcCnt, 
     util_ssnprintf(run->report, sizeof(run->report), "DESCRIPTION: %s\n", description);
     util_ssnprintf(run->report, sizeof(run->report), "ORIG_FNAME: %s\n", run->dynfile->path);
     util_ssnprintf(run->report, sizeof(run->report), "FUZZ_FNAME: %s\n", run->crashFileName);
-    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", pid);
+    util_ssnprintf(run->report, sizeof(run->report), "PID: %d\n", (int)pid);
     util_ssnprintf(
         run->report, sizeof(run->report), "SIGNAL: %s (%d)\n", util_sigName(signo), signo);
     util_ssnprintf(run->report, sizeof(run->report), "PC: 0x%" PRIx64 "\n", pc);

@@ -34,6 +34,23 @@
 #include <time.h>
 #include <unistd.h>
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+#include <sys/resource.h>
+#include <sys/sysctl.h>
+#if defined(__OpenBSD__)
+#include <sys/sched.h>
+#endif
+#endif
+
+#if defined(__sun)
+#include <kstat.h>
+#endif
+
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/task_info.h>
+#endif
+
 #include "libhfcommon/common.h"
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
@@ -90,7 +107,12 @@ static unsigned getCpuUse(int numCpus) {
     static uint64_t prevNiceT   = 0UL;
     static uint64_t prevSystemT = 0UL;
     static uint64_t prevIdleT   = 0UL;
+    uint64_t        userT       = 0UL;
+    uint64_t        niceT       = 0UL;
+    uint64_t        systemT     = 0UL;
+    uint64_t        idleT       = 0UL;
 
+#if defined(__linux__)
     FILE* f = fopen("/proc/stat", "re");
     if (f == NULL) {
         return 0;
@@ -98,12 +120,107 @@ static unsigned getCpuUse(int numCpus) {
     defer {
         fclose(f);
     };
-    uint64_t userT, niceT, systemT, idleT;
     if (fscanf(f, "cpu  %" PRIu64 "%" PRIu64 "%" PRIu64 "%" PRIu64, &userT, &niceT, &systemT,
             &idleT) != 4) {
         LOG_W("fscanf('/proc/stat') != 4");
         return 0;
     }
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
+    long   ticks      = (1000 / sysconf(_SC_CLK_TCK));
+    long   off        = 0;
+    size_t cpuDataLen = sizeof(long) * CPUSTATES * numCpus;
+    long*  cpuData    = malloc(cpuDataLen);
+    if (cpuData == NULL) {
+        return 0;
+    }
+
+    if (sysctlbyname("kern.cp_times", cpuData, &cpuDataLen, NULL, 0) != 0) {
+        LOG_W("sysctlbyname('kern.cp_times') != 0");
+        free(cpuData);
+        return 0;
+    }
+
+    userT = niceT = systemT = idleT = 0;
+
+    for (int i = 0; i < numCpus; i++) {
+        userT += cpuData[CP_USER + off] * ticks;
+        niceT += cpuData[CP_NICE + off] * ticks;
+        systemT += cpuData[CP_SYS + off] * ticks;
+        idleT += cpuData[CP_IDLE + off] * ticks;
+        off += CPUSTATES;
+    }
+
+    free(cpuData);
+#elif defined(__NetBSD__)
+    long ticks = (1000 / sysconf(_SC_CLK_TCK));
+
+    userT = niceT = systemT = idleT = 0;
+
+    for (int i = 0; i < numCpus; i++) {
+        uint64_t cpuData[CPUSTATES];
+        size_t   cpuDataLen = sizeof(cpuData);
+        char     mib[24]    = {0};
+        snprintf(mib, sizeof(mib), "kern.cp_time.%d", i);
+        if (sysctlbyname(mib, &cpuData, &cpuDataLen, NULL, 0) != 0) {
+            LOG_W("sysctlbyname('kern.cp_time') != 0");
+            return 0;
+        }
+        userT += cpuData[CP_USER] * ticks;
+        niceT += cpuData[CP_NICE] * ticks;
+        systemT += cpuData[CP_SYS] * ticks;
+        idleT += cpuData[CP_IDLE] * ticks;
+    }
+#elif defined(__OpenBSD__)
+    long ticks = (1000 / sysconf(_SC_CLK_TCK));
+
+    userT = niceT = systemT = idleT = 0;
+
+    for (int i = 0; i < numCpus; i++) {
+        uint64_t cpuData[CPUSTATES];
+        size_t   cpuDataLen = sizeof(cpuData);
+        int      mib[3]     = {CTL_KERN, KERN_CPTIME2, i};
+        if (sysctl(mib, 3, &cpuData, &cpuDataLen, NULL, 0) != 0) {
+            LOG_W("sysctl('KERN_CPTIME2') != 0");
+            return 0;
+        }
+        userT += cpuData[CP_USER] * ticks;
+        niceT += cpuData[CP_NICE] * ticks;
+        systemT += cpuData[CP_SYS] * ticks;
+        idleT += cpuData[CP_IDLE] * ticks;
+    }
+#elif defined(__sun)
+    kstat_ctl_t* kctl = kstat_open();
+    for (int i = 0; i < numCpus; i++) {
+        kstat_named_t* data;
+        kstat_t*       cpu = kstat_lookup(kctl, "cpu", i, NULL);
+        if (!cpu) {
+            LOG_W("kstat_lookup('cpu_info') != 0");
+            continue;
+        }
+        kstat_read(kctl, cpu, NULL);
+        data = kstat_data_lookup(cpu, "cpu_ticks_user");
+        userT += data->value.ui64;
+        data = kstat_data_lookup(cpu, "cpu_ticks_kernel");
+        systemT += data->value.ui64;
+        data = kstat_data_lookup(cpu, "cpu_ticks_idle");
+        idleT += data->value.ui64;
+    }
+
+    kstat_close(kctl);
+#else
+    host_cpu_load_info_data_t avg;
+    mach_msg_type_number_t    num = HOST_CPU_LOAD_INFO_COUNT;
+    userT = niceT = systemT = idleT = 0;
+
+    if (host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, (host_info_t)&avg, &num) ==
+        KERN_SUCCESS) {
+        userT   = avg.cpu_ticks[CPU_STATE_USER];
+        niceT   = avg.cpu_ticks[CPU_STATE_NICE];
+        systemT = avg.cpu_ticks[CPU_STATE_SYSTEM];
+        idleT   = avg.cpu_ticks[CPU_STATE_IDLE];
+    }
+
+#endif
 
     uint64_t userCycles   = (userT - prevUserT);
     uint64_t niceCycles   = (niceT - prevNiceT);
@@ -259,7 +376,7 @@ void display_display(honggfuzz_t* hfuzz) {
     uint64_t crashesCnt = ATOMIC_GET(hfuzz->cnts.crashesCnt);
     /* colored the crash count as red when exist crash */
     display_put("     Crashes : " ESC_BOLD "%s"
-                "%zu" ESC_RESET " [unique: %s" ESC_BOLD "%zu" ESC_RESET ", blacklist: " ESC_BOLD
+                "%zu" ESC_RESET " [unique: %s" ESC_BOLD "%zu" ESC_RESET ", blocklist: " ESC_BOLD
                 "%zu" ESC_RESET ", verified: " ESC_BOLD "%zu" ESC_RESET "]\n",
         crashesCnt > 0 ? ESC_RED : "", hfuzz->cnts.crashesCnt, crashesCnt > 0 ? ESC_RED : "",
         ATOMIC_GET(hfuzz->cnts.uniqueCrashesCnt), ATOMIC_GET(hfuzz->cnts.blCrashesCnt),
