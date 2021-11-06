@@ -169,7 +169,7 @@ private:
   size_t NumPCTables;
   size_t NumPCsInPCTables;
 
-  std::set<const PCTableEntry *> ObservedPCs;
+  Set<const PCTableEntry*> ObservedPCs;
   std::unordered_map<uintptr_t, uintptr_t> ObservedFuncs;  // PC => Counter.
 
   uint8_t *FocusFunctionCounterPtr = nullptr;

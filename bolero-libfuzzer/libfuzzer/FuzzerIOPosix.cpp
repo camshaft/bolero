@@ -53,7 +53,7 @@ std::string Basename(const std::string &Path) {
 }
 
 void ListFilesInDirRecursive(const std::string &Dir, long *Epoch,
-                             std::vector<std::string> *V, bool TopDir) {
+                             Vector<std::string> *V, bool TopDir) {
   auto E = GetEpoch(Dir);
   if (Epoch)
     if (E && *Epoch >= E) return;
@@ -77,6 +77,7 @@ void ListFilesInDirRecursive(const std::string &Dir, long *Epoch,
   if (Epoch && TopDir)
     *Epoch = E;
 }
+
 
 void IterateDirRecursive(const std::string &Dir,
                          void (*DirPreCallback)(const std::string &Dir),

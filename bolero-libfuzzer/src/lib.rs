@@ -6,8 +6,9 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
+        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test, TestFailure,
     };
+    use core::time::Duration;
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
@@ -23,6 +24,7 @@ pub mod fuzzer {
     #[derive(Debug, Default)]
     pub struct LibFuzzerEngine {
         driver_mode: Option<DriverMode>,
+        shrink_time: Option<Duration>,
     }
 
     impl LibFuzzerEngine {
@@ -41,6 +43,10 @@ pub mod fuzzer {
             self.driver_mode = Some(mode);
         }
 
+        fn set_shrink_time(&mut self, shrink_time: Duration) {
+            self.shrink_time = Some(shrink_time);
+        }
+
         fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
             panic::forward_panic(false);
@@ -49,17 +55,31 @@ pub mod fuzzer {
 
             start(&mut |slice: &[u8]| -> bool {
                 let mut input = ByteSliceTestInput::new(slice, driver_mode);
-                if test.test(&mut input).is_ok() {
-                    return true;
+
+                match test.test(&mut input) {
+                    Ok(_) => true,
+                    Err(error) => {
+                        eprintln!("test failed; shrinking input...");
+
+                        let shrunken =
+                            test.shrink(slice.to_vec(), None, driver_mode, self.shrink_time);
+
+                        if let Some(shrunken) = shrunken {
+                            eprintln!("{}", shrunken);
+                        } else {
+                            eprintln!(
+                                "{}",
+                                TestFailure {
+                                    seed: None,
+                                    error,
+                                    input
+                                }
+                            );
+                        }
+
+                        false
+                    }
                 }
-
-                let failure = test
-                    .shrink(slice.to_vec(), None, driver_mode)
-                    .expect("test should fail");
-
-                eprintln!("{:#}", failure);
-
-                false
             })
         }
     }

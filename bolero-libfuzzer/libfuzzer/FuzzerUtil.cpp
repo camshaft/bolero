@@ -43,7 +43,7 @@ void PrintASCIIByte(uint8_t Byte) {
   else if (Byte >= 32 && Byte < 127)
     Printf("%c", Byte);
   else
-    Printf("\\%03o", Byte);
+    Printf("\\x%02x", Byte);
 }
 
 void PrintASCII(const uint8_t *Data, size_t Size, const char *PrintAfter) {
@@ -124,7 +124,7 @@ bool ParseOneDictionaryEntry(const std::string &Str, Unit *U) {
   return true;
 }
 
-bool ParseDictionaryFile(const std::string &Text, std::vector<Unit> *Units) {
+bool ParseDictionaryFile(const std::string &Text, Vector<Unit> *Units) {
   if (Text.empty()) {
     Printf("ParseDictionaryFile: file does not exist or is empty\n");
     return false;

@@ -32,9 +32,9 @@ void WriteToFile(const Unit &U, const std::string &Path);
 void AppendToFile(const uint8_t *Data, size_t Size, const std::string &Path);
 void AppendToFile(const std::string &Data, const std::string &Path);
 
-void ReadDirToVectorOfUnits(const char *Path, std::vector<Unit> *V, long *Epoch,
+void ReadDirToVectorOfUnits(const char *Path, Vector<Unit> *V, long *Epoch,
                             size_t MaxSize, bool ExitOnError,
-                            std::vector<std::string> *VPaths = 0);
+                            Vector<std::string> *VPaths = 0);
 
 // Returns "Dir/FileName" or equivalent for the current OS.
 std::string DirPlusFile(const std::string &DirPath,
@@ -54,10 +54,6 @@ void DupAndCloseStderr();
 
 void CloseStdout();
 
-// For testing.
-FILE *GetOutputFile();
-void SetOutputFile(FILE *NewOutputFile);
-
 void Printf(const char *Fmt, ...);
 void VPrintf(bool Verbose, const char *Fmt, ...);
 
@@ -70,7 +66,7 @@ bool IsDirectory(const std::string &Path);
 size_t FileSize(const std::string &Path);
 
 void ListFilesInDirRecursive(const std::string &Dir, long *Epoch,
-                             std::vector<std::string> *V, bool TopDir);
+                             Vector<std::string> *V, bool TopDir);
 
 bool MkDirRecursive(const std::string &Dir);
 void RmDirRecursive(const std::string &Dir);
@@ -89,7 +85,7 @@ struct SizedFile {
   bool operator<(const SizedFile &B) const { return Size < B.Size; }
 };
 
-void GetSizedFilesFromDir(const std::string &Dir, std::vector<SizedFile> *V);
+void GetSizedFilesFromDir(const std::string &Dir, Vector<SizedFile> *V);
 
 char GetSeparator();
 bool IsSeparator(char C);

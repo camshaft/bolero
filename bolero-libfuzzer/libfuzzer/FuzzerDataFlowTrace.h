@@ -39,7 +39,7 @@
 namespace fuzzer {
 
 int CollectDataFlow(const std::string &DFTBinary, const std::string &DirPath,
-                    const std::vector<SizedFile> &CorporaFiles);
+                    const Vector<SizedFile> &CorporaFiles);
 
 class BlockCoverage {
 public:
@@ -77,11 +77,11 @@ public:
     return Result;
   }
 
-  std::vector<double> FunctionWeights(size_t NumFunctions) const;
+  Vector<double> FunctionWeights(size_t NumFunctions) const;
   void clear() { Functions.clear(); }
 
 private:
-  typedef std::vector<uint32_t> CoverageVector;
+  typedef Vector<uint32_t> CoverageVector;
 
   uint32_t NumberOfCoveredBlocks(const CoverageVector &Counters) const {
     uint32_t Res = 0;
@@ -117,9 +117,9 @@ class DataFlowTrace {
  public:
   void ReadCoverage(const std::string &DirPath);
   bool Init(const std::string &DirPath, std::string *FocusFunction,
-            std::vector<SizedFile> &CorporaFiles, Random &Rand);
+            Vector<SizedFile> &CorporaFiles, Random &Rand);
   void Clear() { Traces.clear(); }
-  const std::vector<uint8_t> *Get(const std::string &InputSha1) const {
+  const Vector<uint8_t> *Get(const std::string &InputSha1) const {
     auto It = Traces.find(InputSha1);
     if (It != Traces.end())
       return &It->second;
@@ -128,9 +128,9 @@ class DataFlowTrace {
 
  private:
   // Input's sha1 => DFT for the FocusFunction.
-   std::unordered_map<std::string, std::vector<uint8_t>> Traces;
-   BlockCoverage Coverage;
-   std::unordered_set<std::string> CorporaHashes;
+  std::unordered_map<std::string, Vector<uint8_t> > Traces;
+  BlockCoverage Coverage;
+  std::unordered_set<std::string> CorporaHashes;
 };
 }  // namespace fuzzer
 

@@ -33,8 +33,7 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
    COMPILER_RT_LIBCXX_PATH AND
    COMPILER_RT_LIBCXXABI_PATH)
-  list(APPEND LIBFUZZER_UNITTEST_CFLAGS -nostdinc++ -fno-exceptions)
-  list(APPEND LIBFUZZER_UNITTEST_LINK_FLAGS -nostdlib++ -fno-exceptions)
+  list(APPEND LIBFUZZER_UNITTEST_CFLAGS -nostdinc++)
 endif()
 
 if ("-fvisibility=hidden" IN_LIST LIBFUZZER_CFLAGS)

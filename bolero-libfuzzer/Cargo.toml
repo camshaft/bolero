@@ -1,6 +1,6 @@
 [package]
 name = "bolero-libfuzzer"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "libfuzzer plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
