@@ -39,14 +39,13 @@ impl ValueGenerator for BooleanGenerator {
     type Output = bool;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let value = driver.gen::<u32>()? as f32 / core::u32::MAX as f32;
-        Some(value < self.weight)
+        driver.gen_bool(Some(self.weight))
     }
 }
 
 impl TypeGenerator for bool {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(driver.gen::<u8>()? > (core::u8::MAX / 2))
+        driver.gen_bool(None)
     }
 }
 

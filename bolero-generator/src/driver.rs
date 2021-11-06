@@ -1,5 +1,24 @@
-use crate::TypeGenerator;
+use crate::{
+    uniform::{FillBytes, Uniform},
+    TypeGenerator,
+};
+use core::ops::Bound;
 use rand_core::RngCore;
+
+#[macro_use]
+mod macros;
+
+mod bytes;
+mod rng;
+
+pub use bytes::ByteSliceDriver;
+pub use rng::{DirectRng, ForcedRng};
+
+macro_rules! gen_method {
+    ($name:ident, $ty:ty) => {
+        fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty>;
+    };
+}
 
 /// Trait for driving the generation of a value
 ///
@@ -12,11 +31,23 @@ pub trait Driver: Sized {
         T::generate(self)
     }
 
-    /// Return the mode set for the driver
-    fn mode(&self) -> DriverMode;
+    gen_method!(gen_u8, u8);
+    gen_method!(gen_i8, i8);
+    gen_method!(gen_u16, u16);
+    gen_method!(gen_i16, i16);
+    gen_method!(gen_u32, u32);
+    gen_method!(gen_i32, i32);
+    gen_method!(gen_u64, u64);
+    gen_method!(gen_i64, i64);
+    gen_method!(gen_u128, u128);
+    gen_method!(gen_i128, i128);
+    gen_method!(gen_usize, usize);
+    gen_method!(gen_isize, isize);
+    gen_method!(gen_f32, f32);
+    gen_method!(gen_f64, f64);
+    gen_method!(gen_char, char);
 
-    /// Fill the target bytes with the driver state
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()>;
+    fn gen_bool(&mut self, probability: Option<f32>) -> Option<bool>;
 }
 
 /// Byte exhaustion strategy for the driver
@@ -29,114 +60,4 @@ pub enum DriverMode {
     /// When the driver bytes are exhausted, the driver will continue to fill input bytes with 0.
     /// This is useful for engines that want to maximize the amount of time spent executing tests.
     Forced,
-}
-
-#[derive(Debug)]
-pub struct ByteSliceDriver<'a> {
-    mode: DriverMode,
-    input: &'a [u8],
-}
-
-impl<'a> ByteSliceDriver<'a> {
-    pub fn new(input: &'a [u8], mode: Option<DriverMode>) -> Self {
-        let randomized = mode.is_none();
-
-        let mut driver = Self {
-            input,
-            mode: mode.unwrap_or(DriverMode::Direct),
-        };
-
-        // randomize the driver mode for better coverage
-        if randomized {
-            driver.mode = if driver.gen().unwrap_or_default() {
-                DriverMode::Forced
-            } else {
-                DriverMode::Direct
-            };
-        }
-
-        driver
-    }
-
-    pub fn new_direct(input: &'a [u8]) -> Self {
-        Self::new(input, Some(DriverMode::Direct))
-    }
-
-    pub fn new_forced(input: &'a [u8]) -> Self {
-        Self::new(input, Some(DriverMode::Forced))
-    }
-}
-
-impl<'a> Driver for ByteSliceDriver<'a> {
-    fn mode(&self) -> DriverMode {
-        self.mode
-    }
-
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
-        match self.mode {
-            DriverMode::Forced => {
-                let offset = self.input.len().min(bytes.len());
-                let (current, remaining) = self.input.split_at(offset);
-                let (bytes_to_fill, bytes_to_zero) = bytes.split_at_mut(offset);
-                bytes_to_fill.copy_from_slice(current);
-                for byte in bytes_to_zero.iter_mut() {
-                    *byte = 0;
-                }
-                self.input = remaining;
-                Some(())
-            }
-            DriverMode::Direct => {
-                if bytes.len() > self.input.len() {
-                    return None;
-                }
-                let (current, remaining) = self.input.split_at(bytes.len());
-                bytes.copy_from_slice(current);
-                self.input = remaining;
-                Some(())
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct DirectRng<R: RngCore>(R);
-
-impl<R: RngCore> DirectRng<R> {
-    pub fn new(rng: R) -> Self {
-        Self(rng)
-    }
-}
-
-impl<R: RngCore> Driver for DirectRng<R> {
-    fn mode(&self) -> DriverMode {
-        DriverMode::Direct
-    }
-
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
-        RngCore::try_fill_bytes(&mut self.0, bytes).ok()
-    }
-}
-
-#[derive(Debug)]
-pub struct ForcedRng<R: RngCore>(R);
-
-impl<R: RngCore> ForcedRng<R> {
-    pub fn new(rng: R) -> Self {
-        Self(rng)
-    }
-}
-
-impl<R: RngCore> Driver for ForcedRng<R> {
-    fn mode(&self) -> DriverMode {
-        DriverMode::Forced
-    }
-
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
-        if RngCore::try_fill_bytes(&mut self.0, bytes).is_err() {
-            for byte in bytes.iter_mut() {
-                *byte = 0;
-            }
-        }
-        Some(())
-    }
 }

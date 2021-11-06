@@ -1,68 +1,61 @@
-use crate::{driver::DriverMode, Driver, TypeGenerator, ValueGenerator};
-use core::ops::RangeBounds;
+use crate::{Driver, ValueGenerator};
+use core::{
+    marker::PhantomData,
+    ops::{Bound, RangeBounds},
+};
 
-pub trait BoundedValue<RangeBounds> {
-    type BoundValue;
-
-    fn is_within(&self, range: &RangeBounds) -> bool;
-    fn bind_within(&mut self, range: &RangeBounds);
+pub(crate) trait BoundExt<T> {
+    fn as_ref(&self) -> Bound<&T>;
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Bound<U>;
 }
 
-#[inline(always)]
-pub(crate) fn is_within<T: PartialOrd, R: RangeBounds<T>>(value: &T, range_bounds: &R) -> bool {
-    #![allow(clippy::neg_cmp_op_on_partial_ord)]
-    use core::ops::Bound::*;
-
-    macro_rules! ensure {
-        ($value:expr) => {{
-            if !($value) {
-                return false;
-            }
-        }};
+impl<T> BoundExt<T> for Bound<T> {
+    fn as_ref(&self) -> Bound<&T> {
+        match self {
+            Self::Excluded(v) => Bound::Excluded(v),
+            Self::Included(v) => Bound::Included(v),
+            Self::Unbounded => Bound::Unbounded,
+        }
     }
 
-    match range_bounds.start_bound() {
-        Included(start) => ensure!(start <= value),
-        Excluded(start) => ensure!(start < value),
-        Unbounded => {}
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Bound<U> {
+        match self {
+            Self::Excluded(v) => Bound::Excluded(f(v)),
+            Self::Included(v) => Bound::Included(f(v)),
+            Self::Unbounded => Bound::Unbounded,
+        }
     }
+}
 
-    match range_bounds.end_bound() {
-        Included(end) => ensure!(value <= end),
-        Excluded(end) => ensure!(value < end),
-        Unbounded => {}
+pub trait BoundedValue<B = Self>: Sized {
+    fn gen_bounded<D: Driver>(driver: &mut D, min: Bound<&B>, max: Bound<&B>) -> Option<Self>;
+
+    fn mutate_bounded<D: Driver>(
+        &mut self,
+        driver: &mut D,
+        min: Bound<&B>,
+        max: Bound<&B>,
+    ) -> Option<()> {
+        *self = Self::gen_bounded(driver, min, max)?;
+        Some(())
     }
-
-    true
 }
 
 macro_rules! range_generator {
     ($ty:ident) => {
-        impl<T: TypeGenerator + BoundedValue<Self>> ValueGenerator for core::ops::$ty<T> {
+        impl<T: BoundedValue> ValueGenerator for core::ops::$ty<T> {
             type Output = T;
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                let mut value = T::generate(driver)?;
-                if driver.mode() == DriverMode::Forced {
-                    value.bind_within(self);
-                    Some(value)
-                } else if value.is_within(self) {
-                    Some(value)
-                } else {
-                    None
-                }
+                let min = self.start_bound();
+                let max = self.end_bound();
+                T::gen_bounded(driver, min, max)
             }
 
             fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                T::mutate(value, driver)?;
-                if driver.mode() == DriverMode::Forced {
-                    value.bind_within(self);
-                    Some(())
-                } else if value.is_within(self) {
-                    Some(())
-                } else {
-                    None
-                }
+                let min = self.start_bound();
+                let max = self.end_bound();
+                value.mutate_bounded(driver, min, max)
             }
         }
     };
@@ -75,103 +68,44 @@ range_generator!(RangeTo);
 range_generator!(RangeToInclusive);
 
 #[derive(Debug)]
-pub struct BoundedGenerator<G, B> {
-    generator: G,
+pub struct BoundedGenerator<T, B> {
     range_bounds: B,
+    output: PhantomData<T>,
 }
 
-impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundValue>>
-    BoundedGenerator<G, B>
-{
-    pub fn new(generator: G, range_bounds: B) -> Self {
+impl<T: BoundedValue, B: RangeBounds<T>> BoundedGenerator<T, B> {
+    pub fn new(range_bounds: B) -> Self {
         BoundedGenerator {
-            generator,
             range_bounds,
+            output: PhantomData,
         }
     }
 
-    pub fn bounds<NewB: RangeBounds<T>>(self, range_bounds: NewB) -> BoundedGenerator<G, NewB> {
+    pub fn bounds<NewB: RangeBounds<T>>(self, range_bounds: NewB) -> BoundedGenerator<T, NewB> {
         BoundedGenerator {
-            generator: self.generator,
             range_bounds,
+            output: PhantomData,
         }
     }
 }
 
-impl<T: BoundedValue<B>, G: ValueGenerator<Output = T>, B: RangeBounds<T::BoundValue>>
-    ValueGenerator for BoundedGenerator<G, B>
-{
+impl<T: BoundedValue, B: RangeBounds<T>> ValueGenerator for BoundedGenerator<T, B> {
     type Output = T;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let mut value = self.generator.generate(driver)?;
-        if driver.mode() == DriverMode::Forced {
-            value.bind_within(&self.range_bounds);
-            Some(value)
-        } else if value.is_within(&self.range_bounds) {
-            Some(value)
-        } else {
-            None
-        }
+        let min = self.range_bounds.start_bound();
+        let max = self.range_bounds.end_bound();
+        T::gen_bounded(driver, min, max)
     }
 
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        self.generator.mutate(driver, value)?;
-        if driver.mode() == DriverMode::Forced {
-            value.bind_within(&self.range_bounds);
-            Some(())
-        } else if value.is_within(&self.range_bounds) {
-            Some(())
-        } else {
-            None
-        }
+        let min = self.range_bounds.start_bound();
+        let max = self.range_bounds.end_bound();
+        value.mutate_bounded(driver, min, max)
     }
 }
 
 #[test]
 fn with_bounds_test() {
     let _ = generator_test!(gen::<u8>().with().bounds(0..32));
-}
-
-#[test]
-fn bounded_u8_test() {
-    use core::ops::Bound;
-    fn test_bound<Bounds: std::fmt::Debug + RangeBounds<u8>>(mut v: u8, bounds: Bounds) {
-        assert_eq!(v.is_within(&bounds), bounds.contains(&v));
-        v.bind_within(&bounds);
-        assert!(bounds.contains(&v), "{:?} not in {:?}", v, bounds);
-    }
-
-    for v in 0u8..=255 {
-        test_bound(v, 4..10);
-        test_bound(v, 4..=10);
-        test_bound(v, ..10);
-        test_bound(v, ..);
-        test_bound(v, 4..);
-        test_bound(v, (Bound::Excluded(4), Bound::Unbounded));
-    }
-}
-
-#[test]
-fn bounded_i8_test() {
-    use core::ops::Bound;
-    fn test_bound<Bounds: core::fmt::Debug + RangeBounds<i8>>(mut v: i8, bounds: Bounds) {
-        assert_eq!(v.is_within(&bounds), bounds.contains(&v));
-        v.bind_within(&bounds);
-        assert!(bounds.contains(&v), "{:?} not in {:?}", v, bounds);
-    }
-
-    for v in -128i8..=127 {
-        test_bound(v, -5..=5);
-        test_bound(v, -10..=-5);
-        test_bound(v, 4..10);
-        test_bound(v, 4..=10);
-        test_bound(v, ..-10);
-        test_bound(v, ..=-10);
-        test_bound(v, ..);
-        test_bound(v, 4..);
-        test_bound(v, -127..0);
-        test_bound(v, -120..120);
-        test_bound(v, (Bound::Excluded(4), Bound::Unbounded));
-    }
 }

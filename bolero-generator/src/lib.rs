@@ -7,6 +7,8 @@ use core::marker::PhantomData;
 #[macro_use]
 mod testing;
 
+mod uniform;
+
 #[cfg(feature = "either")]
 pub use either;
 

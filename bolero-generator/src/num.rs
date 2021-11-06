@@ -1,97 +1,63 @@
 use crate::{
-    bounded::{is_within, BoundedGenerator, BoundedValue},
-    driver::DriverMode,
-    Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator,
+    bounded::{BoundExt, BoundedGenerator, BoundedValue},
+    Driver, TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
 };
-use byteorder::{ByteOrder, LittleEndian};
-use core::{
-    mem::size_of,
-    ops::{RangeBounds, RangeFrom},
-};
+use core::ops::{Bound, RangeFrom, RangeFull};
 
-trait NumBindWithin {
-    fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R);
-}
-
-macro_rules! impl_unsigned_bounded_integer {
-    ($ty:ident) => {
-        impl NumBindWithin for $ty {
-            fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R) {
-                use core::ops::Bound::*;
-
-                let start = match range_bounds.start_bound() {
-                    Included(value) => *value,
-                    Excluded(value) => value.saturating_add(1),
-                    Unbounded => core::$ty::MIN,
-                };
-
-                let end = match range_bounds.end_bound() {
-                    Included(value) => *value,
-                    Excluded(value) => value.saturating_sub(1),
-                    Unbounded => core::$ty::MAX,
-                };
-
-                let steps = (end - start).saturating_add(1);
-                let values_per_step = core::$ty::MAX / steps;
-                *self = core::cmp::min(start.saturating_add(*self / values_per_step), end);
+macro_rules! impl_integer {
+    ($ty:ident, $call:ident) => {
+        impl TypeGenerator for $ty {
+            fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
+                driver.$call(Bound::Unbounded, Bound::Unbounded)
             }
         }
 
-        impl_bounded_integer!($ty);
-    };
-}
+        impl ValueGenerator for $ty {
+            type Output = $ty;
 
-macro_rules! impl_bounded_integer {
-    ($ty:ident) => {
-        impl<R: RangeBounds<Self>> BoundedValue<R> for $ty {
-            type BoundValue = $ty;
-
-            #[inline(always)]
-            fn is_within(&self, range_bounds: &R) -> bool {
-                is_within(self, range_bounds)
+            fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
+                Some(*self)
             }
+        }
 
-            #[inline(always)]
-            fn bind_within(&mut self, range_bounds: &R) {
-                NumBindWithin::bind_within(self, range_bounds)
+        impl BoundedValue for $ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<Self> {
+                driver.$call(min, max)
             }
         }
 
         impl TypeGeneratorWithParams for $ty {
-            type Output = BoundedGenerator<TypeValueGenerator<$ty>, RangeFrom<$ty>>;
+            type Output = BoundedGenerator<Self, RangeFull>;
 
             fn gen_with() -> Self::Output {
-                BoundedGenerator::new(Default::default(), core::$ty::MIN..)
+                BoundedGenerator::new(..)
             }
         }
     };
 }
 
-impl TypeGenerator for u8 {
-    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        let mut bytes = [0; size_of::<u8>()];
-        Driver::fill_bytes(driver, &mut bytes)?;
-        Some(bytes[0])
-    }
-}
+impl_integer!(u8, gen_u8);
+impl_integer!(i8, gen_i8);
+impl_integer!(u16, gen_u16);
+impl_integer!(i16, gen_i16);
+impl_integer!(u32, gen_u32);
+impl_integer!(i32, gen_i32);
+impl_integer!(u64, gen_u64);
+impl_integer!(i64, gen_i64);
+impl_integer!(u128, gen_u128);
+impl_integer!(i128, gen_i128);
+impl_integer!(usize, gen_usize);
+impl_integer!(isize, gen_isize);
 
-impl ValueGenerator for u8 {
-    type Output = u8;
-
-    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-        Some(*self)
-    }
-}
-
-impl_unsigned_bounded_integer!(u8);
-
-macro_rules! impl_unsigned_integer {
+macro_rules! impl_float {
     ($ty:ident, $call:ident) => {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                let mut bytes = [0; size_of::<$ty>()];
-                Driver::fill_bytes(driver, &mut bytes)?;
-                Some(LittleEndian::$call(&bytes))
+                driver.$call(Bound::Unbounded, Bound::Unbounded)
             }
         }
 
@@ -103,220 +69,86 @@ macro_rules! impl_unsigned_integer {
             }
         }
 
-        impl_unsigned_bounded_integer!($ty);
+        impl BoundedValue for $ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<Self> {
+                driver.$call(min, max)
+            }
+        }
+
+        impl TypeGeneratorWithParams for $ty {
+            type Output = BoundedGenerator<Self, RangeFull>;
+
+            fn gen_with() -> Self::Output {
+                BoundedGenerator::new(..)
+            }
+        }
     };
 }
 
-macro_rules! impl_signed_integer {
-    ($ty:ident, $unsigned:ident) => {
-        impl TypeGenerator for $ty {
-            fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                let unsigned: $unsigned = driver.gen()?;
-
-                // When using Direct, use simple conversions instead of zigzag
-                let signed = if driver.mode() == DriverMode::Direct {
-                    unsigned as $ty
-                } else {
-                    ((unsigned >> 1) as $ty) ^ (-((unsigned & 1) as $ty))
-                };
-
-                Some(signed)
-            }
-        }
-
-        impl ValueGenerator for $ty {
-            type Output = $ty;
-
-            fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-                Some(*self)
-            }
-        }
-
-        impl NumBindWithin for $ty {
-            #[inline]
-            fn bind_within<R: RangeBounds<Self>>(&mut self, range_bounds: &R) {
-                use core::ops::Bound::*;
-
-                let to_unsigned = |value: $ty| {
-                    if value == core::$ty::MIN {
-                        return 0;
-                    }
-
-                    if value >= 0 {
-                        return value as $unsigned + core::$ty::MAX as $unsigned + 1;
-                    }
-
-                    value as $unsigned - core::$ty::MAX as $unsigned - 1
-                };
-
-                let from_unsigned = |value: $unsigned| {
-                    if value == 0 {
-                        return core::$ty::MIN;
-                    }
-
-                    if value > core::$ty::MAX as $unsigned {
-                        return (value - core::$ty::MAX as $unsigned - 1) as $ty;
-                    }
-
-                    (value + core::$ty::MAX as $unsigned) as $ty + 1
-                };
-
-                let start = match range_bounds.start_bound() {
-                    Included(value) => Included(to_unsigned(*value)),
-                    Excluded(value) => Excluded(to_unsigned(*value)),
-                    Unbounded => Unbounded,
-                };
-
-                let end = match range_bounds.end_bound() {
-                    Included(value) => Included(to_unsigned(*value)),
-                    Excluded(value) => Excluded(to_unsigned(*value)),
-                    Unbounded => Unbounded,
-                };
-
-                let mut unsigned = to_unsigned(*self);
-                NumBindWithin::bind_within(&mut unsigned, &(start, end));
-                *self = from_unsigned(unsigned);
-            }
-        }
-
-        impl_bounded_integer!($ty);
-    };
-}
-
-impl_signed_integer!(i8, u8);
-
-impl_unsigned_integer!(u16, read_u16);
-impl_signed_integer!(i16, u16);
-
-impl_unsigned_integer!(u32, read_u32);
-impl_signed_integer!(i32, u32);
-
-impl_unsigned_integer!(u64, read_u64);
-impl_signed_integer!(i64, u64);
-
-impl_unsigned_integer!(u128, read_u128);
-impl_signed_integer!(i128, u128);
-
-impl TypeGenerator for usize {
-    fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        let mut bytes = [0; size_of::<usize>()];
-        Driver::fill_bytes(driver, &mut bytes)?;
-        Some(LittleEndian::read_uint(&bytes, bytes.len()) as usize)
-    }
-}
-
-impl ValueGenerator for usize {
-    type Output = Self;
-
-    fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-        Some(*self)
-    }
-}
-
-impl_unsigned_bounded_integer!(usize);
-impl_signed_integer!(isize, usize);
-
-macro_rules! impl_float {
-    ($name:ident, $ty:ident, $call:ident) => {
-        impl TypeGenerator for $ty {
-            fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                let mut bytes = [0; size_of::<$ty>()];
-                Driver::fill_bytes(driver, &mut bytes)?;
-                Some(unsafe { core::mem::transmute(bytes) })
-            }
-        }
-
-        impl ValueGenerator for $ty {
-            type Output = $ty;
-
-            fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-                Some(*self)
-            }
-        }
-
-        // TODO impl_bounded
-    };
-}
-
-impl_float!(gen_f32, f32, read_f32);
-impl_float!(gen_f64, f64, read_f64);
+impl_float!(f32, gen_f32);
+impl_float!(f64, gen_f64);
 
 macro_rules! impl_non_zero_integer {
-    ($ty:ident) => {
+    ($ty:ident, $inner:ty) => {
         impl TypeGenerator for core::num::$ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 let value = (1..).generate(driver)?;
-                Some(unsafe { Self::new_unchecked(value) })
+                Self::new(value)
             }
         }
 
-        impl<R: RangeBounds<Self>> BoundedValue<R> for core::num::$ty {
-            type BoundValue = core::num::$ty;
+        impl BoundedValue for core::num::$ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<Self> {
+                let min = BoundExt::map(min, |value| value.get());
+                let max = BoundExt::map(max, |value| value.get());
 
-            #[inline(always)]
-            fn is_within(&self, range_bounds: &R) -> bool {
-                is_within(self, range_bounds)
+                let value = BoundedValue::gen_bounded(
+                    driver,
+                    BoundExt::as_ref(&min),
+                    BoundExt::as_ref(&max),
+                )?;
+                Self::new(value)
             }
+        }
 
-            #[inline(always)]
-            fn bind_within(&mut self, range_bounds: &R) {
-                use core::ops::Bound::*;
-
-                let start = match range_bounds.start_bound() {
-                    Included(value) => Included(value.get()),
-                    Excluded(value) => Excluded(value.get()),
-                    Unbounded => Unbounded,
-                };
-
-                let end = match range_bounds.end_bound() {
-                    Included(value) => Included(value.get()),
-                    Excluded(value) => Excluded(value.get()),
-                    Unbounded => Unbounded,
-                };
-
-                let mut inner = self.get();
-
-                // try a few times before giving up
-                for _ in 0..=3 {
-                    NumBindWithin::bind_within(&mut inner, &(start, end));
-                    if let Some(value) = Self::new(inner) {
-                        *self = value;
-                        return;
-                    } else {
-                        inner = inner.wrapping_add(1);
-                    }
-                }
-
-                panic!(concat!(
-                    "could not satisfy bounded value for ",
-                    stringify!($ty)
-                ))
+        impl BoundedValue<$inner> for core::num::$ty {
+            fn gen_bounded<D: Driver>(
+                driver: &mut D,
+                min: Bound<&$inner>,
+                max: Bound<&$inner>,
+            ) -> Option<Self> {
+                let value = BoundedValue::gen_bounded(driver, min, max)?;
+                Self::new(value)
             }
         }
 
         impl TypeGeneratorWithParams for core::num::$ty {
-            type Output =
-                BoundedGenerator<TypeValueGenerator<core::num::$ty>, RangeFrom<core::num::$ty>>;
+            type Output = BoundedGenerator<Self, RangeFrom<Self>>;
 
             fn gen_with() -> Self::Output {
-                BoundedGenerator::new(
-                    Default::default(),
-                    unsafe { core::num::$ty::new_unchecked(1) }..,
-                )
+                BoundedGenerator::new(unsafe { core::num::$ty::new_unchecked(1) }..)
             }
         }
     };
 }
 
-impl_non_zero_integer!(NonZeroI8);
-impl_non_zero_integer!(NonZeroU8);
-impl_non_zero_integer!(NonZeroI16);
-impl_non_zero_integer!(NonZeroU16);
-impl_non_zero_integer!(NonZeroI32);
-impl_non_zero_integer!(NonZeroU32);
-impl_non_zero_integer!(NonZeroI64);
-impl_non_zero_integer!(NonZeroU64);
-impl_non_zero_integer!(NonZeroI128);
-impl_non_zero_integer!(NonZeroU128);
-impl_non_zero_integer!(NonZeroIsize);
-impl_non_zero_integer!(NonZeroUsize);
+impl_non_zero_integer!(NonZeroI8, i8);
+impl_non_zero_integer!(NonZeroU8, u8);
+impl_non_zero_integer!(NonZeroI16, i16);
+impl_non_zero_integer!(NonZeroU16, u16);
+impl_non_zero_integer!(NonZeroI32, i32);
+impl_non_zero_integer!(NonZeroU32, u32);
+impl_non_zero_integer!(NonZeroI64, i64);
+impl_non_zero_integer!(NonZeroU64, u64);
+impl_non_zero_integer!(NonZeroI128, i128);
+impl_non_zero_integer!(NonZeroU128, u128);
+impl_non_zero_integer!(NonZeroIsize, isize);
+impl_non_zero_integer!(NonZeroUsize, usize);

@@ -2,6 +2,7 @@ use crate::{
     panic, panic::PanicError, test_input::SliceDebug, DriverMode, IntoTestResult, TestFailure,
     TestInput, ValueGenerator,
 };
+use core::time::Duration;
 use std::panic::RefUnwindSafe;
 
 /// Trait for defining a test case
@@ -26,8 +27,9 @@ pub trait Test: Sized {
         input: Vec<u8>,
         seed: Option<u64>,
         driver_mode: Option<DriverMode>,
+        shrink_time: Option<Duration>,
     ) -> Option<TestFailure<Self::Value>> {
-        crate::shrink::shrink(self, input, seed, driver_mode)
+        crate::shrink::shrink(self, input, seed, driver_mode, shrink_time)
     }
 }
 
@@ -197,7 +199,12 @@ where
     }
 
     fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
-        input.with_driver(&mut |driver| self.gen.generate(driver).unwrap())
+        input.with_driver(&mut |driver| {
+            let forward_panic = crate::panic::forward_panic(true);
+            let value = self.gen.generate(driver).unwrap();
+            crate::panic::forward_panic(forward_panic);
+            value
+        })
     }
 }
 
@@ -247,6 +254,11 @@ where
     }
 
     fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
-        input.with_driver(&mut |driver| self.gen.generate(driver).unwrap())
+        input.with_driver(&mut |driver| {
+            let forward_panic = crate::panic::forward_panic(true);
+            let value = self.gen.generate(driver).unwrap();
+            crate::panic::forward_panic(forward_panic);
+            value
+        })
     }
 }
