@@ -52,13 +52,10 @@ class DictionaryEntry {
  public:
   DictionaryEntry() {}
   DictionaryEntry(Word W) : W(W) {}
-  DictionaryEntry(Word W, size_t PositionHint)
-      : W(W), PositionHint(PositionHint) {}
+  DictionaryEntry(Word W, size_t PositionHint) : W(W), PositionHint(PositionHint) {}
   const Word &GetW() const { return W; }
 
-  bool HasPositionHint() const {
-    return PositionHint != std::numeric_limits<size_t>::max();
-  }
+  bool HasPositionHint() const { return PositionHint != std::numeric_limits<size_t>::max(); }
   size_t GetPositionHint() const {
     assert(HasPositionHint());
     return PositionHint;
@@ -111,12 +108,12 @@ private:
 };
 
 // Parses one dictionary entry.
-// If successful, writes the entry to Unit and returns true,
+// If successful, write the enty to Unit and returns true,
 // otherwise returns false.
 bool ParseOneDictionaryEntry(const std::string &Str, Unit *U);
 // Parses the dictionary file, fills Units, returns true iff all lines
 // were parsed successfully.
-bool ParseDictionaryFile(const std::string &Text, std::vector<Unit> *Units);
+bool ParseDictionaryFile(const std::string &Text, Vector<Unit> *Units);
 
 }  // namespace fuzzer
 
