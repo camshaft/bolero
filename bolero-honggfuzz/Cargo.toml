@@ -1,6 +1,6 @@
 [package]
 name = "bolero-honggfuzz"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "honggfuzz plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
