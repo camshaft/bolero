@@ -1,6 +1,6 @@
 [package]
 name = "bolero-generator"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "value generator for testing and fuzzing"
 homepage = "https://github.com/camshaft/bolero"
