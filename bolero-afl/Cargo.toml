@@ -1,6 +1,6 @@
 [package]
 name = "bolero-afl"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Cameron Bytheway <bythewc@amazon.com>"]
 description = "afl plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
