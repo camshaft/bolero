@@ -124,7 +124,7 @@ impl TargetLocation {
     }
 
     fn item_path(&self) -> String {
-        format_symbol_name(&self.item_path)
+        format_symbol_name(self.item_path)
     }
 }
 

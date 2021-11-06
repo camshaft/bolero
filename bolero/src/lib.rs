@@ -47,11 +47,9 @@ use core::{fmt::Debug, marker::PhantomData};
 /// ```rust
 /// use bolero::check;
 ///
-/// fn main() {
-///     check!().for_each(|input| {
-///         // implement checks here
-///     });
-/// }
+/// check!().for_each(|input| {
+///     // implement checks here
+/// });
 /// ```
 ///
 /// Calling `with_type::<Type>()` will generate random values of `Type`
@@ -64,13 +62,11 @@ use core::{fmt::Debug, marker::PhantomData};
 /// ```rust
 /// use bolero::check;
 ///
-/// fn main() {
-///     check!()
-///         .with_type::<(u8, u16)>()
-///         .for_each(|(a, b)| {
-///             // implement checks here
-///         });
-/// }
+/// check!()
+///     .with_type::<(u8, u16)>()
+///     .for_each(|(a, b)| {
+///         // implement checks here
+///     });
 /// ```
 ///
 /// The function `with_generator::<Generator>(generator)` will use the provided `Generator`,
@@ -85,13 +81,11 @@ use core::{fmt::Debug, marker::PhantomData};
 /// ```rust
 /// use bolero::check;
 ///
-/// fn main() {
-///     check!()
-///         .with_generator((0..100, 10..50))
-///         .for_each(|(a, b)| {
-///             // implement checks here
-///         });
-/// }
+/// check!()
+///     .with_generator((0..100, 10..50))
+///     .for_each(|(a, b)| {
+///         // implement checks here
+///     });
 /// ```
 ///
 /// For compatibility purposes, `bolero` also supports the same interface as
@@ -105,11 +99,9 @@ use core::{fmt::Debug, marker::PhantomData};
 /// ```rust
 /// use bolero::check;
 ///
-/// fn main() {
-///     check!(|input| {
-///         // implement checks here
-///     });
-/// }
+/// check!(|input| {
+///     // implement checks here
+/// });
 /// ```
 
 #[macro_export]
