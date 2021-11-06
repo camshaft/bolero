@@ -188,7 +188,7 @@ fn parse_control_file<'a, I: Iterator<Item = IOResult<String>>>(
         }
     }
 
-    let mut results: Vec<_> = results.drain(..).filter_map(|r| r).collect();
+    let mut results: Vec<_> = results.drain(..).flatten().collect();
 
     results.sort_by(|a, b| {
         let size_cmp = a.size.cmp(&b.size);

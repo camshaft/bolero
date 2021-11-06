@@ -139,7 +139,7 @@ static void fuzz_setDynamicMainState(run_t* run) {
         size_t newsz = (run->global->io.dynfileqMaxSz >= _HF_INPUT_DEFAULT_SIZE)
                            ? run->global->io.dynfileqMaxSz
                            : _HF_INPUT_DEFAULT_SIZE;
-        newsz = (newsz + newsz / 4); /* Add 25% overhead for growth */
+        newsz        = (newsz + newsz / 4); /* Add 25% overhead for growth */
         if (newsz > run->global->mutate.maxInputSz) {
             newsz = run->global->mutate.maxInputSz;
         }
@@ -475,10 +475,15 @@ static void* fuzz_threadNew(void* arg) {
     unsigned int fuzzNo = ATOMIC_POST_INC(hfuzz->threads.threadsActiveCnt);
     LOG_I("Launched new fuzzing thread, no. #%u", fuzzNo);
 
+    if (!util_PinThreadToCPUs(fuzzNo, hfuzz->threads.pinThreadToCPUs)) {
+        PLOG_W("Pinning thread #%u to %" PRIu32 " CPUs failed", fuzzNo,
+            hfuzz->threads.pinThreadToCPUs);
+    }
+
     run_t run = {
         .global         = hfuzz,
         .pid            = 0,
-        .dynfile        = (dynfile_t*)util_Malloc(sizeof(dynfile_t) + hfuzz->io.maxFileSz),
+        .dynfile        = (dynfile_t*)util_Calloc(sizeof(dynfile_t) + hfuzz->io.maxFileSz),
         .fuzzNo         = fuzzNo,
         .persistentSock = -1,
         .tmOutSignaled  = false,

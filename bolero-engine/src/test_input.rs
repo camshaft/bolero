@@ -45,11 +45,11 @@ impl<'a, Output> TestInput<Output> for ByteSliceTestInput<'a> {
     type Driver = ByteSliceDriver<'a>;
 
     fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
-        f(&self.slice)
+        f(self.slice)
     }
 
     fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
-        f(&mut ByteSliceDriver::new(&self.slice, self.mode))
+        f(&mut ByteSliceDriver::new(self.slice, self.mode))
     }
 }
 

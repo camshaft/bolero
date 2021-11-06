@@ -89,7 +89,11 @@ static void initializeLibcFunctions(void) {
 }
 
 static void* initialzeTryMapHugeTLB(int fd, size_t sz) {
-    int   mflags = files_getTmpMapFlags(MAP_SHARED, /* nocore= */ true);
+    int initflags = MAP_SHARED;
+#if defined(MAP_ALIGNED_SUPER)
+    initflags |= MAP_ALIGNED_SUPER;
+#endif
+    int   mflags = files_getTmpMapFlags(initflags, /* nocore= */ true);
     void* ret    = mmap(NULL, sz, PROT_READ | PROT_WRITE, mflags, fd, 0);
 
 #if defined(MADV_HUGEPAGE)
@@ -238,7 +242,7 @@ static inline bool instrumentLimitEvery(uint64_t step) {
 }
 
 static inline void instrumentAddConstMemInternal(const void* mem, size_t len) {
-    if (len == 0) {
+    if (len <= 1) {
         return;
     }
     if (len > sizeof(globalCmpFeedback->valArr[0].val)) {
@@ -771,7 +775,7 @@ void instrumentAddConstMem(const void* mem, size_t len, bool check_if_ro) {
     if (!globalCmpFeedback) {
         return;
     }
-    if (len == 0) {
+    if (len <= 1) {
         return;
     }
     if (!instrumentLimitEvery(127)) {
@@ -790,6 +794,12 @@ void instrumentAddConstStr(const char* s) {
     if (!instrumentLimitEvery(127)) {
         return;
     }
+    /*
+     * if (len <= 1)
+     */
+    if (s[0] == '\0' || s[1] == '\0') {
+        return;
+    }
     if (util_getProgAddr(s) == LHFC_ADDR_NOTFOUND) {
         return;
     }
@@ -800,7 +810,7 @@ void instrumentAddConstStrN(const char* s, size_t n) {
     if (!globalCmpFeedback) {
         return;
     }
-    if (n == 0) {
+    if (n <= 1) {
         return;
     }
     if (!instrumentLimitEvery(127)) {

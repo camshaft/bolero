@@ -82,7 +82,7 @@ static void sigHandler(int sig) {
     }
 
     if (ATOMIC_GET(sigReceived) != 0) {
-        exitWithMsg("Repeated termination signal caugth\n", EXIT_FAILURE);
+        exitWithMsg("Repeated termination signal caught\n", EXIT_FAILURE);
     }
 
     ATOMIC_SET(sigReceived, sig);
@@ -101,7 +101,7 @@ static void setupRLimits(void) {
         LOG_E("RLIMIT_NOFILE max limit < 1024 (%zu). Expect troubles!", (size_t)rlim.rlim_max);
         return;
     }
-    rlim.rlim_cur = MIN(1024, rlim.rlim_max);    // we don't need more
+    rlim.rlim_cur = HF_MIN(1024, rlim.rlim_max);    // we don't need more
     if (setrlimit(RLIMIT_NOFILE, &rlim) == -1) {
         PLOG_E("Couldn't setrlimit(RLIMIT_NOFILE, cur=%zu/max=%zu)", (size_t)rlim.rlim_cur,
             (size_t)rlim.rlim_max);
@@ -160,7 +160,7 @@ static void setupSignalsPreThreads(void) {
         PLOG_F("sigaction(SIGQUIT) failed");
     }
     if (sigaction(SIGALRM, &sa, NULL) == -1) {
-        PLOG_F("sigaction(SIGQUIT) failed");
+        PLOG_F("sigaction(SIGALRM) failed");
     }
     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
         PLOG_F("sigaction(SIGCHLD) failed");
@@ -255,7 +255,7 @@ static void* signalThread(void* arg) {
     return NULL;
 }
 
-static void mainThreadLoop(honggfuzz_t* hfuzz) {
+static uint8_t mainThreadLoop(honggfuzz_t* hfuzz) {
     setupSignalsMainThread();
     setupMainThreadTimer();
 
@@ -291,6 +291,11 @@ static void mainThreadLoop(honggfuzz_t* hfuzz) {
         pingThreads(hfuzz);
         util_sleepForMSec(50); /* 50ms */
     }
+    if (hfuzz->cfg.exitUponCrash && ATOMIC_GET(hfuzz->cnts.crashesCnt) > 0) {
+        return hfuzz->cfg.exitCodeUponCrash;
+    } else {
+        return hfuzz->cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
 }
 
 static const char* strYesNo(bool yes) {
@@ -298,7 +303,7 @@ static const char* strYesNo(bool yes) {
 }
 
 static const char* getGitVersion() {
-    static char version[] = "$Id: 26017da9da354ef4480d11fe3468f4622fb25223 $";
+    static char version[] = "$Id: 380cf14962c64e3fa902d9442b6c6513869116ed $";
     if (strlen(version) == 47) {
         version[45] = '\0';
         return &version[5];
@@ -366,18 +371,18 @@ int honggfuzz_main(int argc, char** argv) {
         LOG_F("Couldn't parse dictionary file ('%s')", hfuzz.mutate.dictionaryFile);
     }
 
-    if (hfuzz.feedback.blacklistFile && !input_parseBlacklist(&hfuzz)) {
-        LOG_F("Couldn't parse stackhash blacklist file ('%s')", hfuzz.feedback.blacklistFile);
+    if (hfuzz.feedback.blocklistFile && !input_parseBlacklist(&hfuzz)) {
+        LOG_F("Couldn't parse stackhash blocklist file ('%s')", hfuzz.feedback.blocklistFile);
     }
 #define hfuzzl hfuzz.arch_linux
     if (hfuzzl.symsBlFile &&
         ((hfuzzl.symsBlCnt = files_parseSymbolFilter(hfuzzl.symsBlFile, &hfuzzl.symsBl)) == 0)) {
-        LOG_F("Couldn't parse symbols blacklist file ('%s')", hfuzzl.symsBlFile);
+        LOG_F("Couldn't parse symbols blocklist file ('%s')", hfuzzl.symsBlFile);
     }
 
     if (hfuzzl.symsWlFile &&
         ((hfuzzl.symsWlCnt = files_parseSymbolFilter(hfuzzl.symsWlFile, &hfuzzl.symsWl)) == 0)) {
-        LOG_F("Couldn't parse symbols whitelist file ('%s')", hfuzzl.symsWlFile);
+        LOG_F("Couldn't parse symbols allowlist file ('%s')", hfuzzl.symsWlFile);
     }
 
     if (!(hfuzz.feedback.covFeedbackMap =
@@ -404,11 +409,11 @@ int honggfuzz_main(int argc, char** argv) {
         LOG_F("Couldn't start the signal thread");
     }
 
-    mainThreadLoop(&hfuzz);
+    uint8_t exitcode = mainThreadLoop(&hfuzz);
 
     /* Clean-up global buffers */
-    if (hfuzz.feedback.blacklist) {
-        free(hfuzz.feedback.blacklist);
+    if (hfuzz.feedback.blocklist) {
+        free(hfuzz.feedback.blocklist);
     }
 #if defined(_HF_ARCH_LINUX)
     if (hfuzz.arch_linux.symsBl) {
@@ -431,5 +436,5 @@ int honggfuzz_main(int argc, char** argv) {
 
     printSummary(&hfuzz);
 
-    return hfuzz.cnts.crashesCnt > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+    return exitcode;
 }

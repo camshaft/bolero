@@ -205,6 +205,8 @@ static void subproc_prepareExecvArgs(run_t* run) {
 }
 
 static bool subproc_PrepareExecv(run_t* run) {
+    util_ParentDeathSigIfAvail(SIGKILL);
+
     /*
      * The address space limit. If big enough - roughly the size of RAM used
      */
@@ -519,7 +521,8 @@ void subproc_checkTimeLimit(run_t* run) {
 
     if (run->tmOutSignaled && (diffUSecs > ((run->global->timing.tmOut + 1) * 1000000))) {
         /* Has this instance been already signaled due to timeout? Just, SIGKILL it */
-        LOG_W("pid=%d has already been signaled due to timeout. Killing it with SIGKILL", run->pid);
+        LOG_W("pid=%d has already been signaled due to timeout. Killing it with SIGKILL",
+            (int)run->pid);
         kill(run->pid, SIGKILL);
         return;
     }

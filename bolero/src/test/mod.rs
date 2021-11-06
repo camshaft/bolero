@@ -120,6 +120,9 @@ impl TestEngine {
             arguments.format = Some(FormatSetting::Terse);
         }
 
+        // we only support running tests in a single thread
+        arguments.num_threads = Some(1);
+
         let tests = self.tests();
 
         bolero_engine::panic::set_hook();

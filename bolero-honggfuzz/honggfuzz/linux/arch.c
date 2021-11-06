@@ -34,7 +34,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__GLIBC__)
 #include <sys/cdefs.h>
+#endif
 #include <sys/personality.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
@@ -83,26 +85,29 @@ static pid_t arch_clone(uintptr_t flags) {
 }
 
 pid_t arch_fork(run_t* run) {
-    pid_t pid = run->global->arch_linux.useClone ? arch_clone(CLONE_UNTRACED | SIGCHLD) : fork();
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+
+    pid_t pid = run->global->arch_linux.useClone
+                    ? arch_clone(run->global->arch_linux.cloneFlags | CLONE_UNTRACED | SIGCHLD)
+                    : fork();
     if (pid == -1) {
         return pid;
     }
     if (pid == 0) {
         logMutexReset();
-        if (prctl(PR_SET_PDEATHSIG, (unsigned long)SIGKILL, 0UL, 0UL, 0UL) == -1) {
-            PLOG_W("prctl(PR_SET_PDEATHSIG, SIGKILL)");
+
+        if (run->global->arch_linux.cloneFlags != 0 && !nsSetup(uid, gid)) {
+            PLOG_W("nsSetup(uid=%d, gid=%d)", (int)uid, (int)gid);
         }
+
         return pid;
     }
     return pid;
 }
 
 bool arch_launchChild(run_t* run) {
-    if ((run->global->arch_linux.cloneFlags & CLONE_NEWNET) && !nsIfaceUp("lo")) {
-        LOG_W("Cannot bring interface 'lo' up");
-    }
-
-    /* Try to enable network namespacing if requested */
+    /* Try to enable network namespacing */
     if (run->global->arch_linux.useNetNs == HF_MAYBE) {
         if (unshare(CLONE_NEWUSER | CLONE_NEWNET) == -1) {
             PLOG_D("unshare((CLONE_NEWUSER|CLONE_NEWNS) failed");
@@ -111,6 +116,9 @@ bool arch_launchChild(run_t* run) {
             return false;
         }
         LOG_D("Network namespacing enabled, and the 'lo' interface is set up");
+    }
+    if ((run->global->arch_linux.cloneFlags & CLONE_NEWNET) && !nsIfaceUp("lo")) {
+        LOG_W("Cannot bring interface 'lo' up");
     }
 
     /* Make it attach-able by ptrace() */
@@ -182,9 +190,6 @@ void arch_prepareParentAfterFork(run_t* run) {
         };
         if (fcntl(run->persistentSock, F_SETOWN_EX, &fown)) {
             PLOG_F("fcntl(%d, F_SETOWN_EX)", run->persistentSock);
-        }
-        if (fcntl(run->persistentSock, F_SETSIG, SIGIO) == -1) {
-            PLOG_F("fcntl(%d, F_SETSIG, SIGIO)", run->persistentSock);
         }
         if (fcntl(run->persistentSock, F_SETFL, O_ASYNC) == -1) {
             PLOG_F("fcntl(%d, F_SETFL, O_ASYNC)", run->persistentSock);
@@ -285,6 +290,12 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
     }
 
     for (;;) {
+        /* We need to use clone() to enable CLONE_NEW* flags */
+        if (hfuzz->arch_linux.cloneFlags) {
+            hfuzz->arch_linux.useClone = true;
+            break;
+        }
+
         __attribute__((weak)) const char* gnu_get_libc_version(void);
         if (!gnu_get_libc_version) {
             LOG_W("Unknown libc implementation. Using clone() instead of fork()");
@@ -372,11 +383,6 @@ bool arch_archInit(honggfuzz_t* hfuzz) {
 
     /* Updates the important signal array based on input args */
     arch_traceSignalsInit(hfuzz);
-
-    if (hfuzz->arch_linux.cloneFlags && unshare(hfuzz->arch_linux.cloneFlags) == -1) {
-        LOG_E("unshare(%tx)", hfuzz->arch_linux.cloneFlags);
-        return false;
-    }
 
     return true;
 }

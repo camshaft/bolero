@@ -11,9 +11,10 @@ edition = "2018"
 readme = "README.md"
 
 [features]
-default = ["afl", "honggfuzz"]
+default = ["afl", "libfuzzer"]
 afl = ["bolero-afl"]
 honggfuzz = ["bolero-honggfuzz"]
+libfuzzer = []
 
 [dependencies]
 anyhow = "1.0"
@@ -21,6 +22,7 @@ bit-set = "0.5"
 bolero-afl = { version = "0.6", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.6", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
 humantime = "2"
+rustc_version = "0.4"
 structopt = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

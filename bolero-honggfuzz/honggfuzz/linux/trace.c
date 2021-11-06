@@ -34,7 +34,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__GLIBC__)
 #include <sys/cdefs.h>
+#endif
 #include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/resource.h>
@@ -229,6 +231,11 @@ struct user_regs_struct {
 #endif /* defined(PTRACE_GETREGS) */
 #endif /* defined(__ANDROID__) */
 
+#if defined(__clang__)
+_Pragma("clang diagnostic push");
+_Pragma("clang diagnostic ignored \"-Woverride-init\"");
+#endif
+
 static struct {
     const char* descr;
     bool        important;
@@ -262,6 +269,10 @@ static struct {
     [SIGSYS].important = true,
     [SIGSYS].descr     = "SIGSYS",
 };
+
+#if defined(__clang__)
+_Pragma("clang diagnostic pop");
+#endif
 
 #ifndef SI_FROMUSER
 #define SI_FROMUSER(siptr) ((siptr)->si_code <= 0)
@@ -531,7 +542,8 @@ static void arch_traceAnalyzeData(run_t* run, pid_t pid) {
 
 static void arch_traceSaveData(run_t* run, pid_t pid) {
     char      instr[_HF_INSTR_SZ] = "\x00";
-    siginfo_t si                  = {};
+    siginfo_t si;
+    memset(&si, '\0', sizeof(si));
 
     if (ptrace(PTRACE_GETSIGINFO, pid, 0, &si) == -1) {
         PLOG_W("Couldn't get siginfo for pid %d", pid);
@@ -543,6 +555,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
         crashAddr = 0UL;
     }
 
+    int      open_flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
     uint64_t pc         = 0;
     uint64_t status_reg = 0;
     size_t   pcRegSz    = arch_getPC(pid, &pc, &status_reg);
@@ -590,7 +603,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
 
     /*
      * Temp local copy of previous backtrace value in case worker hit crashes into multiple
-     * tids for same target master thread. Will be 0 for first crash against target.
+     * tids for same target main thread. Will be 0 for first crash against target.
      */
     uint64_t oldBacktrace = run->backtrace;
 
@@ -612,7 +625,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
 
     /*
      * If worker crashFileName member is set, it means that a tid has already crashed
-     * from target master thread.
+     * from target main thread.
      */
     if (run->crashFileName[0] != '\0') {
         LOG_D("Multiple crashes detected from worker against attached tids group");
@@ -631,8 +644,8 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     ATOMIC_POST_INC(run->global->cnts.crashesCnt);
 
     /*
-     * Check if backtrace contains whitelisted symbol. Whitelist overrides
-     * both stackhash and symbol blacklist. Crash is always kept regardless
+     * Check if backtrace contains allowlisted symbol. Whitelist overrides
+     * both stackhash and symbol blocklist. Crash is always kept regardless
      * of the status of uniqueness flag.
      */
     if (run->global->arch_linux.symsWl) {
@@ -640,14 +653,14 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
             run->global->arch_linux.symsWlCnt, run->global->arch_linux.symsWl, funcCnt, funcs);
         if (wlSymbol != NULL) {
             saveUnique = false;
-            LOG_D("Whitelisted symbol '%s' found, skipping blacklist checks", wlSymbol);
+            LOG_D("Whitelisted symbol '%s' found, skipping blocklist checks", wlSymbol);
         }
     } else {
         /*
-         * Check if stackhash is blacklisted
+         * Check if stackhash is blocklisted
          */
-        if (run->global->feedback.blacklist &&
-            (fastArray64Search(run->global->feedback.blacklist, run->global->feedback.blacklistCnt,
+        if (run->global->feedback.blocklist &&
+            (fastArray64Search(run->global->feedback.blocklist, run->global->feedback.blocklistCnt,
                  run->backtrace) != -1)) {
             LOG_I("Blacklisted stack hash '%" PRIx64 "', skipping", run->backtrace);
             ATOMIC_POST_INC(run->global->cnts.blCrashesCnt);
@@ -655,7 +668,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
         }
 
         /*
-         * Check if backtrace contains blacklisted symbol
+         * Check if backtrace contains blocklisted symbol
          */
         char* blSymbol = arch_btContainsSymbol(
             run->global->arch_linux.symsBlCnt, run->global->arch_linux.symsBl, funcCnt, funcs);
@@ -666,7 +679,7 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
         }
     }
 
-    /* If non-blacklisted crash detected, zero set two MSB */
+    /* If non-blocklisted crash detected, zero set two MSB */
     ATOMIC_POST_ADD(run->global->cfg.dynFileIterExpire, _HF_DYNFILE_SUB_MASK);
 
     /* Those addresses will be random, so depend on stack-traces for uniqueness */
@@ -703,14 +716,46 @@ static void arch_traceSaveData(run_t* run, pid_t pid) {
     }
 
     if (files_exists(run->crashFileName)) {
-        LOG_I("Crash (dup): '%s' already exists, skipping", run->crashFileName);
-        /* Clear filename so that verifier can understand we hit a duplicate */
-        memset(run->crashFileName, 0, sizeof(run->crashFileName));
-        return;
+        if (run->global->io.saveSmaller) {
+            /*
+             * If the new run produces a smaller file than exists already, we
+             * will replace it.
+             *
+             * If this is the second test case, we save the first with .orig
+             * suffix before overwriting.
+             */
+            struct stat st;
+            char        origFile[PATH_MAX];
+            if (stat(run->crashFileName, &st) == -1) {
+                LOG_W("Couldn't stat() the '%s' file", run->crashFileName);
+            } else if (st.st_size <= (off_t)run->dynfile->size) {
+                LOG_I("Crash (dup): '%s' exists and is smaller, skipping", run->crashFileName);
+                /* Clear filename so that verifier can understand we hit a duplicate */
+                memset(run->crashFileName, 0, sizeof(run->crashFileName));
+                return;
+            } else {
+                /* we have a new champion */
+                LOG_I("Crash: overwriting '%s' (old %zu bytes, new %zu bytes)", run->crashFileName,
+                    (size_t)st.st_size, (size_t)run->dynfile->size);
+            }
+
+            snprintf(origFile, sizeof(origFile), "%s.orig", run->crashFileName);
+            if (!files_exists(origFile)) {
+                rename(run->crashFileName, origFile);
+            } else {
+                /* allow overwrite */
+                open_flags = O_CREAT | O_WRONLY | O_CLOEXEC;
+            }
+        } else {
+            LOG_I("Crash (dup): '%s' already exists, skipping", run->crashFileName);
+            /* Clear filename so that verifier can understand we hit a duplicate */
+            memset(run->crashFileName, 0, sizeof(run->crashFileName));
+            return;
+        }
     }
 
-    if (!files_writeBufToFile(run->crashFileName, run->dynfile->data, run->dynfile->size,
-            O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC)) {
+    if (!files_writeBufToFile(
+            run->crashFileName, run->dynfile->data, run->dynfile->size, open_flags)) {
         LOG_E("Couldn't write to '%s'", run->crashFileName);
         return;
     }

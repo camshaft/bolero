@@ -1,4 +1,11 @@
 SANITIZER ?= NONE
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+FUZZERS := libfuzzer afl
+else
+FUZZERS := libfuzzer honggfuzz afl
+endif
 
 test: unit-tests test_fuzzers examples-tests
 
@@ -34,10 +41,11 @@ test_example:
 unit-tests:
 	@cargo test
 
-test_fuzzers: libfuzzer honggfuzz afl
+test_fuzzers: $(FUZZERS)
 
 libfuzzer honggfuzz:
 	@cargo run \
+	    --features $@ \
 	    test \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -46,6 +54,7 @@ libfuzzer honggfuzz:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    reduce \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -53,6 +62,7 @@ libfuzzer honggfuzz:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    test \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -61,6 +71,7 @@ libfuzzer honggfuzz:
 	    --release true \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    reduce \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -68,6 +79,7 @@ libfuzzer honggfuzz:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    test \
 	    fuzz_operations \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -76,6 +88,7 @@ libfuzzer honggfuzz:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    reduce \
 	    fuzz_operations \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -83,6 +96,7 @@ libfuzzer honggfuzz:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    test \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -92,6 +106,7 @@ libfuzzer honggfuzz:
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    reduce \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -100,6 +115,7 @@ libfuzzer honggfuzz:
 	    --sanitizer $(SANITIZER) \
 	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    test \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -109,6 +125,7 @@ libfuzzer honggfuzz:
 	    --sanitizer $(SANITIZER) \
 	    && exit 1 || true
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    reduce \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -117,6 +134,7 @@ libfuzzer honggfuzz:
 	    --sanitizer $(SANITIZER) \
 	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    test \
 	    tests::panicking_generator_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -128,6 +146,7 @@ libfuzzer honggfuzz:
 
 afl:
 	@cargo run \
+	    --features $@ \
 	    test \
 	    fuzz_bytes \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -136,6 +155,7 @@ afl:
 	    --release \
 	    --sanitizer $(SANITIZER)
 	@cargo run \
+	    --features $@ \
 	    test \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -145,6 +165,7 @@ afl:
 	    --sanitizer $(SANITIZER)
 	@rm -rf examples/basic/src/__fuzz__
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    test \
 	    tests::add_test \
 	    --manifest-path examples/basic/Cargo.toml \
@@ -155,6 +176,7 @@ afl:
 	    && exit 1 || true
 	@rm -rf examples/basic/src/__fuzz__
 	@SHOULD_PANIC=1 cargo run \
+	    --features $@ \
 	    test \
 	    tests::other_test \
 	    --manifest-path examples/basic/Cargo.toml \

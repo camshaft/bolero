@@ -54,8 +54,12 @@ lazy_static! {
 #[derive(Debug)]
 pub struct PanicError {
     pub(crate) message: String,
+    // in some fuzzing modes we don't use these fields so ignore unused warnings
+    #[allow(dead_code)]
     pub(crate) location: Option<String>,
+    #[allow(dead_code)]
     pub(crate) backtrace: Option<Backtrace>,
+    #[allow(dead_code)]
     pub(crate) thread_name: String,
 }
 

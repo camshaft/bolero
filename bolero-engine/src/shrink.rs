@@ -183,7 +183,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
         predicate!(slice.len() >= 2);
 
         // store the previous input
-        let mut temp_input = core::mem::replace(&mut self.temp_input, vec![]);
+        let mut temp_input = core::mem::take(&mut self.temp_input);
         temp_input.clear();
         temp_input.extend_from_slice(slice);
 

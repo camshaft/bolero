@@ -39,7 +39,7 @@
 #include "libhfcommon/util.h"
 
 #define PROG_NAME    "honggfuzz"
-#define PROG_VERSION "2.3"
+#define PROG_VERSION "2.4"
 
 /* Name of the template which will be replaced with the proper name of the file */
 #define _HF_FILE_PLACEHOLDER "___FILE___"
@@ -193,6 +193,7 @@ typedef struct {
         uint32_t  threadsActiveCnt;
         pthread_t mainThread;
         pid_t     mainPid;
+        uint32_t  pinThreadToCPUs;
         pthread_t threads[_HF_THREAD_MAX];
     } threads;
     struct {
@@ -208,6 +209,7 @@ typedef struct {
         const char* crashDir;
         const char* covDirNew;
         bool        saveUnique;
+        bool        saveSmaller;
         size_t      dynfileqMaxSz;
         size_t      dynfileqCnt;
         dynfile_t*  dynfileqCurrent;
@@ -245,9 +247,9 @@ typedef struct {
     } timing;
     struct {
         struct {
-            uint8_t val[256];
+            uint8_t val[512];
             size_t  len;
-        } dictionary[1024];
+        } dictionary[8192];
         size_t      dictionaryCnt;
         const char* dictionaryFile;
         size_t      mutationsMax;
@@ -262,6 +264,7 @@ typedef struct {
     struct {
         bool        useVerifier;
         bool        exitUponCrash;
+        uint8_t     exitCodeUponCrash;
         const char* reportFile;
         size_t      dynFileIterExpire;
         bool        only_printable;
@@ -279,9 +282,9 @@ typedef struct {
         cmpfeedback_t*  cmpFeedbackMap;
         int             cmpFeedbackFd;
         bool            cmpFeedback;
-        const char*     blacklistFile;
-        uint64_t*       blacklist;
-        size_t          blacklistCnt;
+        const char*     blocklistFile;
+        uint64_t*       blocklist;
+        size_t          blocklistCnt;
         bool            skipFeedbackOnTimeout;
         uint64_t        maxCov[4];
         dynFileMethod_t dynFileMethod;

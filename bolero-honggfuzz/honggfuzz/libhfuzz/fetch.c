@@ -30,6 +30,37 @@ __attribute__((constructor)) static void init(void) {
     }
 }
 
+/*
+ * Instruct *SAN to treat the input buffer to be of a specific size, treating all accesses
+ * beyond that as access violations
+ */
+static void fetchSanPoison(const uint8_t* buf, size_t len) {
+/* MacOS X linker doesn't like those */
+#if defined(_HF_ARCH_DARWIN)
+    return;
+#endif /* defined(_HF_ARCH_DARWIN) */
+    __attribute__((weak)) extern void __asan_unpoison_memory_region(const void* addr, size_t sz);
+    __attribute__((weak)) extern void __msan_unpoison(const void* addr, size_t sz);
+
+    /* Unpoison the whole area first */
+    if (__asan_unpoison_memory_region) {
+        __asan_unpoison_memory_region(buf, _HF_INPUT_MAX_SIZE);
+    }
+    if (__msan_unpoison) {
+        __msan_unpoison(buf, _HF_INPUT_MAX_SIZE);
+    }
+
+    __attribute__((weak)) extern void __asan_poison_memory_region(const void* addr, size_t sz);
+    __attribute__((weak)) extern void __msan_poison(const void* addr, size_t sz);
+    /* Poison the remainder of the buffer (beyond len) */
+    if (__asan_poison_memory_region) {
+        __asan_poison_memory_region(&buf[len], _HF_INPUT_MAX_SIZE - len);
+    }
+    if (__msan_poison) {
+        __msan_poison(&buf[len], _HF_INPUT_MAX_SIZE - len);
+    }
+}
+
 void HonggfuzzFetchData(const uint8_t** buf_ptr, size_t* len_ptr) {
     if (!files_writeToFd(_HF_PERSISTENT_FD, &HFReadyTag, sizeof(HFReadyTag))) {
         LOG_F("writeToFd(size=%zu, readyTag) failed", sizeof(HFReadyTag));
@@ -47,6 +78,8 @@ void HonggfuzzFetchData(const uint8_t** buf_ptr, size_t* len_ptr) {
 
     *buf_ptr = inputFile;
     *len_ptr = (size_t)rcvLen;
+
+    fetchSanPoison(inputFile, rcvLen);
 
     if (lseek(_HF_INPUT_FD, (off_t)0, SEEK_SET) == -1) {
         PLOG_W("lseek(_HF_INPUT_FD=%d, 0)", _HF_INPUT_FD);
