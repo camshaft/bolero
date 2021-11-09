@@ -1,0 +1,19 @@
+[package]
+name = "bolero-macros"
+version = "0.6.2"
+authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
+description = "macro support for bolero"
+homepage = "https://github.com/camshaft/bolero"
+repository = "https://github.com/camshaft/bolero"
+keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
+license = "MIT"
+edition = "2018"
+readme = "../bolero/README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = "1.0"

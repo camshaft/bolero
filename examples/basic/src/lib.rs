@@ -27,6 +27,13 @@ mod tests {
             });
     }
 
+    #[bolero::test]
+    fn add_macro_test(a: &u8, b: &u8) {
+        let value = a.saturating_add(b);
+        assert!(value >= *a);
+        assert!(value >= *b);
+    }
+
     #[test]
     fn other_test() {
         let should_panic = std::env::var("SHOULD_PANIC").is_ok();
