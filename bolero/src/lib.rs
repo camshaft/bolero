@@ -116,6 +116,7 @@ macro_rules! check {
             line: line!(),
             item_path: $crate::__item_path__!(),
             test_name: None,
+            is_harnessed: None,
         };
 
         if !location.should_run() {
@@ -142,6 +143,7 @@ macro_rules! check {
             line: line!(),
             item_path: $crate::__item_path__!(),
             test_name: Some(format!("{}", $target_name)),
+            is_harnessed: None,
         };
 
         if !location.should_run() {

@@ -24,6 +24,9 @@ pub struct TargetLocation {
 
     /// The name of the test
     pub test_name: Option<String>,
+
+    /// Set to true if the location is harnessed by libtest
+    pub is_harnessed: Option<bool>,
 }
 
 impl TargetLocation {
@@ -101,7 +104,8 @@ impl TargetLocation {
     }
 
     pub fn is_harnessed(&self) -> bool {
-        is_harnessed(self.item_path)
+        self.is_harnessed
+            .unwrap_or_else(|| is_harnessed(self.item_path))
     }
 
     fn fuzz_dir(&self) -> String {

@@ -23,7 +23,8 @@ fn compile(_config: AttributeArgs, mut body: ItemFn) -> TokenStream2 {
     let span = body.span();
     let mut attrs = core::mem::take(&mut body.attrs);
 
-    if test_name != "main" {
+    let is_harnessed = test_name != "main";
+    if is_harnessed {
         attrs.push(syn::parse_quote!(#[cfg_attr(not(rmc), test)]));
     }
 
@@ -62,8 +63,9 @@ fn compile(_config: AttributeArgs, mut body: ItemFn) -> TokenStream2 {
 
             #body
 
-            #[allow(non_upper_snake_case)]
+            #[allow(non_upper_case_globals)]
             const __BOLERO__ITEM_PATH: &str = concat!(module_path!(), "::", #test_name);
+            #[allow(non_upper_case_globals)]
             const __BOLERO__ITEM_PATH_REG_LEN: usize = __BOLERO__ITEM_PATH.len() + 4;
 
             #[cfg(not(rmc))]
@@ -78,6 +80,7 @@ fn compile(_config: AttributeArgs, mut body: ItemFn) -> TokenStream2 {
                 link_section = "__DATA,__bolero"
             )]
             #[cfg_attr(windows, link_section = ".debug_bolero")]
+            #[allow(non_upper_case_globals)]
             static __BOLERO__ITEM_PATH_REG: [u8; __BOLERO__ITEM_PATH_REG_LEN] = {
                 let mut bytes = [0u8; __BOLERO__ITEM_PATH_REG_LEN];
                 let len_bytes = (__BOLERO__ITEM_PATH.len() as u32).to_be_bytes();
@@ -103,6 +106,7 @@ fn compile(_config: AttributeArgs, mut body: ItemFn) -> TokenStream2 {
                 line: line!(),
                 item_path: __BOLERO__ITEM_PATH,
                 test_name: Some(String::from(#test_name)),
+                is_harnessed: Some(#is_harnessed),
             };
 
             // TODO enable config
