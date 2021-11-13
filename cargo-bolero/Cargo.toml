@@ -14,7 +14,7 @@ readme = "README.md"
 default = ["afl", "libfuzzer"]
 afl = ["bolero-afl"]
 honggfuzz = ["bolero-honggfuzz"]
-rmc = ["bolero-rmc"]
+rmc = []
 libfuzzer = []
 
 [dependencies]
@@ -22,7 +22,6 @@ anyhow = "1.0"
 bit-set = "0.5"
 bolero-afl = { version = "0.6", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.6", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
-bolero-rmc = { version = "0.6", path = "../bolero-rmc", default-features = false, features = ["bin"], optional = true }
 humantime = "2"
 rustc_version = "0.4"
 structopt = "0.3"
