@@ -34,6 +34,10 @@ impl Selection {
 
         TestTarget::from_stdout(&output.stdout)
     }
+
+    pub fn test(&self) -> &str {
+        &self.test
+    }
 }
 
 impl Deref for Selection {

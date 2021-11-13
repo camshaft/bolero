@@ -14,6 +14,8 @@ mod manifest;
 mod new;
 mod project;
 mod reduce;
+#[cfg(feature = "rmc")]
+mod rmc;
 mod selection;
 mod test;
 mod test_target;

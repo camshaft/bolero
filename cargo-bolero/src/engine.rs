@@ -11,6 +11,9 @@ pub enum Engine {
 
     #[cfg(feature = "honggfuzz")]
     Honggfuzz,
+
+    #[cfg(feature = "rmc")]
+    Rmc,
 }
 
 impl Engine {
@@ -23,6 +26,9 @@ impl Engine {
 
             #[cfg(feature = "honggfuzz")]
             Self::Honggfuzz => crate::honggfuzz::test(selection, args),
+
+            #[cfg(feature = "rmc")]
+            Self::Rmc => crate::rmc::test(selection, args),
         }
     }
 
@@ -35,6 +41,9 @@ impl Engine {
 
             #[cfg(feature = "honggfuzz")]
             Self::Honggfuzz => crate::honggfuzz::reduce(selection, args),
+
+            #[cfg(feature = "rmc")]
+            Self::Rmc => Ok(()),
         }
     }
 }
@@ -51,6 +60,9 @@ impl FromStr for Engine {
 
             #[cfg(feature = "honggfuzz")]
             "honggfuzz" => Ok(Self::Honggfuzz),
+
+            #[cfg(feature = "rmc")]
+            "rmc" => Ok(Self::Rmc),
 
             _ => Err(format!("invalid fuzzer {:?}", value)),
         }
