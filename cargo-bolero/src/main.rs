@@ -8,14 +8,14 @@ mod afl;
 mod engine;
 #[cfg(feature = "honggfuzz")]
 mod honggfuzz;
+#[cfg(feature = "kani")]
+mod kani;
 mod libfuzzer;
 mod list;
 mod manifest;
 mod new;
 mod project;
 mod reduce;
-#[cfg(feature = "rmc")]
-mod rmc;
 mod selection;
 mod test;
 mod test_target;
