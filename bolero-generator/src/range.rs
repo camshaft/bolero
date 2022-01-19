@@ -63,6 +63,7 @@ macro_rules! range_generator {
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 let start = self.start.generate(driver)?;
                 let end = self.end.generate(driver)?;
+                #[allow(clippy::redundant_closure)]
                 Some($new(start, end))
             }
         }
@@ -71,6 +72,7 @@ macro_rules! range_generator {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 let start = driver.gen()?;
                 let end = driver.gen()?;
+                #[allow(clippy::redundant_closure)]
                 Some($new(start, end))
             }
         }
