@@ -11,10 +11,10 @@ edition = "2018"
 readme = "README.md"
 
 [features]
-default = ["afl", "libfuzzer", "rmc"]
+default = ["afl", "libfuzzer", "kani"]
 afl = ["bolero-afl"]
 honggfuzz = ["bolero-honggfuzz"]
-rmc = []
+kani = []
 libfuzzer = []
 
 [dependencies]
