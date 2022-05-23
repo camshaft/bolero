@@ -19,6 +19,7 @@ alloc = ["bolero-generator/alloc"]
 [dependencies]
 bolero-engine = { version = "0.6", path = "../bolero-engine" }
 bolero-generator = { version = "0.6", path = "../bolero-generator", default-features = false }
+bolero-macros = { version = "0.6", path = "../bolero-macros" }
 cfg-if = "1"
 
 [target.'cfg(fuzzing_afl)'.dependencies]
