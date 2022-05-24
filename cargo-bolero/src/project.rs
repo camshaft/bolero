@@ -136,7 +136,22 @@ impl Project {
         ]
         .iter()
         .chain({
-            let version_meta = rustc_version::version_meta().unwrap();
+            let toolchain = self.toolchain();
+            let version_meta = if toolchain == "default" {
+                rustc_version::version_meta().unwrap()
+            } else {
+                let mut cmd = Command::new("rustup");
+                let stdout = cmd
+                    .arg("run")
+                    .arg(toolchain)
+                    .arg("rustc")
+                    .arg("-vV")
+                    .output()
+                    .unwrap()
+                    .stdout;
+                let stdout = core::str::from_utf8(&stdout).unwrap();
+                rustc_version::version_meta_for(stdout).unwrap()
+            };
 
             // New LLVM pass manager is enabled when Rust 1.57+ and LLVM 13+
             // https://github.com/rust-lang/rust/pull/88243
