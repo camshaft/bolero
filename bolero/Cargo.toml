@@ -11,8 +11,7 @@ edition = "2018"
 readme = "../README.md"
 
 [features]
-default = ["std", "rng"]
-rng = ["rand", "bolero-engine/rng"]
+default = ["std"]
 std = ["alloc", "bolero-generator/std"]
 alloc = ["bolero-generator/alloc"]
 
@@ -30,9 +29,13 @@ bolero-libfuzzer = { version = "0.6", path = "../bolero-libfuzzer" }
 [target.'cfg(fuzzing_honggfuzz)'.dependencies]
 bolero-honggfuzz = { version = "0.6", path = "../bolero-honggfuzz" }
 
-[target.'cfg(not(fuzzing))'.dependencies]
+[target.'cfg(kani)'.dependencies]
+bolero-kani = { version = "0.6", path = "../bolero-kani" }
+
+[target.'cfg(not(any(fuzzing, kani)))'.dependencies]
+bolero-engine = { version = "0.6", path = "../bolero-engine" }
 libtest-mimic = "0.3.0"
-rand = { version = "^0.8", optional = true }
+rand = { version = "^0.8" }
 
 [dev-dependencies]
 rand = "^0.8"

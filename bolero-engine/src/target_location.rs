@@ -28,6 +28,10 @@ pub struct TargetLocation {
 
 impl TargetLocation {
     pub fn should_run(&self) -> bool {
+        if cfg!(kani) {
+            return true;
+        }
+
         // cargo-bolero needs to resolve information about the target
         if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
             match mode.as_str() {
@@ -61,6 +65,10 @@ impl TargetLocation {
     }
 
     pub fn abs_path(&self) -> Option<PathBuf> {
+        if cfg!(kani) {
+            return None;
+        }
+
         let file = Path::new(self.file);
 
         #[cfg(not(miri))] // miri does not currently support this call
@@ -83,6 +91,10 @@ impl TargetLocation {
     }
 
     pub fn work_dir(&self) -> Option<PathBuf> {
+        if cfg!(kani) {
+            return None;
+        }
+
         let mut work_dir = self.abs_path()?;
         work_dir.pop();
 
@@ -101,6 +113,10 @@ impl TargetLocation {
     }
 
     pub fn is_harnessed(&self) -> bool {
+        if cfg!(kani) {
+            return false;
+        }
+
         is_harnessed(self.item_path)
     }
 

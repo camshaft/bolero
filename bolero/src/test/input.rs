@@ -2,7 +2,6 @@ use std::{io::Read, path::PathBuf};
 
 pub enum TestInput {
     FileTest(FileTest),
-    #[cfg(feature = "rand")]
     RngTest(RngTest),
 }
 
@@ -10,7 +9,6 @@ impl TestInput {
     pub fn read_into(&self, input: &mut Vec<u8>) {
         match self {
             TestInput::FileTest(t) => t.read_into(input),
-            #[cfg(feature = "rand")]
             TestInput::RngTest(t) => t.read_into(input),
         }
     }
@@ -18,7 +16,6 @@ impl TestInput {
     pub fn seed(&self) -> Option<u64> {
         match self {
             TestInput::FileTest(_) => None,
-            #[cfg(feature = "rand")]
             TestInput::RngTest(t) => Some(t.seed),
         }
     }
@@ -37,13 +34,11 @@ impl FileTest {
     }
 }
 
-#[cfg(feature = "rand")]
 pub struct RngTest {
     pub seed: u64,
     pub max_len: usize,
 }
 
-#[cfg(feature = "rand")]
 impl RngTest {
     pub fn read_into(&self, input: &mut Vec<u8>) {
         use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};

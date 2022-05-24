@@ -48,7 +48,7 @@ impl TestEngine {
         std::fs::read_dir(self.sub_dir(sub_dirs))
             .ok()
             .into_iter()
-            .map(move |dir| {
+            .flat_map(move |dir| {
                 dir.filter_map(Result::ok)
                     .map(|item| item.path())
                     .filter(|path| path.is_file())
@@ -61,10 +61,8 @@ impl TestEngine {
                         data: TestInput::FileTest(FileTest { path }),
                     })
             })
-            .flatten()
     }
 
-    #[cfg(feature = "rand")]
     fn rng_tests(&self) -> impl Iterator<Item = LibTest<TestInput>> {
         use rand::{rngs::StdRng, RngCore, SeedableRng};
 
@@ -89,11 +87,6 @@ impl TestEngine {
                     max_len: rng_info.max_len,
                 }),
             })
-    }
-
-    #[cfg(not(feature = "rand"))]
-    fn rng_tests(&self) -> impl Iterator<Item = LibTest<TestInput>> {
-        empty()
     }
 
     fn tests(&self) -> Vec<LibTest<TestInput>> {

@@ -10,14 +10,19 @@ pub fn add(a: u8, b: u8, should_panic: bool) -> u8 {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, kani))]
 mod tests {
     use super::*;
     use bolero::{check, generator::*};
 
-    #[test]
+    #[cfg_attr(not(kani), test)]
+    #[cfg_attr(kani, kani::proof)]
     fn add_test() {
-        let should_panic = std::env::var("SHOULD_PANIC").is_ok();
+        let should_panic = if cfg!(kani) {
+            false
+        } else {
+            std::env::var("SHOULD_PANIC").is_ok()
+        };
 
         check!()
             .with_generator((0..254).map_gen(|a: u8| (a, a + 1)))
