@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <sys/param.h>
 #if !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__)
 #include <link.h>
 #endif /* !defined(_HF_ARCH_DARWIN) && !defined(__CYGWIN__) */
@@ -35,6 +36,17 @@
 #if defined(_HF_ARCH_LINUX)
 #include <sched.h>
 #endif /* defined(_HF_ARCH_LINUX) */
+#if defined(__FreeBSD__)
+#include <pthread_np.h>
+#include <sys/cpuset.h>
+#endif /* defined(__FreebSD__) */
+#if defined(_HF_ARCH_NETBSD)
+#include <sched.h>
+#endif /* defined(_HF_ARCH_NETBSD) */
+#if defined(__DragonFly__)
+#include <pthread.h>
+#include <pthread_np.h>
+#endif /* defined(__DragonFly__) */
 #include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -48,6 +60,9 @@
 #if defined(__FreeBSD__)
 #include <sys/procctl.h>
 #endif /* defined(__FreeBSD__) */
+#if defined(__sun)
+#include <sys/pset.h>
+#endif /* defined(__sun) */
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -76,40 +91,90 @@ bool util_PinThreadToCPUs(uint32_t threadno, uint32_t cpucnt) {
         return true;
     }
 
-    long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-    if (num_cpus == -1) {
+    long r = sysconf(_SC_NPROCESSORS_ONLN);
+    if (r == -1) {
         PLOG_W("sysconf(_SC_NPROCESSORS_ONLN) failed");
         return false;
     }
+    uint32_t num_cpus = (uint32_t)r;
 
-    uint32_t start_cpu = (threadno * cpucnt) % (uint32_t)num_cpus;
-    uint32_t end_cpu   = (threadno * cpucnt + cpucnt - 1U) % (uint32_t)num_cpus;
+    if (cpucnt > num_cpus) {
+        LOG_W("Requested CPUs (%" PRIu32 ") > available CPUs (%" PRIu32 ") for thread #%" PRIu32,
+            cpucnt, num_cpus, threadno);
+        return false;
+    }
 
-    LOG_D("Setting CPU affinity for the current thread #%" PRIu32 " to %" PRId32
-          " consecutive CPUs, (start:%" PRIu32 "-end:%" PRIu32 ") total_cpus:%ld",
+    uint32_t start_cpu = (threadno * cpucnt) % num_cpus;
+    uint32_t end_cpu   = (start_cpu + cpucnt - 1U) % num_cpus;
+    LOG_D("Setting CPU affinity for the current thread #%" PRIu32 " to %" PRIu32
+          " consecutive CPUs, (start:%" PRIu32 "-end:%" PRIu32 ") total_cpus:%" PRIu32,
         threadno, cpucnt, start_cpu, end_cpu, num_cpus);
 
-    if (cpucnt > (uint32_t)num_cpus) {
-        LOG_W("Number of requested CPUs (%" PRId32
-              ") is bigger than number of available CPUs (%ld)",
-            cpucnt, num_cpus);
-        return false;
-    }
-
-#if defined(_HF_ARCH_LINUX)
+#if defined(_HF_ARCH_LINUX) || defined(__FreeBSD__) || defined(_HF_ARCH_NETBSD) ||                 \
+    defined(__DragonFly__)
+#if defined(_HF_ARCH_LINUX) || defined(__DragonFly__)
     cpu_set_t set;
     CPU_ZERO(&set);
+#endif /* defined(_HF_ARCH_LINUX) */
+#if defined(__FreeBSD__)
+    cpuset_t set;
+    CPU_ZERO(&set);
+#endif /* defined(__FreeBSD__) || defined(_HF_ARCH_NETBSD) */
+#if defined(_HF_ARCH_NETBSD)
+    cpuset_t* set = cpuset_create();
+    defer {
+        cpuset_destroy(set);
+    };
+#endif /* defined(_HF_ARCH_NETBSD) */
 
     for (uint32_t i = 0; i < cpucnt; i++) {
+#if defined(_HF_ARCH_NETBSD)
+        cpuset_set((start_cpu + i) % num_cpus, set);
+#else  /* defined((_HF_ARCH_NETBSD) */
         CPU_SET((start_cpu + i) % num_cpus, &set);
+#endif /* defined((_HF_ARCH_NETBSD) */
     }
-
-    if (sched_setaffinity(gettid(), sizeof(set), &set) == -1) {
-        PLOG_W("sched_setaffinity(tid=%d, sizeof(set)) failed", (int)gettid());
+#if defined(__ANDROID__)
+    if (sched_setaffinity(getpid(), sizeof(set), &set) != 0) {
+#elif defined(_HF_ARCH_NETBSD)
+    if (pthread_setaffinity_np(pthread_self(), cpuset_size(set), set) != 0) {
+#else  /* defined((_HF_ARCH_NETBSD) */
+    if (pthread_setaffinity_np(pthread_self(), sizeof(set), &set) != 0) {
+#endif /* defined((_HF_ARCH_NETBSD) */
+        PLOG_W("pthread_setaffinity_np(thread=#%" PRIu32 "), failed", threadno);
         return false;
     }
-#endif /* defined(_HF_ARCH_LINUX) */
     return true;
+#elif defined(__sun)
+    psetid_t set;
+    pid_t    p;
+    bool     ret = true;
+
+    if (pset_create(&set) != 0) {
+        PLOG_W("pset_create failed");
+        return false;
+    }
+
+    for (uint32_t i = 0; i < cpucnt; i++) {
+        if (pset_assign(set, ((start_cpu + i) % num_cpus), NULL) != 0) {
+            PLOG_W("pset_assign(%" PRIu32 "), failed", i);
+            pset_destroy(set);    // TODO: defer mechanism not yet supported
+            return false;
+        }
+    }
+
+    p = getpid();
+
+    if (pset_bind(set, P_PID, p, NULL) != 0) {
+        PLOG_W("pset_bind(%ld) failed", (long)p);
+        ret = false;
+    }
+
+    pset_destroy(set);
+    return ret;
+#endif /* defined(_HF_ARCH_LINUX) || defined(__FreeBSD__) || defined(_HF_ARCH_NETBSD) */
+    LOG_W("util_PinThreadToCPUs() not implemented for the current architecture");
+    return false;
 }
 
 void* util_Malloc(size_t sz) {
@@ -162,6 +227,7 @@ static __thread pthread_once_t rndThreadOnce = PTHREAD_ONCE_INIT;
 static __thread uint64_t       rndState[2];
 
 static void util_rndInitThread(void) {
+#if !defined(BSD)
     int fd = TEMP_FAILURE_RETRY(open("/dev/urandom", O_RDONLY | O_CLOEXEC));
     if (fd == -1) {
         PLOG_F("Couldn't open /dev/urandom for reading");
@@ -170,6 +236,9 @@ static void util_rndInitThread(void) {
         PLOG_F("Couldn't read '%zu' bytes from /dev/urandom", sizeof(rndState));
     }
     close(fd);
+#else
+    arc4random_buf((void*)rndState, sizeof(rndState));
+#endif
 }
 
 /*
