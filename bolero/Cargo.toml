@@ -34,7 +34,7 @@ bolero-kani = { version = "0.6", path = "../bolero-kani" }
 
 [target.'cfg(not(any(fuzzing, kani)))'.dependencies]
 bolero-engine = { version = "0.6", path = "../bolero-engine" }
-libtest-mimic = "0.3.0"
+libtest-mimic = "0.4.1"
 rand = { version = "^0.8" }
 
 [dev-dependencies]
