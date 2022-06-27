@@ -65,8 +65,6 @@ impl Project {
     fn toolchain(&self) -> &str {
         if let Some(toolchain) = self.toolchain.as_ref() {
             toolchain
-        } else if self.requires_nightly() {
-            "nightly"
         } else {
             "default"
         }
@@ -184,10 +182,6 @@ impl Project {
         .chain(std::env::var(inherits).ok())
         .collect::<Vec<_>>()
         .join(" ")
-    }
-
-    pub fn requires_nightly(&self) -> bool {
-        self.sanitizers().next().is_some() || self.build_std
     }
 
     fn sanitizers(&self) -> impl Iterator<Item = &str> {
