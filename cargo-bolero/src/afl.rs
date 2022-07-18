@@ -18,7 +18,10 @@ fn bin() -> String {
 
 pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "afl")?;
-    let corpus_dir = test_target.corpus_dir();
+    let corpus_dir = test_args
+        .corpus_dir
+        .clone()
+        .unwrap_or_else(|| test_target.default_corpus_dir());
     let afl_state = test_target.workdir().join("afl_state");
 
     fs::create_dir_all(&afl_state)?;

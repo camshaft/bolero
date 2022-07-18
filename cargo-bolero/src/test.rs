@@ -1,6 +1,7 @@
 use crate::{engine::Engine, selection::Selection};
 use anyhow::Result;
 use humantime::Duration;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 /// Run an engine for a target
@@ -45,6 +46,14 @@ pub struct Args {
     /// Number of parallel jobs
     #[structopt(short, long)]
     pub jobs: Option<usize>,
+
+    /// User-defined location for the corpus folder
+    #[structopt(long)]
+    pub corpus_dir: Option<PathBuf>,
+
+    /// User-defined location for the crashes folder
+    #[structopt(long)]
+    pub crashes_dir: Option<PathBuf>,
 
     /// Additional arguments to pass to the selected engine
     #[structopt(short = "E", long)]
