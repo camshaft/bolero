@@ -32,8 +32,14 @@ macro_rules! optional_arg {
 
 pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
-    let corpus_dir = test_target.corpus_dir();
-    let crashes_dir = test_target.crashes_dir();
+    let corpus_dir = test_args
+        .corpus_dir
+        .clone()
+        .unwrap_or_else(|| test_target.default_corpus_dir());
+    let crashes_dir = test_args
+        .crashes_dir
+        .clone()
+        .unwrap_or_else(|| test_target.default_crashes_dir());
 
     fs::create_dir_all(&corpus_dir)?;
     fs::create_dir_all(&crashes_dir)?;
@@ -73,8 +79,8 @@ pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> 
 
 pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "honggfuzz")?;
-    let corpus_dir = test_target.corpus_dir();
-    let crashes_dir = test_target.crashes_dir();
+    let corpus_dir = test_target.default_corpus_dir();
+    let crashes_dir = test_target.default_crashes_dir();
 
     fs::create_dir_all(&corpus_dir)?;
     fs::create_dir_all(&crashes_dir)?;

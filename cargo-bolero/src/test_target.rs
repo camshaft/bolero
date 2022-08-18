@@ -62,7 +62,7 @@ impl TestTarget {
         PathBuf::from(&self.work_dir)
     }
 
-    pub fn corpus_dir(&self) -> PathBuf {
+    pub fn default_corpus_dir(&self) -> PathBuf {
         let mut workdir = self.workdir();
         workdir.push("corpus");
         workdir
@@ -73,7 +73,7 @@ impl TestTarget {
         Ok(dir)
     }
 
-    pub fn crashes_dir(&self) -> PathBuf {
+    pub fn default_crashes_dir(&self) -> PathBuf {
         let mut workdir = self.workdir();
         workdir.push("crashes");
         workdir
