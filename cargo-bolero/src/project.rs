@@ -48,18 +48,26 @@ pub struct Project {
     /// Build the standard library with the provided configuration
     #[structopt(long)]
     build_std: bool,
+
+    /// Fake using a nightly toolchain while using the default toolchain by using RUSTC_BOOTSTRAP
+    #[structopt(long)]
+    rustc_bootstrap: bool,
 }
 
 impl Project {
     fn cargo(&self) -> Command {
-        match self.toolchain() {
+        let mut cmd = match self.toolchain() {
             "default" => Command::new("cargo"),
             toolchain => {
                 let mut cmd = Command::new("rustup");
                 cmd.arg("run").arg(toolchain).arg("cargo");
                 cmd
             }
+        };
+        if self.rustc_bootstrap {
+            cmd.env("RUSTC_BOOTSTRAP", "1");
         }
+        cmd
     }
 
     fn toolchain(&self) -> &str {
@@ -187,7 +195,7 @@ impl Project {
     }
 
     pub fn requires_nightly(&self) -> bool {
-        self.sanitizers().next().is_some() || self.build_std
+        !self.rustc_bootstrap && (self.sanitizers().next().is_some() || self.build_std)
     }
 
     fn sanitizers(&self) -> impl Iterator<Item = &str> {
