@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v1.1.14
+        uses: peaceiris/actions-mdbook@v1.2.0
         with:
           mdbook-version: '0.3.5'
 
