@@ -4,8 +4,7 @@ use bolero_engine::{
 };
 use bolero_generator::driver::DriverMode;
 use core::{iter::empty, time::Duration};
-use libtest_mimic::{run_tests, Arguments, FormatSetting, Outcome, Test as LibTest};
-use std::{io::Write, path::PathBuf};
+use std::path::PathBuf;
 
 mod input;
 use input::*;
@@ -18,6 +17,11 @@ pub struct TestEngine {
     location: TargetLocation,
     driver_mode: Option<DriverMode>,
     shrink_time: Option<Duration>,
+}
+
+struct NamedTest {
+    name: String,
+    data: TestInput,
 }
 
 impl TestEngine {
@@ -44,7 +48,7 @@ impl TestEngine {
     fn file_tests<'a, D: Iterator<Item = &'a str> + std::panic::UnwindSafe>(
         &self,
         sub_dirs: D,
-    ) -> impl Iterator<Item = LibTest<TestInput>> {
+    ) -> impl Iterator<Item = NamedTest> {
         std::fs::read_dir(self.sub_dir(sub_dirs))
             .ok()
             .into_iter()
@@ -53,17 +57,14 @@ impl TestEngine {
                     .map(|item| item.path())
                     .filter(|path| path.is_file())
                     .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
-                    .map(move |path| LibTest {
+                    .map(move |path| NamedTest {
                         name: format!("{}", path.display()),
-                        kind: "".into(),
-                        is_ignored: false,
-                        is_bench: false,
                         data: TestInput::FileTest(FileTest { path }),
                     })
             })
     }
 
-    fn rng_tests(&self) -> impl Iterator<Item = LibTest<TestInput>> {
+    fn rng_tests(&self) -> impl Iterator<Item = NamedTest> {
         use rand::{rngs::StdRng, RngCore, SeedableRng};
 
         let rng_info = RngEngine::default();
@@ -77,11 +78,8 @@ impl TestEngine {
                 *state = seed_rng.next_u64();
                 Some(seed)
             })
-            .map(move |seed| LibTest {
+            .map(move |seed| NamedTest {
                 name: format!("{} [seed={}]", test_name, seed),
-                kind: "".into(),
-                is_ignored: false,
-                is_bench: false,
                 data: TestInput::RngTest(RngTest {
                     seed,
                     max_len: rng_info.max_len,
@@ -89,7 +87,7 @@ impl TestEngine {
             })
     }
 
-    fn tests(&self) -> Vec<LibTest<TestInput>> {
+    fn tests(&self) -> Vec<NamedTest> {
         empty()
             .chain(self.file_tests(["corpus"].iter().cloned()))
             .chain(self.file_tests(["crashes"].iter().cloned()))
@@ -98,47 +96,6 @@ impl TestEngine {
             .chain(self.file_tests(["afl_state", "crashes"].iter().cloned()))
             .chain(self.rng_tests())
             .collect()
-    }
-
-    /// Use the libtest_mimic harness
-    fn libtest_mimic(self, testfn: &mut dyn FnMut(&TestInput) -> Result<bool, String>) -> Never {
-        // `run_tests` only accepts `Fn` instead of `FnMut`
-        // convert the function to a dynamic FnMut and drop the lifetime
-        static mut TESTFN: Option<&mut dyn FnMut(&TestInput) -> Result<bool, String>> = None;
-
-        unsafe {
-            TESTFN = Some(std::mem::transmute(
-                testfn as &mut dyn FnMut(&TestInput) -> Result<bool, String>,
-            ));
-        }
-
-        let mut arguments = Arguments::from_args();
-
-        if arguments.format.is_none() {
-            arguments.format = Some(FormatSetting::Terse);
-        }
-
-        // we only support running tests in a single thread
-        arguments.num_threads = Some(1);
-
-        let tests = self.tests();
-
-        bolero_engine::panic::set_hook();
-        bolero_engine::panic::forward_panic(true);
-
-        let result = run_tests(&arguments, tests, |config| {
-            let testfn = unsafe { TESTFN.as_mut().expect("uninitialized test function") };
-
-            progress();
-
-            if let Err(err) = testfn(&config.data) {
-                Outcome::Failed { msg: Some(err) }
-            } else {
-                Outcome::Passed
-            }
-        });
-
-        result.exit();
     }
 
     /// Use the libtest harness
@@ -154,7 +111,7 @@ impl TestEngine {
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
                 eprintln!("{}", err);
-                panic!("test failed");
+                panic!("test failed: {:?}", test.name);
             }
         }
     }
@@ -185,7 +142,9 @@ where
     }
 
     fn run(self, mut test: T) -> Self::Output {
-        let driver_mode = self.driver_mode;
+        // used forced mode to get more valid inputs
+        let driver_mode = self.driver_mode.or(Some(DriverMode::Forced));
+
         let shrink_time = self.shrink_time;
         let mut input = vec![];
         let mut testfn = &mut |data: &TestInput| {
@@ -195,8 +154,6 @@ where
             let mut input_slice = ByteSliceTestInput::new(&input, driver_mode);
 
             test.test(&mut input_slice).map_err(|error| {
-                let _ = writeln!(std::io::stderr(), "test failed; shrinking input...");
-
                 let shrunken = test.shrink(input.clone(), data.seed(), driver_mode, shrink_time);
 
                 if let Some(shrunken) = shrunken {
@@ -214,10 +171,6 @@ where
             })
         };
 
-        if self.location.is_harnessed() {
-            self.libtest(&mut testfn)
-        } else {
-            self.libtest_mimic(&mut testfn)
-        }
+        self.libtest(&mut testfn)
     }
 }

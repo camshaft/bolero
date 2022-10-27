@@ -104,7 +104,7 @@ libfuzzer honggfuzz:
 	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
-	    && exit 1 || true
+	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
 	    --features $@ \
 	    reduce \
@@ -123,7 +123,7 @@ libfuzzer honggfuzz:
 	    --engine $@ \
 	    --release \
 	    --sanitizer $(SANITIZER) \
-	    && exit 1 || true
+	    || true # TODO make this consistent
 	@SHOULD_PANIC=1 cargo run \
 	    --features $@ \
 	    reduce \
