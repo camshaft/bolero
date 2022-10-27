@@ -47,3 +47,28 @@ The `honggfuzz` engine can be selected like so:
 $ cargo bolero test --engine honggfuzz my_test_target
 ```
 
+## Kani
+
+* [Kani documentation](https://model-checking.github.io/kani/)
+
+Kani is an open-source verification tool that uses automated reasoning to analyze Rust programs. Kani is particularly useful for verifying unsafe code in Rust, where many of the Rust’s usual guarantees are no longer checked by the compiler. Some example properties you can prove with Kani include memory safety properties (e.g., null pointer dereferences, use-after-free, etc.), the absence of certain runtime errors (i.e., index out of bounds, panics), and the absence of some types of unexpected behavior (e.g., arithmetic overflows). Kani can also prove custom properties provided in the form of user-specified assertions.
+
+Kani uses proof harnesses to analyze programs. Proof harnesses are similar to test harnesses, especially property-based test harnesses.
+
+The `kani` engine can be selected like so:
+
+```bash
+$ cargo bolero test --engine kani my_test_target
+```
+
+Note that each target needs to include a `#[kani::proof]` attribute:
+
+```rust
+#[test]
+#[cfg_attr(kani, kani::proof)]
+fn my_test_target() {
+    bolero::check!().with_type().for_each(|v: &u8| {
+        assert_ne!(*v, 123);
+    });
+}
+```
