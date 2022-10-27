@@ -206,4 +206,14 @@ publish: book
 	@sleep 30
 	@cd cargo-bolero && cargo publish
 
+dry-run:
+	@cd bolero-generator-derive && cargo publish --dry-run --allow-dirty
+	@cd bolero-generator && cargo publish --dry-run --allow-dirty
+	@cd bolero-engine && cargo publish --dry-run --allow-dirty
+	@cd bolero-afl && cargo publish --dry-run --allow-dirty
+	@cd bolero-honggfuzz && cargo publish --dry-run --allow-dirty
+	@cd bolero-libfuzzer && cargo publish --dry-run --allow-dirty
+	@cd bolero && cargo publish --dry-run --allow-dirty
+	@cd cargo-bolero && cargo publish --dry-run --allow-dirty
+
 .PHONY: book

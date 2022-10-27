@@ -55,14 +55,14 @@ impl<'a, Output> TestInput<Output> for ByteSliceTestInput<'a> {
 
 macro_rules! impl_rng {
     ($name:ident, $driver:ident) => {
-        #[cfg(not(any(fuzzing, kani)))]
+        #[cfg(feature = "rng")]
         #[derive(Debug)]
         pub struct $name<'a, R: rand::RngCore> {
             slice: &'a mut Vec<u8>,
             rng: bolero_generator::driver::$driver<R>,
         }
 
-        #[cfg(not(any(fuzzing, kani)))]
+        #[cfg(feature = "rng")]
         impl<'a, R: rand::RngCore + core::panic::RefUnwindSafe> $name<'a, R> {
             pub fn new(rng: R, slice: &'a mut Vec<u8>) -> Self {
                 Self {
@@ -72,15 +72,14 @@ macro_rules! impl_rng {
             }
         }
 
-        #[cfg(not(any(fuzzing, kani)))]
+        #[cfg(feature = "rng")]
         impl<'a, Output, R: rand::RngCore + core::panic::RefUnwindSafe> TestInput<Output>
             for $name<'a, R>
         {
             type Driver = bolero_generator::driver::$driver<R>;
 
             fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
-                use bolero_generator::TypeGenerator;
-                self.slice.mutate(&mut self.rng);
+                bolero_generator::TypeGenerator::mutate(self.slice, &mut self.rng);
                 f(self.slice)
             }
 

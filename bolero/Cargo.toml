@@ -33,7 +33,7 @@ bolero-honggfuzz = { version = "0.8", path = "../bolero-honggfuzz" }
 bolero-kani = { version = "0.8", path = "../bolero-kani" }
 
 [target.'cfg(not(any(fuzzing, kani)))'.dependencies]
-bolero-engine = { version = "0.8", path = "../bolero-engine" }
+bolero-engine = { version = "0.8", path = "../bolero-engine", features = ["rng"] }
 rand = { version = "^0.8" }
 
 [dev-dependencies]

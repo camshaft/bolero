@@ -11,7 +11,7 @@ pub mod panic;
 #[path = "./noop/panic.rs"]
 pub mod panic;
 
-#[cfg(not(any(fuzzing, kani)))]
+#[cfg(feature = "rng")]
 pub mod rng;
 pub mod shrink;
 mod test;
