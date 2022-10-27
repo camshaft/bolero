@@ -202,6 +202,8 @@ publish: book
 	@sleep 30
 	@cd bolero-libfuzzer && cargo publish
 	@sleep 30
+	@cd bolero-kani && cargo publish
+	@sleep 30
 	@cd bolero && cargo publish
 	@sleep 30
 	@cd cargo-bolero && cargo publish
@@ -213,6 +215,7 @@ dry-run:
 	@cd bolero-afl && cargo publish --dry-run --allow-dirty
 	@cd bolero-honggfuzz && cargo publish --dry-run --allow-dirty
 	@cd bolero-libfuzzer && cargo publish --dry-run --allow-dirty
+	@cd bolero-kani && cargo publish --dry-run --allow-dirty
 	@cd bolero && cargo publish --dry-run --allow-dirty
 	@cd cargo-bolero && cargo publish --dry-run --allow-dirty
 
