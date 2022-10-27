@@ -165,6 +165,27 @@ $ cargo bolero test my_test_target
 <p>The <code>honggfuzz</code> engine can be selected like so:</p>
 <pre><code class="language-bash">$ cargo bolero test --engine honggfuzz my_test_target
 </code></pre>
+<h2 id="kani"><a class="header" href="#kani">Kani</a></h2>
+<ul>
+<li><a href="https://model-checking.github.io/kani/">Kani documentation</a></li>
+</ul>
+<p>Kani is an open-source verification tool that uses automated reasoning to analyze Rust programs. Kani is particularly useful for verifying unsafe code in Rust, where many of the Rust’s usual guarantees are no longer checked by the compiler. Some example properties you can prove with Kani include memory safety properties (e.g., null pointer dereferences, use-after-free, etc.), the absence of certain runtime errors (i.e., index out of bounds, panics), and the absence of some types of unexpected behavior (e.g., arithmetic overflows). Kani can also prove custom properties provided in the form of user-specified assertions.</p>
+<p>Kani uses proof harnesses to analyze programs. Proof harnesses are similar to test harnesses, especially property-based test harnesses.</p>
+<p>The <code>kani</code> engine can be selected like so:</p>
+<pre><code class="language-bash">$ cargo bolero test --engine kani my_test_target
+</code></pre>
+<p>Note that each target needs to include a <code>#[kani::proof]</code> attribute:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+#[cfg_attr(kani, kani::proof)]
+fn my_test_target() {
+    bolero::check!().with_type().for_each(|v: &amp;u8| {
+        assert_ne!(*v, 123);
+    });
+}
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
