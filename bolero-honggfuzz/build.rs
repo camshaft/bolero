@@ -21,7 +21,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
     let out_dir = env::var("OUT_DIR").unwrap();
 
     let status = Command::new(MAKE_COMMAND)
-        .args(&["-C", "honggfuzz", target, "libhfcommon/libhfcommon.a"])
+        .args(["-C", "honggfuzz", target, "libhfcommon/libhfcommon.a"])
         .status()
         .unwrap();
     assert!(status.success());
@@ -45,7 +45,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
 
     // don't fail after cleaning
     Command::new(MAKE_COMMAND)
-        .args(&["-C", "honggfuzz", "clean"])
+        .args(["-C", "honggfuzz", "clean"])
         .status()
         .unwrap();
 

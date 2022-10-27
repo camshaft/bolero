@@ -70,8 +70,6 @@ impl TestEngine {
         let rng_info = RngEngine::default();
         let mut seed_rng = StdRng::seed_from_u64(rng_info.seed);
 
-        let test_name = self.location.module_path;
-
         (0..rng_info.iterations)
             .scan(rng_info.seed, move |state, _index| {
                 let seed = *state;
@@ -79,7 +77,7 @@ impl TestEngine {
                 Some(seed)
             })
             .map(move |seed| NamedTest {
-                name: format!("{} [seed={}]", test_name, seed),
+                name: format!("[BOLERO_RANDOM_SEED={}]", seed),
                 data: TestInput::RngTest(RngTest {
                     seed,
                     max_len: rng_info.max_len,
@@ -96,24 +94,6 @@ impl TestEngine {
             .chain(self.file_tests(["afl_state", "crashes"].iter().cloned()))
             .chain(self.rng_tests())
             .collect()
-    }
-
-    /// Use the libtest harness
-    fn libtest(self, testfn: &mut dyn FnMut(&TestInput) -> Result<bool, String>) -> Never {
-        let tests = self.tests();
-
-        bolero_engine::panic::set_hook();
-        bolero_engine::panic::forward_panic(false);
-
-        for test in tests {
-            progress();
-
-            if let Err(err) = testfn(&test.data) {
-                bolero_engine::panic::forward_panic(true);
-                eprintln!("{}", err);
-                panic!("test failed: {:?}", test.name);
-            }
-        }
     }
 }
 
@@ -142,35 +122,81 @@ where
     }
 
     fn run(self, mut test: T) -> Self::Output {
-        // used forced mode to get more valid inputs
-        let driver_mode = self.driver_mode.or(Some(DriverMode::Forced));
-
+        let driver_mode = self.driver_mode;
         let shrink_time = self.shrink_time;
-        let mut input = vec![];
-        let mut testfn = &mut |data: &TestInput| {
-            input.clear();
-            data.read_into(&mut input);
+        let mut buffer = vec![];
+        let mut testfn = |data: &TestInput| {
+            buffer.clear();
+            match data {
+                TestInput::FileTest(file) => {
+                    file.read_into(&mut buffer);
 
-            let mut input_slice = ByteSliceTestInput::new(&input, driver_mode);
+                    let mut input = ByteSliceTestInput::new(&buffer, driver_mode);
+                    test.test(&mut input).map_err(|error| {
+                        let shrunken =
+                            test.shrink(buffer.clone(), data.seed(), driver_mode, shrink_time);
 
-            test.test(&mut input_slice).map_err(|error| {
-                let shrunken = test.shrink(input.clone(), data.seed(), driver_mode, shrink_time);
-
-                if let Some(shrunken) = shrunken {
-                    format!("{}", shrunken)
-                } else {
-                    format!(
-                        "{}",
-                        TestFailure {
-                            seed: data.seed(),
-                            error,
-                            input: input_slice
+                        if let Some(shrunken) = shrunken {
+                            format!("{}", shrunken)
+                        } else {
+                            format!(
+                                "{}",
+                                TestFailure {
+                                    seed: data.seed(),
+                                    error,
+                                    input: buffer.clone()
+                                }
+                            )
                         }
-                    )
+                    })
                 }
-            })
+                TestInput::RngTest(conf) => {
+                    let mut input = conf.input(&mut buffer);
+                    test.test(&mut input).map_err(|error| {
+                        // reseed the input and buffer the rng for shrinking
+                        let mut input = conf.buffered_input(&mut buffer);
+                        let _ = test.generate_value(&mut input);
+
+                        let shrunken = test.shrink(
+                            buffer.clone(),
+                            data.seed(),
+                            Some(DriverMode::Forced),
+                            shrink_time,
+                        );
+
+                        if let Some(shrunken) = shrunken {
+                            format!("{}", shrunken)
+                        } else {
+                            buffer.clear();
+                            let mut input = conf.input(&mut buffer);
+                            let input = test.generate_value(&mut input);
+                            format!(
+                                "{}",
+                                TestFailure {
+                                    seed: data.seed(),
+                                    error,
+                                    input
+                                }
+                            )
+                        }
+                    })
+                }
+            }
         };
 
-        self.libtest(&mut testfn)
+        let tests = self.tests();
+
+        bolero_engine::panic::set_hook();
+        bolero_engine::panic::forward_panic(false);
+
+        for test in tests {
+            progress();
+
+            if let Err(err) = testfn(&test.data) {
+                bolero_engine::panic::forward_panic(true);
+                eprintln!("{}", err);
+                panic!("test failed: {:?}", test.name);
+            }
+        }
     }
 }

@@ -216,7 +216,7 @@ fn lower_type_index(value: usize, max: usize, span: Span) -> TokenStream2 {
 
     assert!(max < core::u32::MAX as usize);
     let value = value as u32;
-    return quote_spanned!(span=> #value);
+    quote_spanned!(span=> #value)
 }
 
 fn generate_fields_type_gen<C: ToTokens>(
