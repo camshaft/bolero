@@ -1,6 +1,6 @@
 [package]
 name = "bolero-kani"
-version = "0.6.0"
+version = "0.8.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "kani plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -16,4 +16,4 @@ bin = []
 lib = ["bolero-engine"]
 
 [dependencies]
-bolero-engine = { version = "0.6", path = "../bolero-engine", optional = true }
+bolero-engine = { version = "0.8", path = "../bolero-engine", optional = true }

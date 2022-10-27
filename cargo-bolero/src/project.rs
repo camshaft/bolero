@@ -1,7 +1,12 @@
 use crate::DEFAULT_TARGET;
 use core::hash::{Hash, Hasher};
+use lazy_static::lazy_static;
 use std::{collections::hash_map::DefaultHasher, process::Command};
 use structopt::StructOpt;
+
+lazy_static! {
+    static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
+}
 
 #[derive(Debug, StructOpt)]
 pub struct Project {
@@ -73,7 +78,8 @@ impl Project {
     fn toolchain(&self) -> &str {
         if let Some(toolchain) = self.toolchain.as_ref() {
             toolchain
-        } else if self.requires_nightly() {
+        } else if self.requires_nightly() && RUST_VERSION.channel == rustc_version::Channel::Stable
+        {
             "nightly"
         } else {
             "default"
@@ -146,7 +152,7 @@ impl Project {
         .chain({
             let toolchain = self.toolchain();
             let version_meta = if toolchain == "default" {
-                rustc_version::version_meta().unwrap()
+                RUST_VERSION.clone()
             } else {
                 let mut cmd = Command::new("rustup");
                 let stdout = cmd
@@ -161,13 +167,13 @@ impl Project {
                 rustc_version::version_meta_for(stdout).unwrap()
             };
 
-            // New LLVM pass manager is enabled when Rust 1.57+ and LLVM 13+
+            // New LLVM pass manager is enabled when Rust 1.59+ and LLVM 13+
             // https://github.com/rust-lang/rust/pull/88243
 
-            let is_rust_157 = version_meta.semver.major == 1 && version_meta.semver.minor >= 57;
+            let is_rust_159 = version_meta.semver.major == 1 && version_meta.semver.minor >= 59;
             let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
 
-            Some(if is_rust_157 && is_llvm_13 {
+            Some(if is_rust_159 && is_llvm_13 {
                 &"-Cpasses=sancov-module"
             } else {
                 &"-Cpasses=sancov"

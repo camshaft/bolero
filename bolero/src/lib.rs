@@ -171,11 +171,11 @@ pub struct TestTarget<Generator, Engine, InputOwnership> {
 }
 
 #[doc(hidden)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BorrowedInput;
 
 #[doc(hidden)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClonedInput;
 
 #[doc(hidden)]
@@ -186,7 +186,7 @@ pub fn test(
 }
 
 /// Default generator for byte slices
-#[derive(Copy, Clone, Default, PartialEq)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct ByteSliceGenerator;
 
 impl<Engine> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
