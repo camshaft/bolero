@@ -10,10 +10,6 @@ arrayvec = "0.5"
 [dev-dependencies]
 bolero = { path = "../../bolero" }
 
-# TODO remove this once this is fixed: https://github.com/model-checking/kani/issues/473
-[target.'cfg(kani)'.dependencies]
-bolero = { path = "../../bolero" }
-
 [workspace]
 members = ["."]
 
