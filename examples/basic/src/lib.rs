@@ -10,12 +10,12 @@ pub fn add(a: u8, b: u8, should_panic: bool) -> u8 {
     }
 }
 
-#[cfg(any(test, kani))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use bolero::{check, generator::*};
 
-    #[cfg_attr(not(kani), test)]
+    #[test]
     #[cfg_attr(kani, kani::proof)]
     fn add_test() {
         let should_panic = if cfg!(kani) {
