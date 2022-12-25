@@ -1,5 +1,5 @@
 use crate::{reduce, selection::Selection, test};
-use anyhow::Error;
+use anyhow::Result;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub enum Engine {
 }
 
 impl Engine {
-    pub fn test(&self, selection: &Selection, args: &test::Args) -> Result<(), Error> {
+    pub fn test(&self, selection: &Selection, args: &test::Args) -> Result<()> {
         match self {
             Self::Libfuzzer => crate::libfuzzer::test(selection, args),
 
@@ -32,7 +32,7 @@ impl Engine {
         }
     }
 
-    pub fn reduce(&self, selection: &Selection, args: &reduce::Args) -> Result<(), Error> {
+    pub fn reduce(&self, selection: &Selection, args: &reduce::Args) -> Result<()> {
         match self {
             Self::Libfuzzer => crate::libfuzzer::reduce(selection, args),
 
