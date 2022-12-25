@@ -1,4 +1,5 @@
 use crate::DEFAULT_TARGET;
+use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
 use std::{collections::hash_map::DefaultHasher, process::Command};
@@ -86,7 +87,7 @@ impl Project {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Command {
+    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Result<Command> {
         let mut cmd = self.cargo();
 
         cmd.arg(call).arg("--target").arg(&self.target);
@@ -116,7 +117,7 @@ impl Project {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = self.rustflags("RUSTFLAGS", flags);
+            let rustflags = self.rustflags("RUSTFLAGS", flags)?;
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
@@ -132,15 +133,15 @@ impl Project {
             }
 
             cmd.env("RUSTFLAGS", rustflags)
-                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags))
+                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags)?)
                 .env("BOLERO_FUZZER", fuzzer);
         }
 
-        cmd
+        Ok(cmd)
     }
 
-    fn rustflags(&self, inherits: &str, flags: &[&str]) -> String {
-        [
+    fn rustflags(&self, inherits: &str, flags: &[&str]) -> Result<String> {
+        let flags = [
             "--cfg fuzzing",
             "-Cdebug-assertions",
             "-Ctarget-cpu=native",
@@ -161,10 +162,12 @@ impl Project {
                     .arg("rustc")
                     .arg("-vV")
                     .output()
-                    .unwrap()
+                    .with_context(|| {
+                        format!("failed to determine {} toolchain version", toolchain)
+                    })?
                     .stdout;
-                let stdout = core::str::from_utf8(&stdout).unwrap();
-                rustc_version::version_meta_for(stdout).unwrap()
+                let stdout = core::str::from_utf8(&stdout)?;
+                rustc_version::version_meta_for(stdout)?
             };
 
             // New LLVM pass manager is enabled when Rust 1.59+ and LLVM 13+
@@ -197,7 +200,8 @@ impl Project {
         .chain(self.sanitizer_flags())
         .chain(std::env::var(inherits).ok())
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+        Ok(flags)
     }
 
     pub fn requires_nightly(&self) -> bool {

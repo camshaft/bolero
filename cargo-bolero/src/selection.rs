@@ -14,7 +14,7 @@ pub struct Selection {
 
 impl Selection {
     pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", flags, Some(fuzzer));
+        let mut build_command = self.cmd("test", flags, Some(fuzzer))?;
         build_command
             .arg(&self.test)
             .arg("--no-run")
@@ -23,7 +23,7 @@ impl Selection {
         exec(build_command)?;
 
         let output = self
-            .cmd("test", flags, Some(fuzzer))
+            .cmd("test", flags, Some(fuzzer))?
             .arg(&self.test)
             .arg("--")
             .arg("--nocapture")
