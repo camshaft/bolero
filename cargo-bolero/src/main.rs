@@ -51,7 +51,8 @@ fn main() {
         });
 
     if let Err(err) = Commands::from_iter(args).exec() {
-        eprintln!("error: {}", err);
+        // Formatting anyhow error with {:#} to print all the error causes.
+        eprintln!("error: {:#}", err);
         std::process::exit(1);
     }
 }

@@ -12,12 +12,12 @@ pub struct List {
 
 impl List {
     pub fn exec(&self) -> Result<()> {
-        let mut build_command = self.cmd("test", &[], None);
+        let mut build_command = self.cmd("test", &[], None)?;
         build_command.arg("--no-run");
         exec(build_command)?;
 
         let output = self
-            .cmd("test", &[], None)
+            .cmd("test", &[], None)?
             .arg("--")
             .arg("--nocapture")
             .env("CARGO_BOLERO_SELECT", "all")

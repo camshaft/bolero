@@ -141,6 +141,7 @@ impl<T> CollectionGenerator for VecDeque<T> {
         }
 
         if let Some(to_add) = new_len.checked_sub(self.len()) {
+            self.reserve(to_add);
             for _ in 0..to_add {
                 self.push_back(item_gen.generate(driver)?);
             }
@@ -180,6 +181,7 @@ impl<T> CollectionGenerator for Vec<T> {
         }
 
         if let Some(to_add) = new_len.checked_sub(self.len()) {
+            self.reserve(to_add);
             for _ in 0..to_add {
                 self.push(item_gen.generate(driver)?);
             }

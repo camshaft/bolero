@@ -8,7 +8,7 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 /// The inputs will only be derived from the `seed` field.
 /// As such, the quality of the inputs may not be high
 /// enough to find edge cases.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct RngEngine {
     pub iterations: usize,
     pub max_len: usize,

@@ -250,7 +250,11 @@ where
 
             let value = generate_value!(self, driver);
 
-            let input = value.clone();
+            let input = if cfg!(kani) {
+                self.value.take().unwrap()
+            } else {
+                value.clone()
+            };
 
             panic::catch(|| {
                 let res = (fun)(input);

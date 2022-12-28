@@ -1,7 +1,13 @@
 use crate::DEFAULT_TARGET;
+use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
+use lazy_static::lazy_static;
 use std::{collections::hash_map::DefaultHasher, process::Command};
 use structopt::StructOpt;
+
+lazy_static! {
+    static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
+}
 
 #[derive(Debug, StructOpt)]
 pub struct Project {
@@ -48,18 +54,26 @@ pub struct Project {
     /// Build the standard library with the provided configuration
     #[structopt(long)]
     build_std: bool,
+
+    /// Fake using a nightly toolchain while using the default toolchain by using RUSTC_BOOTSTRAP
+    #[structopt(long)]
+    rustc_bootstrap: bool,
 }
 
 impl Project {
     fn cargo(&self) -> Command {
-        match self.toolchain() {
+        let mut cmd = match self.toolchain() {
             "default" => Command::new("cargo"),
             toolchain => {
                 let mut cmd = Command::new("rustup");
                 cmd.arg("run").arg(toolchain).arg("cargo");
                 cmd
             }
+        };
+        if self.rustc_bootstrap {
+            cmd.env("RUSTC_BOOTSTRAP", "1");
         }
+        cmd
     }
 
     fn toolchain(&self) -> &str {
@@ -70,7 +84,7 @@ impl Project {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Command {
+    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Result<Command> {
         let mut cmd = self.cargo();
 
         cmd.arg(call).arg("--target").arg(&self.target);
@@ -100,7 +114,7 @@ impl Project {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = self.rustflags("RUSTFLAGS", flags);
+            let rustflags = self.rustflags("RUSTFLAGS", flags)?;
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
@@ -116,15 +130,15 @@ impl Project {
             }
 
             cmd.env("RUSTFLAGS", rustflags)
-                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags))
+                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags)?)
                 .env("BOLERO_FUZZER", fuzzer);
         }
 
-        cmd
+        Ok(cmd)
     }
 
-    fn rustflags(&self, inherits: &str, flags: &[&str]) -> String {
-        [
+    fn rustflags(&self, inherits: &str, flags: &[&str]) -> Result<String> {
+        let flags = [
             "--cfg fuzzing",
             "-Cdebug-assertions",
             "-Ctarget-cpu=native",
@@ -136,7 +150,7 @@ impl Project {
         .chain({
             let toolchain = self.toolchain();
             let version_meta = if toolchain == "default" {
-                rustc_version::version_meta().unwrap()
+                RUST_VERSION.clone()
             } else {
                 let mut cmd = Command::new("rustup");
                 let stdout = cmd
@@ -145,19 +159,21 @@ impl Project {
                     .arg("rustc")
                     .arg("-vV")
                     .output()
-                    .unwrap()
+                    .with_context(|| {
+                        format!("failed to determine {} toolchain version", toolchain)
+                    })?
                     .stdout;
-                let stdout = core::str::from_utf8(&stdout).unwrap();
-                rustc_version::version_meta_for(stdout).unwrap()
+                let stdout = core::str::from_utf8(&stdout)?;
+                rustc_version::version_meta_for(stdout)?
             };
 
-            // New LLVM pass manager is enabled when Rust 1.57+ and LLVM 13+
+            // New LLVM pass manager is enabled when Rust 1.59+ and LLVM 13+
             // https://github.com/rust-lang/rust/pull/88243
 
-            let is_rust_157 = version_meta.semver.major == 1 && version_meta.semver.minor >= 57;
+            let is_rust_159 = version_meta.semver.major == 1 && version_meta.semver.minor >= 59;
             let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
 
-            Some(if is_rust_157 && is_llvm_13 {
+            Some(if is_rust_159 && is_llvm_13 {
                 &"-Cpasses=sancov-module"
             } else {
                 &"-Cpasses=sancov"
@@ -181,7 +197,8 @@ impl Project {
         .chain(self.sanitizer_flags())
         .chain(std::env::var(inherits).ok())
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+        Ok(flags)
     }
 
     fn sanitizers(&self) -> impl Iterator<Item = &str> {

@@ -11,20 +11,54 @@ fuzz and property testing front-end for Rust
 
 A copy of the Bolero Book can be found here: http://camshaft.github.io/bolero
 
-## Installation
+## Quick Start
 
-`bolero` is on `crates.io` and can be added to a project like so:
+1. Install subcommand and add a dependency
 
-```toml
-[dev-dependencies]
-bolero = "0.6"
-```
+    ```console
+    $ cargo add --dev bolero
+    $ cargo install -f cargo-bolero
+    ```
 
-`bolero` also provides a CLI program to execute fuzz tests, [`cargo-bolero`](https://crates.io/crates/cargo-bolero). It can be installed globally with cargo:
+2. Write a test using [`bolero::check!`](https://docs.rs/bolero/latest/bolero/macro.check.html) macro:
 
-```bash
-$ cargo install -f cargo-bolero
-```
+    ```rust
+    pub fn buggy_add(x: u32, y: u32) -> u32 {
+        if x == 12976 && y == 14867 {
+            return x.wrapping_sub(y);
+        }
+        return x.wrapping_add(y);
+    }
+
+    #[test]
+    fn fuzz_add() {
+        bolero::check!()
+            .with_type()
+            .cloned()
+            .for_each(|(a, b)| buggy_add(a, b) == a.wrapping_add(b));
+    }
+    ```
+
+3. Run the test with `cargo bolero`
+
+    ```console
+    $ cargo bolero test fuzz_add
+
+    # ... some moments later ...
+
+    ======================== Test Failure ========================
+
+    Input:
+    (
+        12976,
+        14867,
+    )
+
+    Error:
+    test returned `false`
+
+    ==============================================================
+    ```
 
 ### Linux Installation
 
