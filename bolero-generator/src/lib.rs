@@ -29,6 +29,7 @@ pub mod std_generators;
 
 pub use bolero_generator_derive::*;
 
+pub mod arbitrary;
 pub mod array;
 pub mod atomic;
 pub mod bool;
@@ -43,7 +44,8 @@ pub mod result;
 pub mod time;
 pub mod tuple;
 
-pub use driver::Driver;
+pub use crate::arbitrary::gen_arbitrary;
+pub use crate::driver::Driver;
 
 /// Generate a value for a given type
 pub trait TypeGenerator: Sized {
@@ -252,7 +254,7 @@ pub fn constant<T: Clone>(value: T) -> Constant<T> {
 
 pub mod prelude {
     pub use crate::{
-        constant, gen, gen_with,
+        constant, gen, gen_arbitrary, gen_with,
         one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
         TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
