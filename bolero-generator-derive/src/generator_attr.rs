@@ -6,6 +6,7 @@ use syn::{
 };
 
 pub struct GeneratorAttr {
+    krate: TokenStream2,
     pub generator: Option<TokenStream2>,
 }
 
@@ -14,7 +15,8 @@ impl ToTokens for GeneratorAttr {
         if let Some(generator) = self.generator.as_ref() {
             tokens.extend(quote!(#generator));
         } else {
-            tokens.extend(quote!(bolero_generator::gen()));
+            let krate = &self.krate;
+            tokens.extend(quote!(#krate::gen()));
         }
     }
 }
@@ -24,28 +26,39 @@ impl GeneratorAttr {
         GeneratorAttrValue(self)
     }
 
-    pub fn from_attrs<'a, I: Iterator<Item = &'a Attribute>>(attributes: I) -> Self {
+    pub fn from_attrs<'a, I: Iterator<Item = &'a Attribute>>(
+        krate: &TokenStream2,
+        attributes: I,
+    ) -> Self {
         for attr in attributes {
             if attr.path.is_ident("generator") {
-                return match Self::from_attr(attr) {
+                return match Self::from_attr(krate, attr) {
                     Ok(generator) => generator,
                     Err(err) => Self {
+                        krate: krate.clone(),
                         generator: Some(err.to_compile_error()),
                     },
                 };
             }
         }
 
-        Self { generator: None }
+        Self {
+            krate: krate.clone(),
+            generator: None,
+        }
     }
 
-    pub fn from_attr(attr: &Attribute) -> Result<Self, Error> {
+    pub fn from_attr(krate: &TokenStream2, attr: &Attribute) -> Result<Self, Error> {
         match attr.parse_meta() {
-            Ok(Meta::Path(_)) => Ok(Self { generator: None }),
+            Ok(Meta::Path(_)) => Ok(Self {
+                krate: krate.clone(),
+                generator: None,
+            }),
             Ok(Meta::List(meta)) => {
                 if let Some(generator) = parse_code_hack(&meta)? {
                     // #[generator(_code = "...")]
                     return Ok(Self {
+                        krate: krate.clone(),
                         generator: Some(generator.to_token_stream()),
                     });
                 }
@@ -68,16 +81,19 @@ impl GeneratorAttr {
                     .expect("length already checked above")
                     .to_token_stream();
                 Ok(Self {
+                    krate: krate.clone(),
                     generator: Some(generator),
                 })
             }
             Ok(Meta::NameValue(meta)) => Ok(Self {
+                krate: krate.clone(),
                 generator: Some(meta.lit.to_token_stream()),
             }),
             Err(error) => {
                 // last effort to make it work
                 if let Ok(expr) = attr.parse_args::<Expr>() {
                     return Ok(Self {
+                        krate: krate.clone(),
                         generator: Some(expr.to_token_stream()),
                     });
                 }
@@ -90,7 +106,8 @@ impl GeneratorAttr {
     pub fn apply_constraint(&self, ty: &Type, where_clause: &mut WhereClause) {
         if self.generator.is_none() {
             let span = ty.span();
-            let constraint = quote_spanned!(span=> : bolero_generator::TypeGenerator);
+            let krate = &self.krate;
+            let constraint = quote_spanned!(span=> : #krate::TypeGenerator);
             where_clause.predicates.push(parse_quote!(#ty #constraint));
         }
     }
@@ -114,10 +131,11 @@ pub struct GeneratorAttrValue<'a>(&'a GeneratorAttr);
 
 impl ToTokens for GeneratorAttrValue<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let krate = &self.0.krate;
         let generator = self.0;
         let span = generator.span();
         tokens.extend(quote_spanned!(span=>
-            bolero_generator::ValueGenerator::generate(&(#generator), __bolero_driver)?
+            #krate::ValueGenerator::generate(&(#generator), __bolero_driver)?
         ))
     }
 }
