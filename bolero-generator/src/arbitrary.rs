@@ -1,8 +1,6 @@
-use core::{cmp, marker::PhantomData};
-
-use arbitrary::{Arbitrary, Unstructured};
-
 use crate::{gen_with, Driver, ValueGenerator};
+use arbitrary::{Arbitrary, Unstructured};
+use core::{cmp, marker::PhantomData};
 
 pub struct ArbitraryGenerator<T>(PhantomData<T>);
 

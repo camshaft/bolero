@@ -28,8 +28,9 @@ extern crate std;
 pub mod std_generators;
 
 pub use bolero_generator_derive::*;
-
+#[cfg(feature = "arbitrary")]
 pub mod arbitrary;
+
 pub mod array;
 pub mod atomic;
 pub mod bool;
@@ -44,7 +45,9 @@ pub mod result;
 pub mod time;
 pub mod tuple;
 
+#[cfg(feature = "arbitrary")]
 pub use crate::arbitrary::gen_arbitrary;
+
 pub use crate::driver::Driver;
 
 /// Generate a value for a given type
@@ -254,8 +257,11 @@ pub fn constant<T: Clone>(value: T) -> Constant<T> {
 
 pub mod prelude {
     pub use crate::{
-        constant, gen, gen_arbitrary, gen_with,
+        constant, gen, gen_with,
         one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
         TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
+
+    #[cfg(feature = "arbitrary")]
+    pub use crate::gen_arbitrary;
 }
