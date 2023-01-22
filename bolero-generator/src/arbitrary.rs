@@ -1,6 +1,8 @@
 use crate::{Driver, ValueGenerator};
-use arbitrary::{Arbitrary, Unstructured};
+use arbitrary::Unstructured;
 use core::marker::PhantomData;
+
+pub use arbitrary::Arbitrary;
 
 pub struct ArbitraryGenerator<T>(PhantomData<T>);
 
