@@ -143,6 +143,19 @@ pub mod lib {
         fn gen_bool(&mut self, _probability: Option<f32>) -> Option<bool> {
             Some(kani::any())
         }
+
+        fn gen_from_bytes<Gen, T>(
+            &mut self,
+            _len: std::ops::RangeInclusive<usize>,
+            mut gen: Gen,
+        ) -> Option<T>
+        where
+            Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+        {
+            let value = gen(kani::any()).map(|v| v.1);
+            kani::assume(value.is_some());
+            value
+        }
     }
 }
 

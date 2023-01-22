@@ -21,9 +21,12 @@ impl<R: RngCore> FillBytes for DirectRng<R> {
     }
 
     #[inline]
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
+    fn peek_bytes(&mut self, _offset: usize, bytes: &mut [u8]) -> Option<()> {
         RngCore::try_fill_bytes(&mut self.0, bytes).ok()
     }
+
+    #[inline]
+    fn consume_bytes(&mut self, _consumed: usize) {}
 }
 
 impl<R: RngCore> Driver for DirectRng<R> {
@@ -47,7 +50,7 @@ impl<R: RngCore> FillBytes for ForcedRng<R> {
     }
 
     #[inline]
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
+    fn peek_bytes(&mut self, _offset: usize, bytes: &mut [u8]) -> Option<()> {
         if RngCore::try_fill_bytes(&mut self.0, bytes).is_err() {
             // if the rng fails to fill the remaining bytes, then we just start returning 0s
             for byte in bytes.iter_mut() {
@@ -56,6 +59,9 @@ impl<R: RngCore> FillBytes for ForcedRng<R> {
         }
         Some(())
     }
+
+    #[inline]
+    fn consume_bytes(&mut self, _consumed: usize) {}
 }
 
 impl<R: RngCore> Driver for ForcedRng<R> {

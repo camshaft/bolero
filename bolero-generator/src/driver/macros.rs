@@ -90,5 +90,68 @@ macro_rules! gen_from_bytes {
                 Some(value < (u8::MAX / 2))
             }
         }
+
+        fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, mut gen: Gen) -> Option<T>
+        where
+            Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+        {
+            const ABUSIVE_SIZE: usize = 64 * 1024;
+            const MIN_INCREASE: usize = 32;
+
+            match self.mode() {
+                DriverMode::Direct => {
+                    let len = self.gen_usize(
+                        Bound::Included(len.start()),
+                        Bound::Included(&std::cmp::min(*len.end(), ABUSIVE_SIZE)),
+                    )?;
+                    let mut data = vec![0; len];
+                    self.peek_bytes(0, &mut data)?;
+                    match gen(&data) {
+                        None => None,
+                        Some((consumed, res)) => {
+                            self.consume_bytes(consumed);
+                            Some(res)
+                        }
+                    }
+                }
+                DriverMode::Forced => {
+                    let init_len = len.start()
+                        + self.gen_usize(
+                            Bound::Included(&0),
+                            Bound::Included(&std::cmp::min(ABUSIVE_SIZE, len.end() - len.start())),
+                        )?;
+                    let mut data = vec![0; init_len];
+                    self.peek_bytes(0, &mut data)?;
+                    loop {
+                        match gen(&data) {
+                            Some((consumed, res)) => {
+                                self.consume_bytes(consumed);
+                                return Some(res);
+                            }
+                            None => {
+                                let max_additional_size = std::cmp::min(
+                                    ABUSIVE_SIZE,
+                                    len.end().saturating_sub(data.len()),
+                                );
+                                if max_additional_size == 0 {
+                                    self.consume_bytes(data.len());
+                                    return None; // we actually tried feeding the max amount of data already
+                                }
+                                let additional_size = self.gen_usize(
+                                    Bound::Included(&std::cmp::min(
+                                        MIN_INCREASE,
+                                        max_additional_size,
+                                    )),
+                                    Bound::Included(&max_additional_size),
+                                )?;
+                                let previous_len = data.len();
+                                data.resize(data.len() + additional_size, 0);
+                                self.peek_bytes(previous_len, &mut data[previous_len..]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     };
 }
