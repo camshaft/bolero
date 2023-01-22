@@ -137,10 +137,10 @@ where
                             test.shrink(buffer.clone(), data.seed(), driver_mode, shrink_time);
 
                         if let Some(shrunken) = shrunken {
-                            format!("{}", shrunken)
+                            format!("{:#}", shrunken)
                         } else {
                             format!(
-                                "{}",
+                                "{:#}",
                                 TestFailure {
                                     seed: data.seed(),
                                     error,
@@ -165,13 +165,13 @@ where
                         );
 
                         if let Some(shrunken) = shrunken {
-                            format!("{}", shrunken)
+                            format!("{:#}", shrunken)
                         } else {
                             buffer.clear();
                             let mut input = conf.input(&mut buffer);
                             let input = test.generate_value(&mut input);
                             format!(
-                                "{}",
+                                "{:#}",
                                 TestFailure {
                                     seed: data.seed(),
                                     error,
