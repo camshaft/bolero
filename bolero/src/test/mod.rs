@@ -87,11 +87,11 @@ impl TestEngine {
 
     fn tests(&self) -> Vec<NamedTest> {
         empty()
-            .chain(self.file_tests(["corpus"].iter().cloned()))
             .chain(self.file_tests(["crashes"].iter().cloned()))
-            .chain(self.file_tests(["afl_state", "hangs"].iter().cloned()))
-            .chain(self.file_tests(["afl_state", "queue"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "crashes"].iter().cloned()))
+            .chain(self.file_tests(["afl_state", "hangs"].iter().cloned()))
+            .chain(self.file_tests(["corpus"].iter().cloned()))
+            .chain(self.file_tests(["afl_state", "queue"].iter().cloned()))
             .chain(self.rng_tests())
             .collect()
     }
