@@ -79,9 +79,6 @@ impl Project {
     fn toolchain(&self) -> &str {
         if let Some(toolchain) = self.toolchain.as_ref() {
             toolchain
-        } else if self.requires_nightly() && RUST_VERSION.channel == rustc_version::Channel::Stable
-        {
-            "nightly"
         } else {
             "default"
         }
@@ -202,10 +199,6 @@ impl Project {
         .collect::<Vec<_>>()
         .join(" ");
         Ok(flags)
-    }
-
-    pub fn requires_nightly(&self) -> bool {
-        !self.rustc_bootstrap && (self.sanitizers().next().is_some() || self.build_std)
     }
 
     fn sanitizers(&self) -> impl Iterator<Item = &str> {
