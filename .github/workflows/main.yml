@@ -130,12 +130,8 @@ jobs:
         profile: minimal
         override: true
 
-    - name: Setup
-      run: |
-        cargo install kani-verifier
-        cargo-kani setup
-
-    - name: Test
-      working-directory: examples/basic
-      run: |
-        cargo kani
+    - name: Kani run
+      uses: model-checking/kani-github-action@v0.20
+      with:
+        working-directory: examples/basic
+        args: --tests
