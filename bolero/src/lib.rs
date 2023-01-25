@@ -26,7 +26,6 @@ cfg_if::cfg_if! {
 
 /// Re-export of [`bolero_generator`]
 pub mod generator {
-    // TODO: remove the use of prelude::* for the next major release
     pub use bolero_generator::{self, prelude::*};
 }
 
