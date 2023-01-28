@@ -159,9 +159,7 @@ impl Project {
                     .arg("rustc")
                     .arg("-vV")
                     .output()
-                    .with_context(|| {
-                        format!("failed to determine {toolchain} toolchain version")
-                    })?
+                    .with_context(|| format!("failed to determine {toolchain} toolchain version"))?
                     .stdout;
                 let stdout = core::str::from_utf8(&stdout)?;
                 rustc_version::version_meta_for(stdout)?
