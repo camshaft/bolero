@@ -40,6 +40,7 @@ test_example:
 
 unit-tests:
 	@cargo test
+	@cargo test --features arbitrary
 
 test_fuzzers: $(FUZZERS)
 
