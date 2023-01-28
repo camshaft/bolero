@@ -95,15 +95,15 @@ macro_rules! gen_from_bytes {
         where
             Gen: FnMut(&[u8]) -> Option<(usize, T)>,
         {
-            const ABUSIVE_SIZE: usize = 64 * 1024;
+            const ABUSIVE_SIZE: usize = 1024;
             const MIN_INCREASE: usize = 32;
 
             match self.mode() {
                 DriverMode::Direct => {
-                    let len = self.gen_usize(
-                        Bound::Included(len.start()),
-                        Bound::Included(&std::cmp::min(*len.end(), ABUSIVE_SIZE)),
-                    )?;
+                    let len = match (len.start(), len.end()) {
+                        (s, e) if s == e => *s,
+                        (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
+                    };
                     let mut data = vec![0; len];
                     self.peek_bytes(0, &mut data)?;
                     match gen(&data) {
