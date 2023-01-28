@@ -95,6 +95,10 @@ macro_rules! gen_from_bytes {
         where
             Gen: FnMut(&[u8]) -> Option<(usize, T)>,
         {
+            // Even attempting an alloc of more than 0x10000000000 bytes makes asan crash.
+            // LibFuzzer limits memory to 2G (by default) and try_reserve() does not fail in oom situations then.
+            // With all the above, limit memory allocations to 1M at a time here.
+            const NONSENSICAL_SIZE: usize = 1024 * 1024;
             const ABUSIVE_SIZE: usize = 1024;
             const MIN_INCREASE: usize = 32;
 
@@ -104,6 +108,9 @@ macro_rules! gen_from_bytes {
                         (s, e) if s == e => *s,
                         (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
                     };
+                    if len >= NONSENSICAL_SIZE {
+                        return None;
+                    }
                     let mut data = Vec::new();
                     if let Err(_) = data.try_reserve(len) {
                         return None;
