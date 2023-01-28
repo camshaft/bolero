@@ -263,8 +263,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
         {
             if self.execute().is_ok() {
                 eprintln!(
-                    "transform created non-failing test: {}\nBEFORE: {:?}\nAFTER: {:?}",
-                    transform,
+                    "transform created non-failing test: {transform}\nBEFORE: {:?}\nAFTER: {:?}",
                     &self.snapshot_input,
                     &self.input[..self.end],
                 );
