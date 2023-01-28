@@ -104,7 +104,11 @@ macro_rules! gen_from_bytes {
                         (s, e) if s == e => *s,
                         (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
                     };
-                    let mut data = vec![0; len];
+                    let mut data = Vec::new();
+                    if let Err(_) = data.try_reserve(len) {
+                        return None;
+                    }
+                    data.resize(len, 0);
                     self.peek_bytes(0, &mut data)?;
                     match gen(&data) {
                         None => None,
