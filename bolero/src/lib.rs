@@ -367,7 +367,11 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<G, Engine> TestTarget<G, Engine, BorrowedInput> {
+impl<G, Engine> TestTarget<G, Engine, BorrowedInput>
+where
+    G: generator::ValueGenerator,
+    <G as generator::ValueGenerator>::Output: Clone,
+{
     /// Use a cloned value for the test input
     ///
     /// Cloning the test inputs will force a call to [`Clone::clone`]
