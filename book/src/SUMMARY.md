@@ -13,3 +13,6 @@
     - [Miri Support](./features/miri.md)
 - [Tutorials](./tutorials/index.md)
     - [Fibonacci](./tutorials/fibonacci.md)
+
+- [Developer documentation](./dev-docs/index.md)
+    - [Build from source](./dev-docs/build.md)
