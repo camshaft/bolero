@@ -40,7 +40,9 @@ test_example:
 
 unit-tests:
 	cargo test
-	if [ "$$(rustc --version)" != "rustc 1.57.0" ]; then cargo test --features arbitrary; fi
+
+unit-tests-no-1.57:
+	cargo test --features arbitrary
 
 test_fuzzers: $(FUZZERS)
 
