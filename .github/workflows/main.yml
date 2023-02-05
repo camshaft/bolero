@@ -47,9 +47,11 @@ jobs:
         rust: [1.57.0, 1.63.0, stable, beta, nightly]
         os: [ubuntu-latest, macOS-latest]
         # TODO add honggfuzz back
-        test: [unit-tests, libfuzzer, afl, examples-tests]
+        test: [unit-tests, unit-tests-no-1.57, libfuzzer, afl, examples-tests]
         sanitizer: [NONE]
         exclude:
+          - rust: 1.57.0
+            test: unit-tests-no-1.57
           # honggfuzz is broken on macOS
           - os: macos-latest
             test: honggfuzz
@@ -112,14 +114,6 @@ jobs:
 
     - name: ${{ matrix.test }}
       run: make ${{ matrix.test }}
-      env:
-        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
-        AFL_SKIP_CPUFREQ: 1
-        SANITIZER: ${{ matrix.sanitizer }}
-
-    - name: ${{ matrix.test }}
-      if: ${{matrix.test}} == 'unit-tests' && ${{ matrix.rust }} != '1.57.0'
-      run: make ${{ matrix.test }}-no-1.57
       env:
         AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
         AFL_SKIP_CPUFREQ: 1
