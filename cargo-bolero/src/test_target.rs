@@ -26,7 +26,7 @@ impl TestTarget {
             1 => Ok(targets.pop().unwrap()),
             _ => {
                 for target in targets {
-                    eprintln!("{target}");
+                    eprintln!("{}", target);
                 }
                 Err(anyhow!("multiple targets matched"))
             }

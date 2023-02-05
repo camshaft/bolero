@@ -138,14 +138,14 @@ where
                         )
                         .expect("test should fail");
 
-                    eprintln!("{failure}");
+                    eprintln!("{}", failure);
 
                     std::panic::resume_unwind(Box::new(failure));
                 }
                 #[cfg(miri)]
                 Err(failure) => {
                     // don't shrink in Miri execution
-                    eprintln!("{failure}");
+                    eprintln!("{}", failure);
                     std::panic::resume_unwind(Box::new(failure));
                 }
             }

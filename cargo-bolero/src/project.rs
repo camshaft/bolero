@@ -159,7 +159,9 @@ impl Project {
                     .arg("rustc")
                     .arg("-vV")
                     .output()
-                    .with_context(|| format!("failed to determine {toolchain} toolchain version"))?
+                    .with_context(|| {
+                        format!("failed to determine {} toolchain version", toolchain)
+                    })?
                     .stdout;
                 let stdout = core::str::from_utf8(&stdout)?;
                 rustc_version::version_meta_for(stdout)?
@@ -208,7 +210,7 @@ impl Project {
 
     fn sanitizer_flags(&self) -> impl Iterator<Item = String> + '_ {
         self.sanitizers()
-            .map(|sanitizer| format!("-Zsanitizer={sanitizer}"))
+            .map(|sanitizer| format!("-Zsanitizer={}", sanitizer))
     }
 
     fn release(&self) -> bool {

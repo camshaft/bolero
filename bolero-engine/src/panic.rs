@@ -202,7 +202,7 @@ impl Display for Backtrace {
         for (i, frame) in self.frames.iter().enumerate() {
             writeln!(f, "   {}: {}", i, frame.symbol)?;
             if let Some(location) = frame.location.as_ref() {
-                writeln!(f, "             at {location}")?;
+                writeln!(f, "             at {}", location)?;
             }
         }
 
@@ -223,7 +223,7 @@ impl BacktraceFrame {
             symbol: name,
             location: symbol.filename().map(|filename| {
                 if let Some(lineno) = symbol.lineno() {
-                    format!("{}:{lineno}", filename.display())
+                    format!("{}:{}", filename.display(), lineno)
                 } else {
                     filename.display().to_string()
                 }

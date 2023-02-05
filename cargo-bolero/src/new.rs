@@ -85,5 +85,5 @@ fn mkdir<P: AsRef<Path>>(path: P) {
 fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) {
     let path = path.as_ref();
     fs::write(path, contents).expect("could not create file");
-    println!("wrote {path:?}");
+    println!("wrote {:?}", path);
 }

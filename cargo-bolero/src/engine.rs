@@ -64,7 +64,7 @@ impl FromStr for Engine {
             #[cfg(feature = "kani")]
             "kani" => Ok(Self::Kani),
 
-            _ => Err(format!("invalid fuzzer {value:?}")),
+            _ => Err(format!("invalid fuzzer {:?}", value)),
         }
     }
 }

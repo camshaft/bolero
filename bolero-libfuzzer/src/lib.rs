@@ -65,7 +65,7 @@ pub mod fuzzer {
                             test.shrink(slice.to_vec(), None, driver_mode, self.shrink_time);
 
                         if let Some(shrunken) = shrunken {
-                            eprintln!("{shrunken:#}");
+                            eprintln!("{:#}", shrunken);
                         } else {
                             eprintln!(
                                 "{:#}",

@@ -26,7 +26,7 @@ impl List {
         // ignore the status in case any tests failed
 
         for target in TestTarget::all_from_stdout(&output.stdout)? {
-            println!("{target}");
+            println!("{}", target);
         }
 
         Ok(())

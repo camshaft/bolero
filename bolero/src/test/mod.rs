@@ -77,7 +77,7 @@ impl TestEngine {
                 Some(seed)
             })
             .map(move |seed| NamedTest {
-                name: format!("[BOLERO_RANDOM_SEED={seed}]"),
+                name: format!("[BOLERO_RANDOM_SEED={}]", seed),
                 data: TestInput::RngTest(RngTest {
                     seed,
                     max_len: rng_info.max_len,
@@ -137,7 +137,7 @@ where
                             test.shrink(buffer.clone(), data.seed(), driver_mode, shrink_time);
 
                         if let Some(shrunken) = shrunken {
-                            format!("{shrunken:#}")
+                            format!("{:#}", shrunken)
                         } else {
                             format!(
                                 "{:#}",
@@ -165,7 +165,7 @@ where
                         );
 
                         if let Some(shrunken) = shrunken {
-                            format!("{shrunken:#}")
+                            format!("{:#}", shrunken)
                         } else {
                             buffer.clear();
                             let mut input = conf.input(&mut buffer);
@@ -194,7 +194,7 @@ where
 
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
-                eprintln!("{err}");
+                eprintln!("{}", err);
                 panic!("test failed: {:?}", test.name);
             }
         }

@@ -25,7 +25,7 @@ macro_rules! optional_arg {
     ($cmd:ident, $harg:expr, $arg:expr) => {
         if let Some(value) = $arg {
             $cmd.push($harg.to_string());
-            $cmd.push(format!("{value}"));
+            $cmd.push(format!("{}", value));
         }
     };
 }
