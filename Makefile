@@ -39,8 +39,8 @@ test_example:
 	    --nocapture $(TEST_THREADS)
 
 unit-tests:
-	@cargo test
-	@cargo test --features arbitrary
+	cargo test
+	if [ "$(cargo --version)" != "cargo 1.57.0" ]; then cargo test --features arbitrary; fi
 
 test_fuzzers: $(FUZZERS)
 
