@@ -252,7 +252,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
 
     /// Set the generator for the `TestTarget` as being `arbitrary`-based
     ///
-    /// Calling `with_arbitrar::<Type>()` will generate random values of `Type`
+    /// Calling `with_arbitrary::<Type>()` will generate random values of `Type`
     /// to be tested. `Type` is required to implement [`arbitrary::Arbitrary`]
     /// in order to use this method.
     ///
