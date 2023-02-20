@@ -31,29 +31,32 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
     }
 
     #[inline]
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
+    fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
         match self.mode {
-            DriverMode::Forced => {
-                let offset = self.input.len().min(bytes.len());
-                let (current, remaining) = self.input.split_at(offset);
-                let (bytes_to_fill, bytes_to_zero) = bytes.split_at_mut(offset);
-                bytes_to_fill.copy_from_slice(current);
-                for byte in bytes_to_zero.iter_mut() {
-                    *byte = 0;
-                }
-                self.input = remaining;
-                Some(())
-            }
             DriverMode::Direct => {
-                if bytes.len() > self.input.len() {
-                    return None;
+                if (offset + bytes.len()) > self.input.len() {
+                    None
+                } else {
+                    bytes.copy_from_slice(&self.input[offset..(offset + bytes.len())]);
+                    Some(())
                 }
-                let (current, remaining) = self.input.split_at(bytes.len());
-                bytes.copy_from_slice(current);
-                self.input = remaining;
+            }
+            DriverMode::Forced => {
+                if offset < self.input.len() {
+                    let copy_len = std::cmp::min(bytes.len(), self.input.len() - offset);
+                    bytes[..copy_len].copy_from_slice(&self.input[offset..(offset + copy_len)]);
+                    bytes[copy_len..].fill(0);
+                } else {
+                    bytes.fill(0);
+                }
                 Some(())
             }
         }
+    }
+
+    #[inline]
+    fn consume_bytes(&mut self, consumed: usize) {
+        self.input = &self.input[std::cmp::min(consumed, self.input.len())..];
     }
 }
 

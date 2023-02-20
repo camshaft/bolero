@@ -90,5 +90,79 @@ macro_rules! gen_from_bytes {
                 Some(value < (u8::MAX / 2))
             }
         }
+
+        fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, mut gen: Gen) -> Option<T>
+        where
+            Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+        {
+            // Even attempting an alloc of more than 0x10000000000 bytes makes asan crash.
+            // LibFuzzer limits memory to 2G (by default) and try_reserve() does not fail in oom situations then.
+            // With all the above, limit memory allocations to 1M at a time here.
+            const NONSENSICAL_SIZE: usize = 1024 * 1024;
+            const ABUSIVE_SIZE: usize = 1024;
+            const MIN_INCREASE: usize = 32;
+
+            match self.mode() {
+                DriverMode::Direct => {
+                    let len = match (len.start(), len.end()) {
+                        (s, e) if s == e => *s,
+                        (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
+                    };
+                    if len >= NONSENSICAL_SIZE {
+                        return None;
+                    }
+                    let mut data = Vec::new();
+                    if let Err(_) = data.try_reserve(len) {
+                        return None;
+                    }
+                    data.resize(len, 0);
+                    self.peek_bytes(0, &mut data)?;
+                    match gen(&data) {
+                        None => None,
+                        Some((consumed, res)) => {
+                            self.consume_bytes(consumed);
+                            Some(res)
+                        }
+                    }
+                }
+                DriverMode::Forced => {
+                    let init_len = len.start()
+                        + self.gen_usize(
+                            Bound::Included(&0),
+                            Bound::Included(&std::cmp::min(ABUSIVE_SIZE, len.end() - len.start())),
+                        )?;
+                    let mut data = vec![0; init_len];
+                    self.peek_bytes(0, &mut data)?;
+                    loop {
+                        match gen(&data) {
+                            Some((consumed, res)) => {
+                                self.consume_bytes(consumed);
+                                return Some(res);
+                            }
+                            None => {
+                                let max_additional_size = std::cmp::min(
+                                    ABUSIVE_SIZE,
+                                    len.end().saturating_sub(data.len()),
+                                );
+                                if max_additional_size == 0 {
+                                    self.consume_bytes(data.len());
+                                    return None; // we actually tried feeding the max amount of data already
+                                }
+                                let additional_size = self.gen_usize(
+                                    Bound::Included(&std::cmp::min(
+                                        MIN_INCREASE,
+                                        max_additional_size,
+                                    )),
+                                    Bound::Included(&max_additional_size),
+                                )?;
+                                let previous_len = data.len();
+                                data.resize(data.len() + additional_size, 0);
+                                self.peek_bytes(previous_len, &mut data[previous_len..]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     };
 }

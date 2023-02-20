@@ -250,6 +250,28 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         }
     }
 
+    /// Set the generator for the `TestTarget` as being `arbitrary`-based
+    ///
+    /// Calling `with_arbitrary::<Type>()` will generate random values of `Type`
+    /// to be tested. `Type` is required to implement [`arbitrary::Arbitrary`]
+    /// in order to use this method.
+    ///
+    /// This mode is used for testing an implementation that requires
+    /// structured input.
+    #[cfg(feature = "arbitrary")]
+    pub fn with_arbitrary<T: Debug + for<'a> bolero_generator::arbitrary::Arbitrary<'a>>(
+        self,
+    ) -> TestTarget<bolero_generator::arbitrary::ArbitraryGenerator<T>, Engine, InputOwnership>
+    {
+        TestTarget {
+            driver_mode: self.driver_mode,
+            shrink_time: self.shrink_time,
+            generator: generator::gen_arbitrary(),
+            engine: self.engine,
+            input_ownership: self.input_ownership,
+        }
+    }
+
     /// Set the amount of time that will be spent shrinking an input on failure
     ///
     /// Engines can optionally shrink inputs on failures to make it easier to debug
@@ -478,6 +500,15 @@ fn slice_generator_test() {
 #[should_panic]
 fn type_generator_test() {
     check!().with_type().for_each(|input: &u8| {
+        assert!(input < &128);
+    });
+}
+
+#[cfg(feature = "arbitrary")]
+#[test]
+#[should_panic]
+fn arbitrary_generator_test() {
+    check!().with_arbitrary().for_each(|input: &u8| {
         assert!(input < &128);
     });
 }

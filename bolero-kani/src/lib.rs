@@ -15,6 +15,12 @@ mod kani {
         // no-op
         let _ = cond;
     }
+
+    pub mod vec {
+        pub fn any_vec<T, const N: usize>() -> Vec<T> {
+            todo!()
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -142,6 +148,21 @@ pub mod lib {
 
         fn gen_bool(&mut self, _probability: Option<f32>) -> Option<bool> {
             Some(kani::any())
+        }
+
+        fn gen_from_bytes<Gen, T>(
+            &mut self,
+            len: std::ops::RangeInclusive<usize>,
+            mut gen: Gen,
+        ) -> Option<T>
+        where
+            Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+        {
+            let bytes = kani::vec::any_vec::<u8, 256>();
+            kani::assume(len.contains(&bytes.len()));
+            let value = gen(&bytes).map(|v| v.1);
+            kani::assume(value.is_some());
+            value
         }
     }
 }

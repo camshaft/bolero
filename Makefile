@@ -39,7 +39,10 @@ test_example:
 	    --nocapture $(TEST_THREADS)
 
 unit-tests:
-	@cargo test
+	cargo test
+
+unit-tests-no-1.57:
+	cargo test --features arbitrary
 
 test_fuzzers: $(FUZZERS)
 

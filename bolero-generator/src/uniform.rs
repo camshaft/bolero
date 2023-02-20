@@ -7,7 +7,15 @@ pub trait Uniform: Sized {
 
 pub trait FillBytes {
     fn mode(&self) -> DriverMode;
-    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()>;
+
+    fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()>;
+    fn consume_bytes(&mut self, consumed: usize);
+
+    fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
+        self.peek_bytes(0, bytes)?;
+        self.consume_bytes(bytes.len());
+        Some(())
+    }
 }
 
 macro_rules! uniform_int {
