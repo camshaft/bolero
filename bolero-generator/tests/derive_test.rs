@@ -41,6 +41,23 @@ pub enum Enum {
     Clear,
 }
 
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Expr {
+    Int(i32),
+    If {
+        test_expr: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
+    },
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum GenericTypes<T1, T2> {
+    T1Value(T1),
+    T2Value(T2),
+    NoValue,
+}
+
 #[derive(TypeGenerator)]
 pub union Union {
     a: u32,

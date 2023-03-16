@@ -1,9 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{
-    parse::Error, parse_quote, spanned::Spanned, Attribute, Expr, Lit, Meta, MetaList, NestedMeta,
-    Type, WhereClause,
-};
+use syn::{parse::Error, spanned::Spanned, Attribute, Expr, Lit, Meta, MetaList, NestedMeta};
 
 pub struct GeneratorAttr {
     krate: TokenStream2,
@@ -100,15 +97,6 @@ impl GeneratorAttr {
 
                 Err(error)
             }
-        }
-    }
-
-    pub fn apply_constraint(&self, ty: &Type, where_clause: &mut WhereClause) {
-        if self.generator.is_none() {
-            let span = ty.span();
-            let krate = &self.krate;
-            let constraint = quote_spanned!(span=> : #krate::TypeGenerator);
-            where_clause.predicates.push(parse_quote!(#ty #constraint));
         }
     }
 }

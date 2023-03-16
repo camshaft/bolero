@@ -8,8 +8,8 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    parse_macro_input, spanned::Spanned, Attribute, Data, DataEnum, DataStruct, DataUnion,
-    DeriveInput, Error, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident, WhereClause,
+    parse_macro_input, parse_quote, spanned::Spanned, Data, DataEnum, DataStruct, DataUnion,
+    DeriveInput, Error, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Generics, Ident,
 };
 
 fn crate_ident(from: FoundCrate) -> Ident {
@@ -40,57 +40,74 @@ fn crate_path() -> TokenStream2 {
 #[proc_macro_derive(TypeGenerator, attributes(generator))]
 pub fn derive_type_generator(input: TokenStream) -> TokenStream {
     let krate = crate_path();
-    let input = parse_macro_input!(input as DeriveInput);
-    match input.data {
-        Data::Struct(data) => {
-            generate_struct_type_gen(input.attrs, &krate, input.ident, input.generics, data)
+    let derive_input = parse_macro_input!(input as DeriveInput);
+    let name = derive_input.ident;
+
+    // Add `T: TypeGenerator` bounds to each generic type `T`
+    let generics = add_trait_bound(derive_input.generics, &krate);
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    // The `generate` and `mutate` methods depend on the data type
+    let (generate_method, mutate_method) = match derive_input.data {
+        Data::Struct(data) => generate_struct_type_gen(&krate, &name, data),
+        Data::Enum(data) => generate_enum_type_gen(&krate, &name, data),
+        Data::Union(data) => generate_union_type_gen(&krate, &name, data),
+    };
+
+    // Generate the implementation for the type
+    quote!(
+        #[automatically_derived]
+        impl #impl_generics #krate::TypeGenerator for #name #ty_generics #where_clause {
+            #generate_method
+
+            #mutate_method
         }
-        Data::Enum(data) => {
-            generate_enum_type_gen(input.attrs, &krate, input.ident, input.generics, data)
-        }
-        Data::Union(data) => {
-            generate_union_type_gen(input.attrs, &krate, input.ident, input.generics, data)
-        }
-    }
+    )
     .into()
 }
 
-fn generate_struct_type_gen(
-    _attrs: Vec<Attribute>,
-    krate: &TokenStream2,
-    name: Ident,
-    mut generics: Generics,
-    data_struct: DataStruct,
-) -> TokenStream2 {
-    let where_clause = generics.make_where_clause();
-    let value = generate_fields_type_gen(krate, &name, &data_struct.fields, where_clause);
-    let destructure = generate_fields_type_destructure(&name, &data_struct.fields);
-    let mutate = generate_fields_type_mutate(krate, &data_struct.fields);
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    quote!(
-        impl #impl_generics #krate::TypeGenerator for #name #ty_generics #where_clause {
-            fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-                Some(#value)
-            }
-
-            fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-                let #destructure = self;
-                #mutate
-                Some(())
-            }
+/// Add a bound `T: TypeGenerator` to each type parameter `T`
+fn add_trait_bound(mut generics: Generics, krate: &TokenStream2) -> Generics {
+    generics.params.iter_mut().for_each(|param| {
+        if let GenericParam::Type(type_param) = param {
+            type_param.bounds.push(parse_quote!(#krate::TypeGenerator));
         }
-    )
+    });
+    generics
 }
 
-fn generate_enum_type_gen(
-    _attrs: Vec<Attribute>,
+/// Create the `generate` and `mutate` methods for the derived `TypeGenerator` impl of a struct
+fn generate_struct_type_gen(
     krate: &TokenStream2,
-    name: Ident,
-    mut generics: Generics,
+    name: &Ident,
+    data_struct: DataStruct,
+) -> (TokenStream2, TokenStream2) {
+    let value = generate_fields_type_gen(krate, &name, &data_struct.fields);
+    let destructure = generate_fields_type_destructure(&name, &data_struct.fields);
+    let mutate_body = generate_fields_type_mutate(krate, &data_struct.fields);
+
+    let generate_method = quote!(
+        fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
+            Some(#value)
+        }
+    );
+    let mutate_method = quote!(
+        fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
+            let #destructure = self;
+            #mutate_body
+            Some(())
+        }
+    );
+    (generate_method, mutate_method)
+}
+
+/// Create the `generate` and `mutate` methods for the derived `TypeGenerator` impl of an enum
+fn generate_enum_type_gen(
+    krate: &TokenStream2,
+    name: &Ident,
     data_enum: DataEnum,
-) -> TokenStream2 {
-    let where_clause = generics.make_where_clause();
+) -> (TokenStream2, TokenStream2) {
     let variant_max = data_enum.variants.len();
     let variant_upper = lower_type_index(variant_max, variant_max, name.span());
 
@@ -102,7 +119,7 @@ fn generate_enum_type_gen(
             let variant_name = &variant.ident;
             let span = variant_name.span();
             let constructor = quote_spanned!(span=> #name::#variant_name);
-            let value = generate_fields_type_gen(krate, constructor, &variant.fields, where_clause);
+            let value = generate_fields_type_gen(krate, constructor, &variant.fields);
 
             let idx = lower_type_index(idx, variant_max, span);
             quote_spanned!(span=> #idx => #value,)
@@ -140,50 +157,47 @@ fn generate_enum_type_gen(
         })
         .collect();
 
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let generate_method = quote!(
+        fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
+            let __bolero_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
+            Some(match __bolero_selection {
+                #(#gen_variants)*
+                _ => unreachable!("Value outside of range"),
+            })
+        }
+    );
 
-    quote!(
-        impl #impl_generics #krate::TypeGenerator for #name #ty_generics #where_clause {
-            fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-                let __bolero_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
-                Some(match __bolero_selection {
+    let mutate_method = quote!(
+        fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
+            let __bolero_prev_selection = match self {
+                #(#gen_lookup)*
+            };
+
+            let __bolero_new_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
+
+            if __bolero_prev_selection == __bolero_new_selection {
+                match self {
+                    #(#gen_mutate)*
+                }
+            } else {
+                *self = match __bolero_new_selection {
                     #(#gen_variants)*
                     _ => unreachable!("Value outside of range"),
-                })
-            }
-
-            fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-                let __bolero_prev_selection = match self {
-                    #(#gen_lookup)*
                 };
-
-                let __bolero_new_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
-
-                if __bolero_prev_selection == __bolero_new_selection {
-                    match self {
-                        #(#gen_mutate)*
-                    }
-                } else {
-                    *self = match __bolero_new_selection {
-                        #(#gen_variants)*
-                        _ => unreachable!("Value outside of range"),
-                    };
-                    Some(())
-                }
+                Some(())
             }
         }
-    )
+    );
+    (generate_method, mutate_method)
 }
 
+/// Create the `generate` and `mutate` methods for the derived `TypeGenerator` impl of a union
 fn generate_union_type_gen(
-    _attrs: Vec<Attribute>,
     krate: &TokenStream2,
-    name: Ident,
-    mut generics: Generics,
+    name: &Ident,
     data_union: DataUnion,
-) -> TokenStream2 {
+) -> (TokenStream2, TokenStream2) {
     let span = name.span();
-    let where_clause = generics.make_where_clause();
     let field_max = data_union.fields.named.len();
     let field_upper = lower_type_index(field_max, field_max, name.span());
 
@@ -195,7 +209,6 @@ fn generate_union_type_gen(
         .map(|(idx, field)| {
             let field_name = &field.ident;
             let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
-            generator.apply_constraint(&field.ty, where_clause);
 
             let idx = lower_type_index(
                 idx,
@@ -210,18 +223,19 @@ fn generate_union_type_gen(
         })
         .collect();
 
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    quote!(
-        impl #impl_generics #krate::TypeGenerator for #name #ty_generics #where_clause {
-            fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-                match #krate::ValueGenerator::generate(&(0..#field_upper), __bolero_driver)? {
-                    #(#fields,)*
-                    _ => unreachable!("Value outside of range"),
-                }
+    let generate_method = quote!(
+        fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
+            match #krate::ValueGenerator::generate(&(0..#field_upper), __bolero_driver)? {
+                #(#fields,)*
+                _ => unreachable!("Value outside of range"),
             }
         }
-    )
+    );
+
+    // The `mutate` method doesn't apply to unions
+    let mutate_method = quote!();
+
+    (generate_method, mutate_method)
 }
 
 fn lower_type_index(value: usize, max: usize, span: Span) -> TokenStream2 {
@@ -250,15 +264,10 @@ fn generate_fields_type_gen<C: ToTokens>(
     krate: &TokenStream2,
     constructor: C,
     fields: &Fields,
-    where_clause: &mut WhereClause,
 ) -> TokenStream2 {
     match fields {
-        Fields::Named(fields) => {
-            generate_fields_named_type_gen(krate, constructor, fields, where_clause)
-        }
-        Fields::Unnamed(fields) => {
-            generate_fields_unnamed_type_gen(krate, constructor, fields, where_clause)
-        }
+        Fields::Named(fields) => generate_fields_named_type_gen(krate, constructor, fields),
+        Fields::Unnamed(fields) => generate_fields_unnamed_type_gen(krate, constructor, fields),
         Fields::Unit => quote!(#constructor),
     }
 }
@@ -291,11 +300,9 @@ fn generate_fields_unnamed_type_gen<C: ToTokens>(
     krate: &TokenStream2,
     constructor: C,
     fields: &FieldsUnnamed,
-    where_clause: &mut WhereClause,
 ) -> TokenStream2 {
     let fields = fields.unnamed.iter().map(|field| {
         let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
-        generator.apply_constraint(&field.ty, where_clause);
         let value = generator.value_generate();
         quote!(#value)
     });
@@ -342,12 +349,10 @@ fn generate_fields_named_type_gen<C: ToTokens>(
     krate: &TokenStream2,
     constructor: C,
     fields: &FieldsNamed,
-    where_clause: &mut WhereClause,
 ) -> TokenStream2 {
     let fields = fields.named.iter().map(|field| {
         let name = &field.ident;
         let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
-        generator.apply_constraint(&field.ty, where_clause);
         let value = generator.value_generate();
         let span = generator.span();
         quote_spanned!(span=>
