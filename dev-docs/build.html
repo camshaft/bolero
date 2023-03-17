@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Works on Rust Stable - Bolero Book</title>
+        <title>Build from source - Bolero Book</title>
         
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html" class="active"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li><li class="expanded "><a href="../features/miri.html"><strong aria-hidden="true">2.7.</strong> Miri Support</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li><li class="expanded "><a href="../dev-docs/index.html"><strong aria-hidden="true">4.</strong> Developer documentation</a></li><li><ol class="section"><li class="expanded "><a href="../dev-docs/build.html"><strong aria-hidden="true">4.1.</strong> Build from source</a></li></ol></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li><ol class="section"><li class="expanded "><a href="../cli-installation.html"><strong aria-hidden="true">1.1.</strong> CLI Installation</a></li><li class="expanded "><a href="../library-installation.html"><strong aria-hidden="true">1.2.</strong> Library Installation</a></li></ol></li><li class="expanded "><a href="../features/index.html"><strong aria-hidden="true">2.</strong> Features</a></li><li><ol class="section"><li class="expanded "><a href="../features/corpus-replay.html"><strong aria-hidden="true">2.1.</strong> Corpus Replay</a></li><li class="expanded "><a href="../features/input-shrinking.html"><strong aria-hidden="true">2.2.</strong> Input Shrinking</a></li><li class="expanded "><a href="../features/rust-stable.html"><strong aria-hidden="true">2.3.</strong> Works on Rust Stable</a></li><li class="expanded "><a href="../features/structured-testing.html"><strong aria-hidden="true">2.4.</strong> Structured Testing</a></li><li class="expanded "><a href="../features/unified-interface.html"><strong aria-hidden="true">2.5.</strong> Unified Interface</a></li><li class="expanded "><a href="../features/private-testing.html"><strong aria-hidden="true">2.6.</strong> Private Testing</a></li><li class="expanded "><a href="../features/miri.html"><strong aria-hidden="true">2.7.</strong> Miri Support</a></li></ol></li><li class="expanded "><a href="../tutorials/index.html"><strong aria-hidden="true">3.</strong> Tutorials</a></li><li><ol class="section"><li class="expanded "><a href="../tutorials/fibonacci.html"><strong aria-hidden="true">3.1.</strong> Fibonacci</a></li></ol></li><li class="expanded "><a href="../dev-docs/index.html"><strong aria-hidden="true">4.</strong> Developer documentation</a></li><li><ol class="section"><li class="expanded "><a href="../dev-docs/build.html" class="active"><strong aria-hidden="true">4.1.</strong> Build from source</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,35 +148,62 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#works-on-rust-stable" id="works-on-rust-stable">Works on Rust Stable</a></h1>
-<p><code>bolero</code> does not require nightly to execute test targets:</p>
-<pre><code class="language-bash"># does not require nightly
-$ cargo bolero test my_test_target --sanitizer NONE
+                        <h1><a class="header" href="#build-from-source" id="build-from-source">Build from source</a></h1>
+<p>In general, the following dependencies are required to build <code>bolero</code> from source.</p>
+<h2><a class="header" href="#dependencies" id="dependencies">Dependencies</a></h2>
+<ul>
+<li>The Rust toolchain (<code>cargo</code>, <code>rustfmt</code>, etc.) installed via <a href="https://rustup.rs/">rustup</a></li>
+<li><code>make</code></li>
+</ul>
+<p><code>bolero</code> has been tested in <a href="#ubuntu-2204"><code>Ubuntu 22.04</code></a> and <a href="#macos-12"><code>macOS 12</code></a> platforms.</p>
+<h3><a class="header" href="#ubuntu-2204" id="ubuntu-2204">Ubuntu 22.04</a></h3>
+<pre><code class="language-bash">sudo apt update
+sudo apt install binutils-dev libunwind-dev
 </code></pre>
-<h2><a class="header" href="#sanitizer-support" id="sanitizer-support">Sanitizer support</a></h2>
-<p>Using a sanitizer will improve the number of edge cases caught by the test. As such, the preference should be towards using them. Unfortunately, sanitizers require Rust nightly to compile.</p>
-<p><code>cargo-bolero</code> will use <code>cargo +nightly</code> instead to execute the test target:</p>
-<pre><code class="language-bash"># uses nightly, even if we're using stable by default
-$ cargo bolero test --sanitizer address my_test_target
+<p><code>make</code> comes pre-installed on Ubuntu, but if for some reason it isn't,
+it can be installed using the command:</p>
+<pre><code class="language-bash">sudo apt install make
 </code></pre>
-<p>If a specific version of nightly is required, the <code>--toolchain</code> argument can be used:</p>
-<pre><code class="language-bash">$ cargo bolero test --sanitizer address --toolchain nightly-2020-01-01 my_test_target
+<h3><a class="header" href="#macos-12" id="macos-12">macOS 12</a></h3>
+<p><code>make</code> can be installed using the command:</p>
+<pre><code class="language-bash">xcode-select --install
 </code></pre>
+<p>No other dependencies are required.</p>
+<h2><a class="header" href="#build-and-test" id="build-and-test">Build and test</a></h2>
+<p>The <a href="https://github.com/camshaft/bolero/blob/master/Makefile"><code>Makefile</code></a> located in the
+root directory can be used to build <code>bolero</code> and run it on several test suites. To execute
+it, just run:</p>
+<pre><code class="language-bash">make
+</code></pre>
+<p>This should compile <code>bolero</code> and run multiple tests. In the process, it's
+possible that you are shown the following message:</p>
+<pre><code>[-] Hmm, your system is configured to send core dump notifications to an
+    external utility. This will cause issues: there will be an extended delay
+    between stumbling upon a crash and having this information relayed to the
+    fuzzer via the standard waitpid() API.
+
+    To avoid having crashes misinterpreted as timeouts, please log in as root
+    and temporarily modify /proc/sys/kernel/core_pattern, like so:
+
+    echo core &gt;/proc/sys/kernel/core_pattern
+</code></pre>
+<p>This message comes from AFL. You can either modify the file as indicated or
+re-run the <code>make</code> command as follows:</p>
+<pre><code class="language-bash">AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 make
+</code></pre>
+<p>However, this doesn't guarantee that the AFL tests will pass. In that case, the
+best option is to temporarily modify the <code>/proc/sys/kernel/core_pattern</code> file.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../features/input-shrinking.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../dev-docs/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
-                        
-                            <a rel="next" href="../features/structured-testing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -186,15 +213,11 @@ $ cargo bolero test --sanitizer address my_test_target
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="../features/input-shrinking.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a href="../dev-docs/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
-                
-                    <a href="../features/structured-testing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
                 
             </nav>
 
