@@ -83,8 +83,8 @@ fn generate_struct_type_gen(
     name: &Ident,
     data_struct: DataStruct,
 ) -> (TokenStream2, TokenStream2) {
-    let value = generate_fields_type_gen(krate, &name, &data_struct.fields);
-    let destructure = generate_fields_type_destructure(&name, &data_struct.fields);
+    let value = generate_fields_type_gen(krate, name, &data_struct.fields);
+    let destructure = generate_fields_type_destructure(name, &data_struct.fields);
     let mutate_body = generate_fields_type_mutate(krate, &data_struct.fields);
 
     let generate_method = quote!(
