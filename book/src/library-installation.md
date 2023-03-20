@@ -9,7 +9,7 @@ $ cargo add --dev bolero
 Or add
 ```toml
 [dev-dependencies]
-bolero = "0.8"
+bolero = "0.9"
 ```
 to `Cargo.toml`.
 
@@ -22,7 +22,7 @@ $ cargo add bolero-generator
 
 ```toml
 [dependencies]
-bolero-generator = "0.8"
+bolero-generator = "0.9"
 ```
 
 The derive attribute can now be used:

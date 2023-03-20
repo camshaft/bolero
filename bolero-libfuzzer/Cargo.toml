@@ -1,6 +1,6 @@
 [package]
 name = "bolero-libfuzzer"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "libfuzzer plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
@@ -16,7 +16,7 @@ bin = []
 lib = ["bolero-engine"]
 
 [dependencies]
-bolero-engine = { version = "0.8", path = "../bolero-engine", optional = true }
+bolero-engine = { version = "0.9", path = "../bolero-engine", optional = true }
 
 [build-dependencies]
 cc = "1.0"
