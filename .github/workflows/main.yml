@@ -153,8 +153,16 @@ jobs:
         repository: ${{ matrix.repo }}
         path: "target/integration/${{ matrix.repo }}"
 
+    - uses: actions-rs/toolchain@v1.0.7
+      id: toolchain
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
     - name: Add patch
       working-directory: target/integration/${{ matrix.repo }}
+      # TODO move this into a script: https://github.com/camshaft/bolero/issues/132
       run: |
         cat <<EOF >> Cargo.toml
         [patch.crates-io]
@@ -163,13 +171,6 @@ jobs:
         bolero-generator = { path = "../../../../bolero-generator" }
         bolero-generator-derive = { path = "../../../../bolero-generator-derive" }
         EOF
-
-    - uses: actions-rs/toolchain@v1.0.7
-      id: toolchain
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
 
     - uses: camshaft/rust-cache@v1
       with:

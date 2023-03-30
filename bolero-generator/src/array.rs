@@ -2,7 +2,9 @@ use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, 
 
 impl<T: TypeGenerator, const LEN: usize> TypeGenerator for [T; LEN] {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        // TODO use core::array::try_from_fn once stable https://github.com/rust-lang/rust/issues/89379
+        // TODO use core::array::try_from_fn once stable
+        //      see: https://github.com/rust-lang/rust/issues/89379
+        //      see: https://github.com/camshaft/bolero/issues/133
         let mut maybe_init: [Option<T>; LEN] = [(); LEN].map(|_| None);
 
         for value in &mut maybe_init {
@@ -24,7 +26,9 @@ impl<G: ValueGenerator, const LEN: usize> ValueGenerator for [G; LEN] {
     type Output = [G::Output; LEN];
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        // TODO use core::array::try_from_fn once stable https://github.com/rust-lang/rust/issues/89379
+        // TODO use core::array::try_from_fn once stable
+        //      see: https://github.com/rust-lang/rust/issues/89379
+        //      see: https://github.com/camshaft/bolero/issues/133
         let mut maybe_init: [Option<G::Output>; LEN] = [(); LEN].map(|_| None);
 
         for (generator, value) in self.iter().zip(&mut maybe_init) {
