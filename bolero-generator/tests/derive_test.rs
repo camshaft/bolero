@@ -79,6 +79,11 @@ pub enum RangeOperation {
     Remove { range: RangeValue },
 }
 
+#[derive(TypeGenerator)]
+pub struct ConstGenericArray<T, const LEN: usize> {
+    value: [T; LEN],
+}
+
 #[test]
 fn derive_struct_test() {
     let _ = generator_test!(Struct::gen());

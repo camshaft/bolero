@@ -21,13 +21,14 @@ fn crate_ident(from: FoundCrate) -> Ident {
 }
 
 fn crate_path() -> TokenStream2 {
-    if let Ok(krate) = crate_name("bolero") {
-        let krate = crate_ident(krate);
-        return quote!(#krate::generator::bolero_generator);
-    }
+    // prefer referring to the generator crate, if present
     if let Ok(krate) = crate_name("bolero-generator") {
         let krate = crate_ident(krate);
         return quote!(#krate);
+    }
+    if let Ok(krate) = crate_name("bolero") {
+        let krate = crate_ident(krate);
+        return quote!(#krate::generator::bolero_generator);
     }
     panic!("current crate seems to import neither bolero nor bolero-generator, but does use the TypeGenerator derive macro")
 }

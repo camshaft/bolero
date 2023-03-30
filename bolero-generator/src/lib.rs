@@ -182,8 +182,17 @@ pub trait TypeGeneratorWithParams {
 }
 
 /// Non-parameterized ValueGenerator given a TypeGenerator
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub struct TypeValueGenerator<T: TypeGenerator>(PhantomData<T>);
+
+// this needs to be implemented manually so it doesn't force `T: Copy`
+impl<T: TypeGenerator> Copy for TypeValueGenerator<T> {}
+
+impl<T: TypeGenerator> Clone for TypeValueGenerator<T> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}
 
 impl<T: TypeGenerator> Default for TypeValueGenerator<T> {
     fn default() -> Self {
