@@ -137,3 +137,48 @@ jobs:
       with:
         working-directory: examples/basic
         args: --tests
+
+  # run integration tests with our main consumers
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: ["aws/s2n-quic"]
+
+    steps:
+    - uses: actions/checkout@v3.5.0
+
+    - uses: actions/checkout@v3.5.0
+      with:
+        repository: ${{ matrix.repo }}
+        path: "target/integration/${{ matrix.repo }}"
+
+    - name: Add patch
+      working-directory: target/integration/${{ matrix.repo }}
+      run: |
+        cat <<EOF >> Cargo.toml
+        [patch.crates-io]
+        bolero = { path = "../../../../bolero" }
+        bolero-engine = { path = "../../../../bolero-engine" }
+        bolero-generator = { path = "../../../../bolero-generator" }
+        bolero-generator-derive = { path = "../../../../bolero-generator-derive" }
+        EOF
+
+    - uses: actions-rs/toolchain@v1.0.7
+      id: toolchain
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - uses: camshaft/rust-cache@v1
+      with:
+        key: ${{ matrix.repo }}
+
+    - name: Build
+      working-directory: target/integration/${{ matrix.repo }}
+      run: cargo build --tests
+
+    - name: Tests
+      working-directory: target/integration/${{ matrix.repo }}
+      run: cargo test
