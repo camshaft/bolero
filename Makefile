@@ -7,7 +7,7 @@ else
 FUZZERS := libfuzzer honggfuzz afl
 endif
 
-test: unit-tests test_fuzzers examples-tests
+test: unit-tests unit-tests-no-default-features test_fuzzers examples-tests
 
 examples-tests: test_basic_example test_workspace_example
 
@@ -40,6 +40,13 @@ test_example:
 
 unit-tests:
 	cargo test
+
+build-no-default-features:
+	cd bolero-generator && cargo build --no-default-features
+	cd bolero-generator && cargo build --no-default-features --features alloc
+	cd bolero-engine && cargo build --no-default-features
+	cd bolero && cargo build --no-default-features
+	cd bolero && cargo build --no-default-features --features alloc
 
 unit-tests-no-1.57:
 	cargo test --features arbitrary
