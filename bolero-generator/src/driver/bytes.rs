@@ -43,7 +43,7 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
             }
             DriverMode::Forced => {
                 if offset < self.input.len() {
-                    let copy_len = std::cmp::min(bytes.len(), self.input.len() - offset);
+                    let copy_len = core::cmp::min(bytes.len(), self.input.len() - offset);
                     bytes[..copy_len].copy_from_slice(&self.input[offset..(offset + copy_len)]);
                     bytes[copy_len..].fill(0);
                 } else {
@@ -56,7 +56,7 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
 
     #[inline]
     fn consume_bytes(&mut self, consumed: usize) {
-        self.input = &self.input[std::cmp::min(consumed, self.input.len())..];
+        self.input = &self.input[core::cmp::min(consumed, self.input.len())..];
     }
 }
 

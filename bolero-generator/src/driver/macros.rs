@@ -91,10 +91,19 @@ macro_rules! gen_from_bytes {
             }
         }
 
+        gen_from_bytes_impl!();
+    };
+}
+
+#[cfg(feature = "alloc")]
+macro_rules! gen_from_bytes_impl {
+    () => {
         fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, mut gen: Gen) -> Option<T>
         where
             Gen: FnMut(&[u8]) -> Option<(usize, T)>,
         {
+            use alloc::{vec, vec::Vec};
+
             // Even attempting an alloc of more than 0x10000000000 bytes makes asan crash.
             // LibFuzzer limits memory to 2G (by default) and try_reserve() does not fail in oom situations then.
             // With all the above, limit memory allocations to 1M at a time here.
@@ -129,7 +138,7 @@ macro_rules! gen_from_bytes {
                     let init_len = len.start()
                         + self.gen_usize(
                             Bound::Included(&0),
-                            Bound::Included(&std::cmp::min(ABUSIVE_SIZE, len.end() - len.start())),
+                            Bound::Included(&core::cmp::min(ABUSIVE_SIZE, len.end() - len.start())),
                         )?;
                     let mut data = vec![0; init_len];
                     self.peek_bytes(0, &mut data)?;
@@ -140,7 +149,7 @@ macro_rules! gen_from_bytes {
                                 return Some(res);
                             }
                             None => {
-                                let max_additional_size = std::cmp::min(
+                                let max_additional_size = core::cmp::min(
                                     ABUSIVE_SIZE,
                                     len.end().saturating_sub(data.len()),
                                 );
@@ -149,7 +158,7 @@ macro_rules! gen_from_bytes {
                                     return None; // we actually tried feeding the max amount of data already
                                 }
                                 let additional_size = self.gen_usize(
-                                    Bound::Included(&std::cmp::min(
+                                    Bound::Included(&core::cmp::min(
                                         MIN_INCREASE,
                                         max_additional_size,
                                     )),
@@ -161,6 +170,38 @@ macro_rules! gen_from_bytes {
                             }
                         }
                     }
+                }
+            }
+        }
+    };
+}
+
+#[cfg(not(feature = "alloc"))]
+macro_rules! gen_from_bytes_impl {
+    () => {
+        fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, mut gen: Gen) -> Option<T>
+        where
+            Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+        {
+            // In alloc-free mode, we can't support FORCED driver mode so just do our best to fill
+            // the data
+            const DATA_LEN: usize = 256;
+
+            let mut data = [0; DATA_LEN];
+
+            let len = match (len.start(), len.end()) {
+                (s, e) if s == e => *s,
+                (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
+            };
+            if len >= DATA_LEN {
+                return None;
+            }
+            self.peek_bytes(0, &mut data[..len])?;
+            match gen(&data[..len]) {
+                None => None,
+                Some((consumed, res)) => {
+                    self.consume_bytes(consumed);
+                    Some(res)
                 }
             }
         }
