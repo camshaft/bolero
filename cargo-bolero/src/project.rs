@@ -85,7 +85,7 @@ impl Project {
     // Determines if the toolchain channel is stable
     fn toolchain_channel_is_stable() -> bool {
         let channel = std::env::var("RUSTUP_TOOLCHAIN");
-        if !channel.is_ok() {
+        if channel.is_err() {
             return false;
         }
         channel.unwrap().contains("stable")
