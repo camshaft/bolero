@@ -1,13 +1,16 @@
-use crate::DEFAULT_TARGET;
+use crate::{DEFAULT_TARGET, util::warning};
 use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
-use std::{collections::hash_map::DefaultHasher, process::Command};
+use std::{collections::hash_map::DefaultHasher, process::Command, sync::Once};
 use structopt::StructOpt;
+
 
 lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
 }
+
+static PRINT_BOOTSTRAP_WARNING: Once = Once::new();
 
 #[derive(Debug, StructOpt)]
 pub struct Project {
@@ -70,10 +73,23 @@ impl Project {
                 cmd
             }
         };
+
         if self.rustc_bootstrap {
+            cmd.env("RUSTC_BOOTSTRAP", "1");
+        } else if Self::toolchain_channel_is_stable() {
+            PRINT_BOOTSTRAP_WARNING.call_once(|| warning("detected a stable toolchain; the variable `RUSTC_BOOTSTRAP` will be set for all commands"));
             cmd.env("RUSTC_BOOTSTRAP", "1");
         }
         cmd
+    }
+
+    // Determines if the toolchain channel is stable
+    fn toolchain_channel_is_stable() -> bool {
+        let channel = std::env::var("RUSTUP_TOOLCHAIN");
+        if !channel.is_ok() {
+            return false;
+        }
+        channel.unwrap().contains("stable")
     }
 
     fn toolchain(&self) -> &str {

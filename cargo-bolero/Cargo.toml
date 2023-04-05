@@ -22,6 +22,7 @@ anyhow = "1.0"
 bit-set = "0.5"
 bolero-afl = { version = "0.9", path = "../bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.9", path = "../bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
+console = "0.15.1"
 humantime = "2"
 lazy_static = "1"
 rustc_version = "0.4"

@@ -19,6 +19,7 @@ mod reduce;
 mod selection;
 mod test;
 mod test_target;
+mod util;
 
 #[derive(Debug, StructOpt)]
 #[allow(clippy::large_enum_variant)]
