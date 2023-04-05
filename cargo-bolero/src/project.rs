@@ -1,10 +1,9 @@
-use crate::{DEFAULT_TARGET, util::warning};
+use crate::{util::warning, DEFAULT_TARGET};
 use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
 use std::{collections::hash_map::DefaultHasher, process::Command, sync::Once};
 use structopt::StructOpt;
-
 
 lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
