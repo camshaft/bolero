@@ -82,7 +82,7 @@ impl Project {
         } else if Self::toolchain_channel_is_stable() {
             #[cfg(target_os = "linux")]
             {
-                PRINT_BOOTSTRAP_WARNING.call_once(|| warning("detected a stable toolchain; the variable `RUSTC_BOOTSTRAP` will be set for all commands"));
+                PRINT_BOOTSTRAP_WARNING.call_once(|| crate::util::warning("detected a stable toolchain; the variable `RUSTC_BOOTSTRAP` will be set for all commands"));
                 cmd.env("RUSTC_BOOTSTRAP", "1");
             }
         }
