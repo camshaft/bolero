@@ -1,8 +1,10 @@
-use crate::{util::warning, DEFAULT_TARGET};
+use crate::DEFAULT_TARGET;
 use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
-use std::{collections::hash_map::DefaultHasher, process::Command, sync::Once};
+use std::{collections::hash_map::DefaultHasher, process::Command};
+#[cfg(target_os = "linux")]
+use std::sync::Once;
 use structopt::StructOpt;
 use rustc_version::{version_meta, Channel};
 
@@ -10,6 +12,7 @@ lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
 }
 
+#[cfg(target_os = "linux")]
 static PRINT_BOOTSTRAP_WARNING: Once = Once::new();
 
 #[derive(Debug, StructOpt)]
@@ -77,8 +80,11 @@ impl Project {
         if self.rustc_bootstrap {
             cmd.env("RUSTC_BOOTSTRAP", "1");
         } else if Self::toolchain_channel_is_stable() {
-            PRINT_BOOTSTRAP_WARNING.call_once(|| warning("detected a stable toolchain; the variable `RUSTC_BOOTSTRAP` will be set for all commands"));
-            cmd.env("RUSTC_BOOTSTRAP", "1");
+            #[cfg(target_os = "linux")]
+            {
+                PRINT_BOOTSTRAP_WARNING.call_once(|| warning("detected a stable toolchain; the variable `RUSTC_BOOTSTRAP` will be set for all commands"));
+                cmd.env("RUSTC_BOOTSTRAP", "1");
+            }
         }
         cmd
     }
