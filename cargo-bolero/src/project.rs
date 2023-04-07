@@ -4,6 +4,7 @@ use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
 use std::{collections::hash_map::DefaultHasher, process::Command, sync::Once};
 use structopt::StructOpt;
+use rustc_version::{version_meta, Channel};
 
 lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
@@ -84,11 +85,11 @@ impl Project {
 
     // Determines if the toolchain channel is stable
     fn toolchain_channel_is_stable() -> bool {
-        let channel = std::env::var("RUSTUP_TOOLCHAIN");
-        if channel.is_err() {
+        let version_meta = version_meta();
+        if version_meta.is_err() {
             return false;
         }
-        channel.unwrap().contains("stable")
+        version_meta.unwrap().channel == Channel::Stable
     }
 
     fn toolchain(&self) -> &str {
