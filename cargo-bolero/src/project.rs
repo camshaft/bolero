@@ -2,11 +2,11 @@ use crate::DEFAULT_TARGET;
 use anyhow::{Context, Result};
 use core::hash::{Hash, Hasher};
 use lazy_static::lazy_static;
-use std::{collections::hash_map::DefaultHasher, process::Command};
+use rustc_version::{version_meta, Channel};
 #[cfg(target_os = "linux")]
 use std::sync::Once;
+use std::{collections::hash_map::DefaultHasher, process::Command};
 use structopt::StructOpt;
-use rustc_version::{version_meta, Channel};
 
 lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
