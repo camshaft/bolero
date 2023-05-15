@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [1.57.0, 1.63.0, stable, nightly]
+        rust: [1.57.0, 1.64.0, stable, nightly]
         os: [ubuntu-latest, macOS-latest]
         # TODO add honggfuzz back
         test: [unit-tests, unit-tests-no-1.57, build-no-default-features, libfuzzer, afl, examples-tests]
