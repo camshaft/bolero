@@ -100,7 +100,6 @@ impl TargetLocation {
 
         #[cfg(not(kani))]
         {
-
             let mut work_dir = self.abs_path()?;
             work_dir.pop();
 
