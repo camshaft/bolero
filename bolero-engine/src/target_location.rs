@@ -27,18 +27,21 @@ pub struct TargetLocation {
 }
 
 impl TargetLocation {
+    #[cfg(kani)]
     pub fn should_run(&self) -> bool {
-        #[cfg(not(kani))]
-        {
-            // cargo-bolero needs to resolve information about the target
-            if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
-                match mode.as_str() {
-                    "all" => self.print(),
-                    "one" if self.is_exact_match() => self.print(),
-                    _ => {}
-                }
-                return false;
+        true
+    }
+
+    #[cfg(not(kani))]
+    pub fn should_run(&self) -> bool {
+        // cargo-bolero needs to resolve information about the target
+        if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
+            match mode.as_str() {
+                "all" => self.print(),
+                "one" if self.is_exact_match() => self.print(),
+                _ => {}
             }
+            return false;
         }
         true
     }
@@ -62,72 +65,66 @@ impl TargetLocation {
         );
     }
 
+    #[cfg(kani)]
     pub fn abs_path(&self) -> Option<PathBuf> {
-        #[cfg(kani)]
+        None
+    }
+
+    #[cfg(not(kani))]
+    pub fn abs_path(&self) -> Option<PathBuf> {
+        let file = Path::new(self.file);
+
+        #[cfg(not(miri))] // miri does not currently support this call
         {
-            None
+            if let Ok(file) = file.canonicalize() {
+                return Some(file);
+            }
         }
 
-        #[cfg(not(kani))]
-        {
-            let file = Path::new(self.file);
-
-            #[cfg(not(miri))] // miri does not currently support this call
-            {
-                if let Ok(file) = file.canonicalize() {
-                    return Some(file);
+        Path::new(self.manifest_dir)
+            .ancestors()
+            .find_map(|ancestor| {
+                let path = ancestor.join(file);
+                if path.exists() {
+                    Some(path)
+                } else {
+                    None
                 }
-            }
-
-            Path::new(self.manifest_dir)
-                .ancestors()
-                .find_map(|ancestor| {
-                    let path = ancestor.join(file);
-                    if path.exists() {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-        }
+            })
     }
 
+    #[cfg(kani)]
     pub fn work_dir(&self) -> Option<PathBuf> {
-        #[cfg(kani)]
-        {
-            None
-        }
-
-        #[cfg(not(kani))]
-        {
-            let mut work_dir = self.abs_path()?;
-            work_dir.pop();
-
-            if !self.is_harnessed() {
-                return Some(work_dir);
-            }
-
-            work_dir.push("__fuzz__");
-            if let Some(test_name) = self.test_name.as_ref() {
-                work_dir.push(test_name);
-            } else {
-                work_dir.push(self.fuzz_dir());
-            }
-
-            Some(work_dir)
-        }
+        None
     }
 
-    pub fn is_harnessed(&self) -> bool {
-        #[cfg(kani)]
-        {
-            false
+    #[cfg(not(kani))]
+    pub fn work_dir(&self) -> Option<PathBuf> {
+        let mut work_dir = self.abs_path()?;
+        work_dir.pop();
+
+        if !self.is_harnessed() {
+            return Some(work_dir);
         }
 
-        #[cfg(not(kani))]
-        {
-            is_harnessed(self.item_path)
+        work_dir.push("__fuzz__");
+        if let Some(test_name) = self.test_name.as_ref() {
+            work_dir.push(test_name);
+        } else {
+            work_dir.push(self.fuzz_dir());
         }
+
+        Some(work_dir)
+    }
+
+    #[cfg(kani)]
+    pub fn is_harnessed(&self) -> bool {
+        false
+    }
+
+    #[cfg(not(kani))]
+    pub fn is_harnessed(&self) -> bool {
+        is_harnessed(self.item_path)
     }
 
     fn fuzz_dir(&self) -> String {
