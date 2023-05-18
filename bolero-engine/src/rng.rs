@@ -1,6 +1,5 @@
-use crate::{panic, ByteSliceTestInput, Engine, TargetLocation, Test};
-use bolero_generator::driver::DriverMode;
-use core::{fmt::Debug, time::Duration};
+use crate::{panic, ByteSliceTestInput, Engine, Options, TargetLocation, Test};
+use core::fmt::Debug;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
 /// Test engine implementation using a RNG.
@@ -8,13 +7,12 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 /// The inputs will only be derived from the `seed` field.
 /// As such, the quality of the inputs may not be high
 /// enough to find edge cases.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct RngEngine {
     pub iterations: usize,
     pub max_len: usize,
     pub seed: u64,
-    pub driver_mode: Option<DriverMode>,
-    pub shrink_time: Option<Duration>,
+    options: Options,
 }
 
 impl Default for RngEngine {
@@ -30,8 +28,7 @@ impl Default for RngEngine {
                 iterations,
                 max_len,
                 seed,
-                driver_mode: None,
-                shrink_time: None,
+                options: Default::default(),
             };
         }
 
@@ -43,8 +40,7 @@ impl Default for RngEngine {
             iterations,
             max_len,
             seed,
-            driver_mode: None,
-            shrink_time: None,
+            options: Default::default(),
         }
     }
 }
@@ -70,14 +66,6 @@ impl RngEngine {
     pub fn with_seed(self, seed: u64) -> Self {
         Self { seed, ..self }
     }
-
-    /// Set the driver mode for the engine
-    pub fn with_driver_mode(self, driver_mode: DriverMode) -> Self {
-        Self {
-            driver_mode: Some(driver_mode),
-            ..self
-        }
-    }
 }
 
 impl<T: Test> Engine<T> for RngEngine
@@ -86,18 +74,14 @@ where
 {
     type Output = ();
 
-    fn set_driver_mode(&mut self, mode: DriverMode) {
-        self.driver_mode = Some(mode);
-    }
-
-    fn set_shrink_time(&mut self, shrink_time: Duration) {
-        self.shrink_time = Some(shrink_time);
+    fn set_options(&mut self, options: &Options) {
+        self.options = options.clone();
     }
 
     fn run(self, mut test: T) -> Self::Output {
         panic::set_hook();
 
-        let mut state = RngState::new(self.seed, self.max_len, self.driver_mode);
+        let mut state = RngState::new(self.seed, self.max_len, &self.options);
 
         let mut valid = 0;
         let mut invalid = 0;
@@ -133,8 +117,7 @@ where
                         .shrink(
                             core::mem::take(&mut state.buffer),
                             Some(self.seed),
-                            Some(state.driver_mode),
-                            self.shrink_time,
+                            &self.options,
                         )
                         .expect("test should fail");
 
@@ -153,20 +136,20 @@ where
     }
 }
 
-struct RngState {
+struct RngState<'a> {
     rng: StdRng,
     max_len: usize,
-    driver_mode: DriverMode,
     buffer: Vec<u8>,
+    options: &'a Options,
 }
 
-impl RngState {
-    fn new(seed: u64, max_len: usize, driver_mode: Option<DriverMode>) -> Self {
+impl<'a> RngState<'a> {
+    fn new(seed: u64, max_len: usize, options: &'a Options) -> Self {
         Self {
             rng: StdRng::seed_from_u64(seed),
             max_len,
-            driver_mode: driver_mode.unwrap_or(DriverMode::Forced),
             buffer: vec![],
+            options,
         }
     }
 
@@ -175,7 +158,7 @@ impl RngState {
         self.buffer.clear();
         self.buffer.resize(len, 0);
         self.rng.fill_bytes(&mut self.buffer);
-        ByteSliceTestInput::new(&self.buffer, Some(self.driver_mode))
+        ByteSliceTestInput::new(&self.buffer, self.options)
     }
 }
 

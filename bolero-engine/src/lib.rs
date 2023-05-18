@@ -1,9 +1,8 @@
 pub use anyhow::Error;
 pub use bolero_generator::{
-    driver::{Driver, DriverMode},
+    driver::{Driver, DriverMode, Options},
     TypeGenerator, ValueGenerator,
 };
-use core::time::Duration;
 
 #[cfg(not(kani))]
 pub mod panic;
@@ -35,8 +34,7 @@ pub use test_result::*;
 pub trait Engine<T: Test>: Sized {
     type Output;
 
-    fn set_driver_mode(&mut self, mode: DriverMode);
-    fn set_shrink_time(&mut self, shrink_time: Duration);
+    fn set_options(&mut self, options: &Options);
     fn run(self, test: T) -> Self::Output;
 }
 

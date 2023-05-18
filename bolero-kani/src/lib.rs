@@ -29,13 +29,13 @@ pub mod lib {
     #[allow(unused_imports)]
     use super::*;
 
-    use bolero_engine::{
-        Driver, DriverMode, Engine, TargetLocation, Test, TestInput, TypeGenerator,
-    };
+    use bolero_engine::{Driver, Engine, Options, TargetLocation, Test, TestInput, TypeGenerator};
     use core::ops::{Bound, RangeBounds};
 
     #[derive(Debug, Default)]
-    pub struct KaniEngine;
+    pub struct KaniEngine {
+        options: Options,
+    }
 
     impl KaniEngine {
         pub fn new(_location: TargetLocation) -> Self {
@@ -49,18 +49,13 @@ pub mod lib {
     {
         type Output = ();
 
-        fn set_driver_mode(&mut self, mode: DriverMode) {
-            // rmc doesn't have a mode
-            let _ = mode;
-        }
-
-        fn set_shrink_time(&mut self, shrink_time: core::time::Duration) {
-            // rmc does its own shrinking
-            let _ = shrink_time;
+        fn set_options(&mut self, options: &Options) {
+            self.options = options.clone();
         }
 
         fn run(self, mut test: T) -> Self::Output {
-            let mut input = KaniInput;
+            let options = self.options;
+            let mut input = KaniInput { options };
             match test.test(&mut input) {
                 Ok(was_valid) => {
                     // make sure the input that we generated was valid
@@ -73,7 +68,9 @@ pub mod lib {
         }
     }
 
-    struct KaniInput;
+    struct KaniInput {
+        options: Options,
+    }
 
     impl<Output> TestInput<Output> for KaniInput {
         type Driver = KaniDriver;
@@ -89,22 +86,18 @@ pub mod lib {
         }
 
         fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
-            f(&mut KaniDriver::default())
+            let max_depth = self.options.max_depth_or_default();
+            let mut driver = KaniDriver {
+                max_depth,
+                depth: 0,
+            };
+            f(&mut driver)
         }
     }
 
     struct KaniDriver {
         depth: usize,
         max_depth: usize,
-    }
-
-    impl Default for KaniDriver {
-        fn default() -> Self {
-            Self {
-                depth: 0,
-                max_depth: 20,
-            }
-        }
     }
 
     macro_rules! gen {
@@ -162,16 +155,12 @@ pub mod lib {
             Some(kani::any())
         }
 
-        fn gen_from_bytes<Gen, T>(
-            &mut self,
-            len: std::ops::RangeInclusive<usize>,
-            mut gen: Gen,
-        ) -> Option<T>
+        fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut gen: Gen) -> Option<T>
         where
+            Hint: FnOnce() -> (usize, Option<usize>),
             Gen: FnMut(&[u8]) -> Option<(usize, T)>,
         {
             let bytes = kani::vec::any_vec::<u8, 256>();
-            kani::assume(len.contains(&bytes.len()));
             let value = gen(&bytes).map(|v| v.1);
             kani::assume(value.is_some());
             value

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[doc(hidden)]
 /// Information about the location of a test target
@@ -26,13 +26,27 @@ pub struct TargetLocation {
     pub test_name: Option<String>,
 }
 
+#[cfg(kani)]
 impl TargetLocation {
-    #[cfg(kani)]
     pub fn should_run(&self) -> bool {
         true
     }
 
-    #[cfg(not(kani))]
+    pub fn abs_path(&self) -> Option<PathBuf> {
+        None
+    }
+
+    pub fn work_dir(&self) -> Option<PathBuf> {
+        None
+    }
+
+    pub fn is_harnessed(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(not(kani))]
+impl TargetLocation {
     pub fn should_run(&self) -> bool {
         // cargo-bolero needs to resolve information about the target
         if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
@@ -65,13 +79,9 @@ impl TargetLocation {
         );
     }
 
-    #[cfg(kani)]
     pub fn abs_path(&self) -> Option<PathBuf> {
-        None
-    }
+        use std::path::Path;
 
-    #[cfg(not(kani))]
-    pub fn abs_path(&self) -> Option<PathBuf> {
         let file = Path::new(self.file);
 
         #[cfg(not(miri))] // miri does not currently support this call
@@ -93,12 +103,6 @@ impl TargetLocation {
             })
     }
 
-    #[cfg(kani)]
-    pub fn work_dir(&self) -> Option<PathBuf> {
-        None
-    }
-
-    #[cfg(not(kani))]
     pub fn work_dir(&self) -> Option<PathBuf> {
         let mut work_dir = self.abs_path()?;
         work_dir.pop();
@@ -117,14 +121,26 @@ impl TargetLocation {
         Some(work_dir)
     }
 
-    #[cfg(kani)]
     pub fn is_harnessed(&self) -> bool {
-        false
-    }
+        // only harnessed tests spawn threads
+        if std::thread::current()
+            .name()
+            .filter(|name| name != &"main")
+            .is_some()
+        {
+            return true;
+        }
 
-    #[cfg(not(kani))]
-    pub fn is_harnessed(&self) -> bool {
-        is_harnessed(self.item_path)
+        let mut parts: Vec<_> = self.item_path.split("::").collect();
+
+        // remove parts up to the path probe
+        while parts.pop().expect("empty path") != "__bolero_item_path__" {}
+
+        // fuzz targets defined in main are not harnessed
+        !matches!(
+            parts.last().cloned(),
+            Some("main") if parts.len() == 2
+        )
     }
 
     fn fuzz_dir(&self) -> String {
@@ -147,30 +163,31 @@ impl TargetLocation {
     }
 
     fn item_path(&self) -> String {
-        format_symbol_name(self.item_path)
-    }
-}
-
-fn is_harnessed(name: &str) -> bool {
-    // only harnessed tests spawn threads
-    if std::thread::current()
-        .name()
-        .filter(|name| name != &"main")
-        .is_some()
-    {
-        return true;
+        Self::format_symbol_name(self.item_path)
     }
 
-    let mut parts: Vec<_> = name.split("::").collect();
+    fn format_symbol_name(name: &str) -> String {
+        let mut parts: Vec<_> = name.split("::").collect();
 
-    // remove parts up to the path probe
-    while parts.pop().expect("empty path") != "__bolero_item_path__" {}
+        // remove parts up to the path probe
+        while parts.pop().expect("empty path") != "__bolero_item_path__" {}
 
-    // fuzz targets defined in main are not harnessed
-    !matches!(
-        parts.last().cloned(),
-        Some("main") if parts.len() == 2
-    )
+        match parts.last().cloned() {
+            Some("main") if parts.len() == 2 => {
+                parts.pop().expect("main symbol");
+            }
+            Some("{{closure}}") => {
+                parts.pop().expect("unused symbol");
+            }
+            _ => {}
+        }
+
+        if parts.len() == 1 {
+            parts.pop().unwrap().to_string()
+        } else {
+            parts[1..].join("::")
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -185,51 +202,35 @@ macro_rules! __item_path__ {
     }};
 }
 
-#[test]
-fn item_path_test() {
-    let test_name = format_symbol_name(__item_path__!());
-    assert_eq!(test_name, "target_location::item_path_test");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn format_symbol_name(name: &str) -> String {
-    let mut parts: Vec<_> = name.split("::").collect();
-
-    // remove parts up to the path probe
-    while parts.pop().expect("empty path") != "__bolero_item_path__" {}
-
-    match parts.last().cloned() {
-        Some("main") if parts.len() == 2 => {
-            parts.pop().expect("main symbol");
-        }
-        Some("{{closure}}") => {
-            parts.pop().expect("unused symbol");
-        }
-        _ => {}
+    #[test]
+    fn item_path_test() {
+        let test_name = TargetLocation::format_symbol_name(__item_path__!());
+        assert_eq!(test_name, "target_location::tests::item_path_test");
     }
 
-    if parts.len() == 1 {
-        parts.pop().unwrap().to_string()
-    } else {
-        parts[1..].join("::")
+    #[test]
+    fn format_symbol_name_test() {
+        assert_eq!(
+            TargetLocation::format_symbol_name("crate::main::__bolero_item_path__::123"),
+            "crate"
+        );
+        assert_eq!(
+            TargetLocation::format_symbol_name("crate::test::__bolero_item_path__::123"),
+            "test"
+        );
+        assert_eq!(
+            TargetLocation::format_symbol_name(
+                "crate::test::{{closure}}::__bolero_item_path__::123"
+            ),
+            "test"
+        );
+        assert_eq!(
+            TargetLocation::format_symbol_name("crate::nested::test::__bolero_item_path__::123"),
+            "nested::test"
+        );
     }
-}
-
-#[test]
-fn format_symbol_name_test() {
-    assert_eq!(
-        format_symbol_name("crate::main::__bolero_item_path__::123"),
-        "crate"
-    );
-    assert_eq!(
-        format_symbol_name("crate::test::__bolero_item_path__::123"),
-        "test"
-    );
-    assert_eq!(
-        format_symbol_name("crate::test::{{closure}}::__bolero_item_path__::123"),
-        "test"
-    );
-    assert_eq!(
-        format_symbol_name("crate::nested::test::__bolero_item_path__::123"),
-        "nested::test"
-    );
 }

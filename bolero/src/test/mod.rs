@@ -2,8 +2,8 @@ use bolero_engine::{
     rng::RngEngine, test_failure::TestFailure, ByteSliceTestInput, Engine, Never, TargetLocation,
     Test,
 };
-use bolero_generator::driver::DriverMode;
-use core::{iter::empty, time::Duration};
+use bolero_generator::driver::{DriverMode, Options};
+use core::iter::empty;
 use std::path::PathBuf;
 
 mod input;
@@ -15,8 +15,7 @@ use input::*;
 #[derive(Debug)]
 pub struct TestEngine {
     location: TargetLocation,
-    driver_mode: Option<DriverMode>,
-    shrink_time: Option<Duration>,
+    options: Options,
 }
 
 struct NamedTest {
@@ -29,8 +28,7 @@ impl TestEngine {
     pub fn new(location: TargetLocation) -> Self {
         Self {
             location,
-            driver_mode: None,
-            shrink_time: None,
+            options: Default::default(),
         }
     }
 
@@ -113,17 +111,14 @@ where
 {
     type Output = Never;
 
-    fn set_driver_mode(&mut self, mode: DriverMode) {
-        self.driver_mode = Some(mode);
+    fn set_options(&mut self, options: &Options) {
+        self.options = options.clone();
     }
 
-    fn set_shrink_time(&mut self, shrink_time: Duration) {
-        self.shrink_time = Some(shrink_time);
-    }
+    fn run(mut self, mut test: T) -> Self::Output {
+        self.options.set_driver_mode(DriverMode::Forced);
 
-    fn run(self, mut test: T) -> Self::Output {
-        let driver_mode = self.driver_mode;
-        let shrink_time = self.shrink_time;
+        let options = &self.options;
         let mut buffer = vec![];
         let mut testfn = |data: &TestInput| {
             buffer.clear();
@@ -131,10 +126,9 @@ where
                 TestInput::FileTest(file) => {
                     file.read_into(&mut buffer);
 
-                    let mut input = ByteSliceTestInput::new(&buffer, driver_mode);
+                    let mut input = ByteSliceTestInput::new(&buffer, options);
                     test.test(&mut input).map_err(|error| {
-                        let shrunken =
-                            test.shrink(buffer.clone(), data.seed(), driver_mode, shrink_time);
+                        let shrunken = test.shrink(buffer.clone(), data.seed(), options);
 
                         if let Some(shrunken) = shrunken {
                             format!("{:#}", shrunken)
@@ -151,24 +145,19 @@ where
                     })
                 }
                 TestInput::RngTest(conf) => {
-                    let mut input = conf.input(&mut buffer);
+                    let mut input = conf.input(&mut buffer, options);
                     test.test(&mut input).map_err(|error| {
                         // reseed the input and buffer the rng for shrinking
-                        let mut input = conf.buffered_input(&mut buffer);
+                        let mut input = conf.buffered_input(&mut buffer, options);
                         let _ = test.generate_value(&mut input);
 
-                        let shrunken = test.shrink(
-                            buffer.clone(),
-                            data.seed(),
-                            Some(DriverMode::Forced),
-                            shrink_time,
-                        );
+                        let shrunken = test.shrink(buffer.clone(), data.seed(), options);
 
                         if let Some(shrunken) = shrunken {
                             format!("{:#}", shrunken)
                         } else {
                             buffer.clear();
-                            let mut input = conf.input(&mut buffer);
+                            let mut input = conf.input(&mut buffer, options);
                             let input = test.generate_value(&mut input);
                             format!(
                                 "{:#}",

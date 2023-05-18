@@ -6,9 +6,8 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test, TestFailure,
+        panic, ByteSliceTestInput, Engine, Never, Options, TargetLocation, Test, TestFailure,
     };
-    use core::time::Duration;
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
@@ -23,8 +22,7 @@ pub mod fuzzer {
 
     #[derive(Debug, Default)]
     pub struct LibFuzzerEngine {
-        driver_mode: Option<DriverMode>,
-        shrink_time: Option<Duration>,
+        options: Options,
     }
 
     impl LibFuzzerEngine {
@@ -39,30 +37,25 @@ pub mod fuzzer {
     {
         type Output = Never;
 
-        fn set_driver_mode(&mut self, mode: DriverMode) {
-            self.driver_mode = Some(mode);
-        }
-
-        fn set_shrink_time(&mut self, shrink_time: Duration) {
-            self.shrink_time = Some(shrink_time);
+        fn set_options(&mut self, options: &Options) {
+            self.options = options.clone();
         }
 
         fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let driver_mode = self.driver_mode;
+            let options = &self.options;
 
             start(&mut |slice: &[u8]| -> bool {
-                let mut input = ByteSliceTestInput::new(slice, driver_mode);
+                let mut input = ByteSliceTestInput::new(slice, options);
 
                 match test.test(&mut input) {
                     Ok(_) => true,
                     Err(error) => {
                         eprintln!("test failed; shrinking input...");
 
-                        let shrunken =
-                            test.shrink(slice.to_vec(), None, driver_mode, self.shrink_time);
+                        let shrunken = test.shrink(slice.to_vec(), None, options);
 
                         if let Some(shrunken) = shrunken {
                             eprintln!("{:#}", shrunken);

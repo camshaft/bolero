@@ -1,10 +1,11 @@
 use crate::{Driver, ValueGenerator};
 use arbitrary::Unstructured;
-use core::{any::TypeId, cell::RefCell, marker::PhantomData, ops::RangeInclusive};
+use core::{any::TypeId, cell::RefCell, marker::PhantomData};
 use std::collections::HashMap;
 
+#[cfg(not(kani))]
 std::thread_local! {
-    static DEPTHS: RefCell<HashMap<TypeId, RangeInclusive<usize>>> = Default::default();
+    static DEPTHS: RefCell<HashMap<TypeId, (usize, Option<usize>)>> = Default::default();
 }
 
 pub use arbitrary::Arbitrary;
@@ -19,17 +20,23 @@ where
     type Output = T;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<T> {
-        let len = DEPTHS.with(|depths| {
-            depths
-                .borrow_mut()
-                .entry(TypeId::of::<T>())
-                .or_insert_with(|| match T::size_hint(0) {
-                    (min, None) => min..=usize::MAX,
-                    (min, Some(max)) => min..=max,
-                })
-                .clone()
-        });
-        driver.gen_from_bytes(len, |b| {
+        #[cfg(not(kani))]
+        let hint = || {
+            // Some recursive size hints are computationally expensive
+            //
+            // Here we cache the hint for each type that we use
+            DEPTHS.with(|depths| {
+                *depths
+                    .borrow_mut()
+                    .entry(TypeId::of::<T>())
+                    .or_insert_with(|| T::size_hint(0))
+            })
+        };
+
+        #[cfg(kani)]
+        let hint = || (0, None);
+
+        driver.gen_from_bytes(hint, |b| {
             let initial_len = b.len();
             let mut b = Unstructured::new(b);
             let res = T::arbitrary(&mut b).ok()?;

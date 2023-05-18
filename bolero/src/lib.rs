@@ -167,9 +167,8 @@ macro_rules! fuzz {
 /// Configuration for a test target
 pub struct TestTarget<Generator, Engine, InputOwnership> {
     generator: Generator,
-    driver_mode: Option<DriverMode>,
-    shrink_time: Option<Duration>,
     engine: Engine,
+    driver_options: bolero_generator::driver::Options,
     input_ownership: PhantomData<InputOwnership>,
 }
 
@@ -196,10 +195,9 @@ impl<Engine> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
     /// Create a `TestTarget` with the given `Engine`
     pub fn new(engine: Engine) -> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
         Self {
-            driver_mode: None,
-            shrink_time: None,
             generator: ByteSliceGenerator,
             engine,
+            driver_options: Default::default(),
             input_ownership: PhantomData,
         }
     }
@@ -222,10 +220,9 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         Generator::Output: Debug,
     {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator,
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -242,10 +239,9 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         self,
     ) -> TestTarget<TypeValueGenerator<T>, Engine, InputOwnership> {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: generator::gen(),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -264,10 +260,9 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     ) -> TestTarget<bolero_generator::arbitrary::ArbitraryGenerator<T>, Engine, InputOwnership>
     {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: generator::gen_arbitrary(),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -277,11 +272,9 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     /// Engines can optionally shrink inputs on failures to make it easier to debug
     /// and identify the failure. Increasing this time can potentially lead to smaller
     /// values.
-    pub fn with_shrink_time(self, shrink_time: Duration) -> Self {
-        Self {
-            shrink_time: Some(shrink_time),
-            ..self
-        }
+    pub fn with_shrink_time(mut self, shrink_time: Duration) -> Self {
+        self.driver_options.set_shrink_time(shrink_time);
+        self
     }
 }
 
@@ -292,10 +285,9 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         map: F,
     ) -> TestTarget<MapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: self.generator.map(map),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -309,10 +301,9 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         T::Output: Debug,
     {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: self.generator.and_then(map),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -323,10 +314,9 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         filter: F,
     ) -> TestTarget<FilterGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: self.generator.filter(filter),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
@@ -337,23 +327,25 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         filter_map: F,
     ) -> TestTarget<FilterMapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: self.generator.filter_map(filter_map),
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: self.input_ownership,
         }
     }
 
+    /// Set the maximum number of recursive types that can be generated.
+    ///
+    /// The default value is `32`.
+    pub fn with_max_depth(mut self, max_depth: usize) -> Self {
+        self.driver_options.set_max_depth(max_depth);
+        self
+    }
+
     /// Set the driver mode for the test target
-    pub fn with_driver_mode(self, mode: DriverMode) -> Self {
-        TestTarget {
-            driver_mode: Some(mode),
-            shrink_time: self.shrink_time,
-            generator: self.generator,
-            engine: self.engine,
-            input_ownership: self.input_ownership,
-        }
+    pub fn with_driver_mode(mut self, mode: DriverMode) -> Self {
+        self.driver_options.set_driver_mode(mode);
+        self
     }
 }
 
@@ -401,10 +393,9 @@ where
     /// efficient than using a reference.
     pub fn cloned(self) -> TestTarget<G, Engine, ClonedInput> {
         TestTarget {
-            driver_mode: self.driver_mode,
-            shrink_time: self.shrink_time,
             generator: self.generator,
             engine: self.engine,
+            driver_options: self.driver_options,
             input_ownership: PhantomData,
         }
     }
@@ -421,12 +412,7 @@ where
         bolero_engine::BorrowedGeneratorTest<F, G, G::Output>: Test,
     {
         let test = bolero_engine::BorrowedGeneratorTest::new(test, self.generator);
-        if let Some(mode) = self.driver_mode {
-            self.engine.set_driver_mode(mode);
-        }
-        if let Some(shrink_time) = self.shrink_time {
-            self.engine.set_shrink_time(shrink_time);
-        }
+        self.engine.set_options(&self.driver_options);
         self.engine.run(test)
     }
 }
@@ -442,12 +428,7 @@ where
         bolero_engine::ClonedGeneratorTest<F, G, G::Output>: Test,
     {
         let test = bolero_engine::ClonedGeneratorTest::new(test, self.generator);
-        if let Some(mode) = self.driver_mode {
-            self.engine.set_driver_mode(mode);
-        }
-        if let Some(shrink_time) = self.shrink_time {
-            self.engine.set_shrink_time(shrink_time);
-        }
+        self.engine.set_options(&self.driver_options);
         self.engine.run(test)
     }
 }
@@ -460,12 +441,7 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
         bolero_engine::BorrowedSliceTest<T>: Test,
     {
         let test = bolero_engine::BorrowedSliceTest::new(test);
-        if let Some(mode) = self.driver_mode {
-            self.engine.set_driver_mode(mode);
-        }
-        if let Some(shrink_time) = self.shrink_time {
-            self.engine.set_shrink_time(shrink_time);
-        }
+        self.engine.set_options(&self.driver_options);
         self.engine.run(test)
     }
 }
@@ -478,69 +454,64 @@ impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
         bolero_engine::ClonedSliceTest<T>: Test,
     {
         let test = bolero_engine::ClonedSliceTest::new(test);
-        if let Some(mode) = self.driver_mode {
-            self.engine.set_driver_mode(mode);
-        }
-        if let Some(shrink_time) = self.shrink_time {
-            self.engine.set_shrink_time(shrink_time);
-        }
+        self.engine.set_options(&self.driver_options);
         self.engine.run(test)
     }
-}
-
-#[test]
-#[should_panic]
-fn slice_generator_test() {
-    check!().for_each(|input| {
-        assert!(input.len() > 1000);
-    });
-}
-
-#[test]
-#[should_panic]
-fn type_generator_test() {
-    check!().with_type().for_each(|input: &u8| {
-        assert!(input < &128);
-    });
-}
-
-#[cfg(feature = "arbitrary")]
-#[test]
-#[should_panic]
-fn arbitrary_generator_test() {
-    check!().with_arbitrary().for_each(|input: &u8| {
-        assert!(input < &128);
-    });
-}
-
-#[test]
-#[should_panic]
-fn type_generator_cloned_test() {
-    check!().with_type().cloned().for_each(|input: u8| {
-        assert!(input < 128);
-    });
-}
-
-#[test]
-fn range_generator_test() {
-    check!().with_generator(0..=5).for_each(|_input: &u8| {
-        // println!("{:?}", input);
-    });
-}
-
-#[test]
-fn range_generator_cloned_test() {
-    check!()
-        .with_generator(0..=5)
-        .cloned()
-        .for_each(|_input: u8| {
-            // println!("{:?}", input);
-        });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic]
+    fn slice_generator_test() {
+        check!().for_each(|input| {
+            assert!(input.len() > 1000);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn type_generator_test() {
+        check!().with_type().for_each(|input: &u8| {
+            assert!(input < &128);
+        });
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    #[should_panic]
+    fn arbitrary_generator_test() {
+        check!().with_arbitrary().for_each(|input: &u8| {
+            assert!(input < &128);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn type_generator_cloned_test() {
+        check!().with_type().cloned().for_each(|input: u8| {
+            assert!(input < 128);
+        });
+    }
+
+    #[test]
+    fn range_generator_test() {
+        check!().with_generator(0..=5).for_each(|_input: &u8| {
+            // println!("{:?}", input);
+        });
+    }
+
+    #[test]
+    fn range_generator_cloned_test() {
+        check!()
+            .with_generator(0..=5)
+            .cloned()
+            .for_each(|_input: u8| {
+                // println!("{:?}", input);
+            });
+    }
 
     #[test]
     fn nested_test() {

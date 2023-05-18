@@ -9,25 +9,16 @@ pub struct ByteSliceDriver<'a> {
 }
 
 impl<'a> ByteSliceDriver<'a> {
-    pub fn new(input: &'a [u8], mode: Option<DriverMode>) -> Self {
-        let mode = mode.unwrap_or(DriverMode::Direct);
+    pub fn new(input: &'a [u8], options: &Options) -> Self {
+        let mode = options.driver_mode.unwrap_or(DriverMode::Direct);
+        let max_depth = options.max_depth_or_default();
 
         Self {
             input,
             mode,
             depth: 0,
-            max_depth: super::DEFAULT_MAX_DEPTH,
+            max_depth,
         }
-    }
-
-    #[inline]
-    pub fn new_direct(input: &'a [u8]) -> Self {
-        Self::new(input, Some(DriverMode::Direct))
-    }
-
-    #[inline]
-    pub fn new_forced(input: &'a [u8]) -> Self {
-        Self::new(input, Some(DriverMode::Forced))
     }
 }
 
@@ -71,15 +62,33 @@ impl<'a> Driver for ByteSliceDriver<'a> {
     gen_from_bytes!();
 
     #[inline]
-    fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut gen: Gen) -> Option<T>
     where
+        Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
-        let end = self.input.len().min(*len.end());
-        let slice = &self.input[..end];
+        let slice = self.input;
         let (len, value) = gen(slice)?;
         self.consume_bytes(len);
         Some(value)
+    }
+
+    #[inline]
+    fn gen_recursive<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut Self) -> Option<R>,
+    {
+        if *self.depth() == self.max_depth() {
+            return None;
+        }
+
+        *self.depth() += 1;
+
+        let value = f(self);
+
+        *self.depth() -= 1;
+
+        value
     }
 
     #[inline]

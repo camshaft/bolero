@@ -1,8 +1,7 @@
 use crate::{
-    panic, panic::PanicError, test_input::SliceDebug, DriverMode, IntoTestResult, TestFailure,
+    panic, panic::PanicError, test_input::SliceDebug, IntoTestResult, Options, TestFailure,
     TestInput, ValueGenerator,
 };
-use core::time::Duration;
 use std::panic::RefUnwindSafe;
 
 /// Trait for defining a test case
@@ -26,10 +25,9 @@ pub trait Test: Sized {
         &mut self,
         input: Vec<u8>,
         seed: Option<u64>,
-        driver_mode: Option<DriverMode>,
-        shrink_time: Option<Duration>,
+        options: &Options,
     ) -> Option<TestFailure<Self::Value>> {
-        crate::shrink::shrink(self, input, seed, driver_mode, shrink_time)
+        crate::shrink::shrink(self, input, seed, options)
     }
 }
 
@@ -250,11 +248,14 @@ where
 
             let value = generate_value!(self, driver);
 
-            let input = if cfg!(kani) {
+            #[cfg(kani)]
+            let input = {
+                let _ = value;
                 self.value.take().unwrap()
-            } else {
-                value.clone()
             };
+
+            #[cfg(not(kani))]
+            let input = value.clone();
 
             panic::catch(|| {
                 let res = (fun)(input);

@@ -1,16 +1,15 @@
-use crate::{panic, panic::PanicError, Test, TestFailure, TestInput};
-use bolero_generator::driver::{ByteSliceDriver, DriverMode};
-use std::time::{Duration, Instant};
+use crate::{panic, panic::PanicError, Options, Test, TestFailure, TestInput};
+use bolero_generator::driver::ByteSliceDriver;
+use std::time::Instant;
 
 /// Shrink the input to a simpler form
 pub fn shrink<T: Test>(
     test: &mut T,
     input: Vec<u8>,
     seed: Option<u64>,
-    driver_mode: Option<DriverMode>,
-    shrink_time: Option<Duration>,
+    options: &Options,
 ) -> Option<TestFailure<T::Value>> {
-    Shrinker::new(test, input, seed, driver_mode, shrink_time).shrink()
+    Shrinker::new(test, input, seed, options).shrink()
 }
 
 macro_rules! predicate {
@@ -36,20 +35,13 @@ struct Shrinker<'a, T> {
     temp_input: Vec<u8>,
     end: usize,
     seed: Option<u64>,
-    driver_mode: Option<DriverMode>,
-    shrink_time: Duration,
+    options: &'a Options,
     #[cfg(test)]
     snapshot_input: Vec<u8>,
 }
 
 impl<'a, T: Test> Shrinker<'a, T> {
-    fn new(
-        test: &'a mut T,
-        input: Vec<u8>,
-        seed: Option<u64>,
-        driver_mode: Option<DriverMode>,
-        shrink_time: Option<Duration>,
-    ) -> Self {
+    fn new(test: &'a mut T, input: Vec<u8>, seed: Option<u64>, options: &'a Options) -> Self {
         let len = input.len();
         Self {
             temp_input: input.clone(),
@@ -57,8 +49,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
             end: len,
             test,
             seed,
-            driver_mode,
-            shrink_time: shrink_time.unwrap_or_else(|| Duration::from_secs(1)),
+            options,
             #[cfg(test)]
             snapshot_input: vec![],
         }
@@ -80,6 +71,8 @@ impl<'a, T: Test> Shrinker<'a, T> {
 
         let mut was_changed;
         let start_time = Instant::now();
+        let shrink_time = self.options.shrink_time_or_default();
+
         loop {
             was_changed = self.apply_truncation();
 
@@ -104,7 +97,7 @@ impl<'a, T: Test> Shrinker<'a, T> {
             }
 
             // put a time limit on the number of shrink iterations
-            if start_time.elapsed() > self.shrink_time {
+            if start_time.elapsed() > shrink_time {
                 break;
             }
         }
@@ -280,21 +273,21 @@ impl<'a, T: Test> Shrinker<'a, T> {
     fn execute(&mut self) -> Result<bool, PanicError> {
         self.test.test(&mut ShrinkInput {
             input: &self.input[..self.end],
-            driver_mode: self.driver_mode,
+            options: self.options,
         })
     }
 
     fn generate_value(&mut self) -> T::Value {
         self.test.generate_value(&mut ShrinkInput {
             input: &self.input[..self.end],
-            driver_mode: self.driver_mode,
+            options: self.options,
         })
     }
 }
 
 struct ShrinkInput<'a> {
     input: &'a [u8],
-    driver_mode: Option<DriverMode>,
+    options: &'a Options,
 }
 
 impl<'a, Output> TestInput<Output> for ShrinkInput<'a> {
@@ -305,78 +298,79 @@ impl<'a, Output> TestInput<Output> for ShrinkInput<'a> {
     }
 
     fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
-        f(&mut ByteSliceDriver::new(self.input, self.driver_mode))
+        f(&mut ByteSliceDriver::new(self.input, self.options))
     }
 }
 
-macro_rules! shrink_test {
-    ($name:ident, $gen:expr, $input:expr, $expected:expr, $check:expr) => {
-        #[test]
-        fn $name() {
-            #[allow(unused_imports)]
-            use bolero_generator::{driver::DriverMode, gen, ValueGenerator};
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-            panic::forward_panic(true);
-            panic::capture_backtrace(true);
+    macro_rules! shrink_test {
+        ($name:ident, $gen:expr, $input:expr, $expected:expr, $check:expr) => {
+            #[test]
+            fn $name() {
+                #[allow(unused_imports)]
+                use bolero_generator::{driver::DriverMode, gen, ValueGenerator};
 
-            let mut test = crate::ClonedGeneratorTest::new($check, $gen);
-            let input = ($input).to_vec();
+                panic::forward_panic(true);
+                panic::capture_backtrace(true);
 
-            let failure = Shrinker::new(
-                &mut test,
-                input,
-                None,
-                Some(DriverMode::Forced),
-                Some(Duration::from_secs(1)),
-            )
-            .shrink()
-            .expect("should produce a result");
+                let mut test = crate::ClonedGeneratorTest::new($check, $gen);
+                let input = ($input).to_vec();
 
-            assert_eq!(failure.input, $expected);
+                let options = Options::default().with_driver_mode(DriverMode::Forced);
+
+                let failure = Shrinker::new(&mut test, input, None, &options)
+                    .shrink()
+                    .expect("should produce a result");
+
+                assert_eq!(failure.input, $expected);
+            }
+        };
+    }
+
+    shrink_test!(u16_shrink_test, gen::<u16>(), [255u8; 2], 1, |value| {
+        assert!(value < 20);
+        assert!(value % 7 == 0);
+    });
+
+    shrink_test!(u32_shrink_test, gen::<u32>(), [255u8; 4], 20, |value| {
+        assert!(value < 20);
+    });
+
+    shrink_test!(
+        vec_shrink_test,
+        gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
+        [255u8; 256],
+        vec![4, 0, 0],
+        |value: Vec<u32>| {
+            assert!(value[0] < 4);
+            assert!(value[1] < 5);
+            assert!(value[2] < 6);
         }
-    };
+    );
+
+    shrink_test!(
+        non_start_vec_shrink_test,
+        gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
+        [255u8; 256],
+        vec![0, 5, 0],
+        |value: Vec<u32>| {
+            assert!(value[1] < 5);
+            assert!(value[2] < 6);
+        }
+    );
+
+    shrink_test!(
+        middle_vec_shrink_test,
+        gen::<Vec<u8>>().filter(|vec| vec.len() >= 3),
+        [255u8; 256],
+        vec![1, 1, 1],
+        |value: Vec<u8>| {
+            if value[0] > 0 && *value.last().unwrap() > 0 {
+                assert_eq!(value[1], 0);
+            }
+        }
+    );
 }
-
-shrink_test!(u16_shrink_test, gen::<u16>(), [255u8; 2], 1, |value| {
-    assert!(value < 20);
-    assert!(value % 7 == 0);
-});
-
-shrink_test!(u32_shrink_test, gen::<u32>(), [255u8; 4], 20, |value| {
-    assert!(value < 20);
-});
-
-shrink_test!(
-    vec_shrink_test,
-    gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
-    [255u8; 256],
-    vec![4, 0, 0],
-    |value: Vec<u32>| {
-        assert!(value[0] < 4);
-        assert!(value[1] < 5);
-        assert!(value[2] < 6);
-    }
-);
-
-shrink_test!(
-    non_start_vec_shrink_test,
-    gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
-    [255u8; 256],
-    vec![0, 5, 0],
-    |value: Vec<u32>| {
-        assert!(value[1] < 5);
-        assert!(value[2] < 6);
-    }
-);
-
-shrink_test!(
-    middle_vec_shrink_test,
-    gen::<Vec<u8>>().filter(|vec| vec.len() >= 3),
-    [255u8; 256],
-    vec![1, 1, 1],
-    |value: Vec<u8>| {
-        if value[0] > 0 && *value.last().unwrap() > 0 {
-            assert_eq!(value[1], 0);
-        }
-    }
-);

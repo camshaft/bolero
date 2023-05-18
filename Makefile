@@ -7,7 +7,7 @@ else
 FUZZERS := libfuzzer honggfuzz afl
 endif
 
-test: unit-tests unit-tests-no-default-features test_fuzzers examples-tests
+test: unit-tests build-no-default-features test_fuzzers examples-tests
 
 examples-tests: test_basic_example test_workspace_example
 

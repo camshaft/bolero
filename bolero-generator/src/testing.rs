@@ -2,12 +2,14 @@
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ByteSliceDriver, ForcedRng},
+            driver::{ByteSliceDriver, DriverMode, Options, Rng},
             *,
         };
         let gen = $gen;
 
-        let mut rng_driver = ForcedRng::new(rand::thread_rng());
+        let options = Options::default().with_driver_mode(DriverMode::Forced);
+
+        let mut rng_driver = Rng::new(rand::thread_rng(), &options);
 
         let inputs = $crate::gen::<Vec<_>>()
             .with()
@@ -16,17 +18,24 @@ macro_rules! generator_test {
             .generate(&mut rng_driver)
             .unwrap();
 
-        for input in inputs.iter() {
-            if let Some(value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
-            {
-                let mut mutated = value.clone();
-                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut mutated)
+        {
+            let options = options.clone().with_driver_mode(DriverMode::Direct);
+            for input in inputs.iter() {
+                if let Some(value) =
+                    ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
+                {
+                    let mut mutated = value.clone();
+                    ValueGenerator::mutate(
+                        &gen,
+                        &mut ByteSliceDriver::new(input, &options),
+                        &mut mutated,
+                    )
                     .expect("mutation with same driver should produce a value");
-                assert_eq!(
-                    value, mutated,
-                    "a mutation with the same input should produce the original"
-                );
+                    assert_eq!(
+                        value, mutated,
+                        "a mutation with the same input should produce the original"
+                    );
+                }
             }
         }
 
@@ -35,11 +44,15 @@ macro_rules! generator_test {
 
         for input in inputs.iter() {
             if let Some(value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_forced(input))
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
             {
                 let mut mutated = value.clone();
-                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_forced(input), &mut mutated)
-                    .expect("mutation with same driver should produce a value");
+                ValueGenerator::mutate(
+                    &gen,
+                    &mut ByteSliceDriver::new(input, &options),
+                    &mut mutated,
+                )
+                .expect("mutation with same driver should produce a value");
                 assert_eq!(
                     value, mutated,
                     "a mutation with the same input should produce the original"
@@ -59,12 +72,14 @@ macro_rules! generator_test {
 macro_rules! generator_no_clone_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ByteSliceDriver, ForcedRng},
+            driver::{ByteSliceDriver, DriverMode, Options, Rng},
             *,
         };
         let gen = $gen;
 
-        let mut rng_driver = ForcedRng::new(rand::thread_rng());
+        let options = Options::default().with_driver_mode(DriverMode::Forced);
+
+        let mut rng_driver = Rng::new(rand::thread_rng(), &options);
 
         let inputs = $crate::gen::<Vec<_>>()
             .with()
@@ -73,12 +88,19 @@ macro_rules! generator_no_clone_test {
             .generate(&mut rng_driver)
             .unwrap();
 
-        for input in inputs.iter() {
-            if let Some(mut value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_direct(input))
-            {
-                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_direct(input), &mut value)
+        {
+            let options = options.clone().with_driver_mode(DriverMode::Direct);
+            for input in inputs.iter() {
+                if let Some(mut value) =
+                    ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
+                {
+                    ValueGenerator::mutate(
+                        &gen,
+                        &mut ByteSliceDriver::new(input, &options),
+                        &mut value,
+                    )
                     .expect("mutation with same driver should produce a value");
+                }
             }
         }
 
@@ -87,10 +109,14 @@ macro_rules! generator_no_clone_test {
 
         for input in inputs.iter() {
             if let Some(mut value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new_forced(input))
+                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
             {
-                ValueGenerator::mutate(&gen, &mut ByteSliceDriver::new_forced(input), &mut value)
-                    .expect("mutation with same driver should produce a value");
+                ValueGenerator::mutate(
+                    &gen,
+                    &mut ByteSliceDriver::new(input, &options),
+                    &mut value,
+                )
+                .expect("mutation with same driver should produce a value");
             } else {
                 failed_forced += 1;
             }

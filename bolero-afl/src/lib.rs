@@ -5,9 +5,7 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_afl)))]
 pub mod fuzzer {
-    use bolero_engine::{
-        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
-    };
+    use bolero_engine::{panic, ByteSliceTestInput, Engine, Never, Options, TargetLocation, Test};
     use std::io::Read;
 
     extern "C" {
@@ -24,7 +22,7 @@ pub mod fuzzer {
 
     #[derive(Debug, Default)]
     pub struct AflEngine {
-        driver_mode: Option<DriverMode>,
+        options: Options,
     }
 
     impl AflEngine {
@@ -39,19 +37,14 @@ pub mod fuzzer {
     {
         type Output = Never;
 
-        fn set_driver_mode(&mut self, mode: DriverMode) {
-            self.driver_mode = Some(mode);
-        }
-
-        fn set_shrink_time(&mut self, shrink_time: core::time::Duration) {
-            // we don't shrink with afl currently
-            let _ = shrink_time;
+        fn set_options(&mut self, options: &Options) {
+            self.options = options.clone();
         }
 
         fn run(self, mut test: T) -> Self::Output {
             panic::set_hook();
 
-            let mut input = AflInput::new(self.driver_mode);
+            let mut input = AflInput::new(self.options);
 
             unsafe {
                 __afl_manual_init();
@@ -69,14 +62,14 @@ pub mod fuzzer {
 
     #[derive(Debug)]
     pub struct AflInput {
-        driver_mode: Option<DriverMode>,
+        options: Options,
         input: Vec<u8>,
     }
 
     impl AflInput {
-        fn new(driver_mode: Option<DriverMode>) -> Self {
+        fn new(options: Options) -> Self {
             Self {
-                driver_mode,
+                options,
                 input: vec![],
             }
         }
@@ -90,7 +83,7 @@ pub mod fuzzer {
 
         fn test_input(&mut self) -> ByteSliceTestInput {
             self.reset();
-            ByteSliceTestInput::new(&self.input, self.driver_mode)
+            ByteSliceTestInput::new(&self.input, &self.options)
         }
     }
 }
