@@ -1,6 +1,11 @@
 use crate::{Driver, ValueGenerator};
 use arbitrary::Unstructured;
-use core::marker::PhantomData;
+use core::{any::TypeId, cell::RefCell, marker::PhantomData, ops::RangeInclusive};
+use std::collections::HashMap;
+
+std::thread_local! {
+    static DEPTHS: RefCell<HashMap<TypeId, RangeInclusive<usize>>> = Default::default();
+}
 
 pub use arbitrary::Arbitrary;
 
@@ -8,15 +13,22 @@ pub struct ArbitraryGenerator<T>(PhantomData<T>);
 
 impl<T> ValueGenerator for ArbitraryGenerator<T>
 where
+    T: 'static,
     T: for<'a> Arbitrary<'a>,
 {
     type Output = T;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<T> {
-        let len = match T::size_hint(0) {
-            (min, None) => min..=usize::MAX,
-            (min, Some(max)) => min..=max,
-        };
+        let len = DEPTHS.with(|depths| {
+            depths
+                .borrow_mut()
+                .entry(TypeId::of::<T>())
+                .or_insert_with(|| match T::size_hint(0) {
+                    (min, None) => min..=usize::MAX,
+                    (min, Some(max)) => min..=max,
+                })
+                .clone()
+        });
         driver.gen_from_bytes(len, |b| {
             let initial_len = b.len();
             let mut b = Unstructured::new(b);

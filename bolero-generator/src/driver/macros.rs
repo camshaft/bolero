@@ -90,8 +90,6 @@ macro_rules! gen_from_bytes {
                 Some(value < (u8::MAX / 2))
             }
         }
-
-        gen_from_bytes_impl!();
     };
 }
 

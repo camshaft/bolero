@@ -14,6 +14,8 @@ mod rng;
 pub use bytes::ByteSliceDriver;
 pub use rng::{DirectRng, ForcedRng};
 
+pub const DEFAULT_MAX_DEPTH: usize = 20;
+
 macro_rules! gen_method {
     ($name:ident, $ty:ty) => {
         fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty>;
@@ -27,9 +29,30 @@ macro_rules! gen_method {
 /// an RNG implementation.
 pub trait Driver: Sized {
     /// Generate a value with type `T`
+    #[inline]
     fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
         T::generate(self)
     }
+
+    #[inline]
+    fn gen_recursive<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut Self) -> Option<R>,
+    {
+        if *self.depth() == self.max_depth() {
+            return None;
+        }
+
+        *self.depth() += 1;
+        let value = f(self);
+        *self.depth() -= 1;
+
+        value
+    }
+
+    fn depth(&mut self) -> &mut usize;
+
+    fn max_depth(&self) -> usize;
 
     gen_method!(gen_u8, u8);
     gen_method!(gen_i8, i8);

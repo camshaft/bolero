@@ -83,15 +83,18 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
+                driver.gen_recursive(|driver| {
+                    let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
 
-                $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &self.values)?;
+                    $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &self.values)?;
 
-                if value.len() != len {
-                    None
-                } else {
-                    Some(())
-                }
+                    if value.len() != len {
+                        None
+                    } else {
+                        Some(())
+                    }
+                })
+
             }
         }
 
@@ -103,15 +106,17 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
-                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
+                driver.gen_recursive(|driver| {
+                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
 
-                $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
+                    $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
 
-                if self.len() != len {
-                    None
-                } else {
-                    Some(())
-                }
+                    if self.len() != len {
+                        None
+                    } else {
+                        Some(())
+                    }
+                })
             }
         }
 
@@ -140,19 +145,21 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
-                let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
-                let gen_item = $crate::one_of(&generators[..]);
+                driver.gen_recursive(|driver| {
+                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
+                    let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
+                    let gen_item = $crate::one_of(&generators[..]);
 
-                $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &gen_item)?;
+                    $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &gen_item)?;
 
-                // The value generator may have not produced enough unique
-                // values to fill the collection to the desired length.
-                if value.len() != len {
-                    None
-                } else {
-                    Some(())
-                }
+                    // The value generator may have not produced enough unique
+                    // values to fill the collection to the desired length.
+                    if value.len() != len {
+                        None
+                    } else {
+                        Some(())
+                    }
+                })
             }
         }
     };
@@ -250,15 +257,17 @@ macro_rules! impl_key_values_collection_generator {
             type Output = $ty<K::Output, V::Output>;
 
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                use $crate::ValueGenerator;
-                let len = ValueGenerator::generate(&self.len, driver)?.into();
-                Iterator::map(0..len, |_| {
-                    Some((
-                        ValueGenerator::generate(&self.keys, driver)?,
-                        ValueGenerator::generate(&self.values, driver)?,
-                    ))
+                driver.gen_recursive(|driver| {
+                    use $crate::ValueGenerator;
+                    let len = ValueGenerator::generate(&self.len, driver)?.into();
+                    Iterator::map(0..len, |_| {
+                        Some((
+                            ValueGenerator::generate(&self.keys, driver)?,
+                            ValueGenerator::generate(&self.values, driver)?,
+                        ))
+                    })
+                    .collect()
                 })
-                .collect()
             }
 
             // TODO mutate
@@ -268,11 +277,13 @@ macro_rules! impl_key_values_collection_generator {
             for $ty<K, V>
         {
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
-                use $crate::ValueGenerator;
-                let len = ValueGenerator::generate(&$default_len_range, driver)?;
-                Iterator::map(0..len, |_|
-                    Some((K::generate(driver)?, V::generate(driver)?))
-                ).collect()
+                driver.gen_recursive(|driver| {
+                    use $crate::ValueGenerator;
+                    let len = ValueGenerator::generate(&$default_len_range, driver)?;
+                    Iterator::map(0..len, |_|
+                        Some((K::generate(driver)?, V::generate(driver)?))
+                    ).collect()
+                })
             }
 
             // TODO mutate
@@ -303,23 +314,25 @@ macro_rules! impl_key_values_collection_generator {
             type Output = $ty<K::Output, V::Output>;
 
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                use $crate::ValueGenerator;
+                driver.gen_recursive(|driver| {
+                    use $crate::ValueGenerator;
 
-                assert!(!self.is_empty());
+                    assert!(!self.is_empty());
 
-                let len = ValueGenerator::generate(&$default_len_range, driver)?;
-                let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
-                let generators_len = 0..generators.len();
+                    let len = ValueGenerator::generate(&$default_len_range, driver)?;
+                    let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
+                    let generators_len = 0..generators.len();
 
-                Iterator::map(0..len, |_| {
-                    let index = ValueGenerator::generate(&generators_len, driver)?;
-                    let (key, value) = generators[index];
-                    Some((
-                        ValueGenerator::generate(key, driver)?,
-                        ValueGenerator::generate(value, driver)?,
-                    ))
+                    Iterator::map(0..len, |_| {
+                        let index = ValueGenerator::generate(&generators_len, driver)?;
+                        let (key, value) = generators[index];
+                        Some((
+                            ValueGenerator::generate(key, driver)?,
+                            ValueGenerator::generate(value, driver)?,
+                        ))
+                    })
+                    .collect()
                 })
-                .collect()
             }
 
             // TODO mutate

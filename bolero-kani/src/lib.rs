@@ -89,11 +89,23 @@ pub mod lib {
         }
 
         fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
-            f(&mut KaniDriver)
+            f(&mut KaniDriver::default())
         }
     }
 
-    struct KaniDriver;
+    struct KaniDriver {
+        depth: usize,
+        max_depth: usize,
+    }
+
+    impl Default for KaniDriver {
+        fn default() -> Self {
+            Self {
+                depth: 0,
+                max_depth: 20,
+            }
+        }
+    }
 
     macro_rules! gen {
         ($name:ident, $ty:ident) => {
@@ -163,6 +175,16 @@ pub mod lib {
             let value = gen(&bytes).map(|v| v.1);
             kani::assume(value.is_some());
             value
+        }
+
+        #[inline]
+        fn depth(&mut self) -> &mut usize {
+            &mut self.depth
+        }
+
+        #[inline]
+        fn max_depth(&self) -> usize {
+            self.max_depth
         }
     }
 }
