@@ -167,8 +167,28 @@ pub mod lib {
         }
 
         #[inline]
-        fn depth(&mut self) -> &mut usize {
-            &mut self.depth
+        fn gen_variant<T: TypeGenerator + PartialOrd>(
+            &mut self,
+            variants: T,
+            base_case: T,
+        ) -> Option<T> {
+            if self.depth == self.max_depth {
+                return Some(base_case);
+            }
+
+            let selected = self.gen::<T>()?;
+            kani::assume(selected < variants);
+            Some(selected)
+        }
+
+        #[inline]
+        fn depth(&self) -> usize {
+            self.depth
+        }
+
+        #[inline]
+        fn set_depth(&mut self, depth: usize) {
+            self.depth = depth;
         }
 
         #[inline]

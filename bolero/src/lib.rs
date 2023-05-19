@@ -255,9 +255,12 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
     /// This mode is used for testing an implementation that requires
     /// structured input.
     #[cfg(feature = "arbitrary")]
-    pub fn with_arbitrary<T: Debug + for<'a> bolero_generator::arbitrary::Arbitrary<'a>>(
+    pub fn with_arbitrary<T>(
         self,
     ) -> TestTarget<bolero_generator::arbitrary::ArbitraryGenerator<T>, Engine, InputOwnership>
+    where
+        T: 'static + Debug,
+        T: for<'a> bolero_generator::arbitrary::Arbitrary<'a>,
     {
         TestTarget {
             generator: generator::gen_arbitrary(),

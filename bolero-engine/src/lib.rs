@@ -1,6 +1,6 @@
 pub use anyhow::Error;
 pub use bolero_generator::{
-    driver::{Driver, DriverMode, Options},
+    driver::{self, Driver, DriverMode, Options},
     TypeGenerator, ValueGenerator,
 };
 

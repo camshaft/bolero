@@ -37,18 +37,24 @@ pub trait Driver: Sized {
     where
         F: FnOnce(&mut Self) -> Option<R>,
     {
-        if *self.depth() == self.max_depth() {
+        let depth = self.depth();
+        if depth == self.max_depth() {
             return None;
         }
 
-        *self.depth() += 1;
+        let new_depth = depth + 1;
+        self.set_depth(new_depth);
         let value = f(self);
-        *self.depth() -= 1;
+        self.set_depth(depth);
 
         value
     }
 
-    fn depth(&mut self) -> &mut usize;
+    fn gen_variant<T: TypeGenerator + Uniform>(&mut self, variants: T, base_case: T) -> Option<T>;
+
+    fn depth(&self) -> usize;
+
+    fn set_depth(&mut self, depth: usize);
 
     fn max_depth(&self) -> usize;
 

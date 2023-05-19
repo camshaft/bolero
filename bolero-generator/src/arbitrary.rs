@@ -1,11 +1,33 @@
 use crate::{Driver, ValueGenerator};
 use arbitrary::Unstructured;
-use core::{any::TypeId, cell::RefCell, marker::PhantomData};
-use std::collections::HashMap;
+use core::marker::PhantomData;
 
 #[cfg(not(kani))]
-std::thread_local! {
-    static DEPTHS: RefCell<HashMap<TypeId, (usize, Option<usize>)>> = Default::default();
+mod hint_cache {
+    //! Some recursive size hints are computationally expensive
+    //!
+    //! Here we cache the hint for each type that we use.
+    //! See https://github.com/rust-fuzz/arbitrary/issues/144
+    use super::*;
+    use core::{any::TypeId, cell::RefCell};
+    use std::collections::HashMap;
+
+    std::thread_local! {
+        static DEPTHS: RefCell<HashMap<TypeId, (usize, Option<usize>)>> = Default::default();
+    }
+
+    pub fn hint<T>() -> (usize, Option<usize>)
+    where
+        T: 'static,
+        T: for<'a> Arbitrary<'a>,
+    {
+        DEPTHS.with(|depths| {
+            *depths
+                .borrow_mut()
+                .entry(TypeId::of::<T>())
+                .or_insert_with(|| T::size_hint(0))
+        })
+    }
 }
 
 pub use arbitrary::Arbitrary;
@@ -19,29 +41,21 @@ where
 {
     type Output = T;
 
+    #[inline]
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<T> {
         #[cfg(not(kani))]
-        let hint = || {
-            // Some recursive size hints are computationally expensive
-            //
-            // Here we cache the hint for each type that we use
-            DEPTHS.with(|depths| {
-                *depths
-                    .borrow_mut()
-                    .entry(TypeId::of::<T>())
-                    .or_insert_with(|| T::size_hint(0))
-            })
-        };
+        let hint = hint_cache::hint::<T>;
 
         #[cfg(kani)]
         let hint = || (0, None);
 
-        driver.gen_from_bytes(hint, |b| {
-            let initial_len = b.len();
-            let mut b = Unstructured::new(b);
-            let res = T::arbitrary(&mut b).ok()?;
-            let remaining_len = b.len();
-            Some((initial_len - remaining_len, res))
+        driver.gen_from_bytes(hint, |bytes| {
+            let initial_len = bytes.len();
+            let mut input = Unstructured::new(bytes);
+            let res = T::arbitrary(&mut input).ok()?;
+            let remaining_len = bytes.len();
+            let consumed = initial_len - remaining_len;
+            Some((consumed, res))
         })
     }
 }
@@ -49,6 +63,7 @@ where
 #[inline]
 pub fn gen_arbitrary<T>() -> ArbitraryGenerator<T>
 where
+    T: 'static,
     T: for<'a> Arbitrary<'a>,
 {
     ArbitraryGenerator(PhantomData)

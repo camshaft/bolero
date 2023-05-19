@@ -20,7 +20,7 @@ macro_rules! gen_float {
             }
 
             // if we're in direct mode, just sample a value and check if it's within the provided range
-            if self.mode() == DriverMode::Direct {
+            if FillBytes::mode(self) == DriverMode::Direct {
                 return self
                     .$name(Bound::Unbounded, Bound::Unbounded)
                     .filter(|value| (min, max).contains(value));
@@ -88,6 +88,22 @@ macro_rules! gen_from_bytes {
             } else {
                 let value: u8 = self.gen_u8(Bound::Unbounded, Bound::Unbounded)?;
                 Some(value < (u8::MAX / 2))
+            }
+        }
+
+        #[inline]
+        fn gen_variant<T: Uniform>(&mut self, variants: T, base_case: T) -> Option<T> {
+            match FillBytes::mode(self) {
+                DriverMode::Direct => {
+                    Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))
+                }
+                DriverMode::Forced => {
+                    if self.depth == self.max_depth {
+                        return Some(base_case);
+                    }
+
+                    Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))
+                }
             }
         }
     };

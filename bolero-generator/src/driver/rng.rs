@@ -94,8 +94,13 @@ impl<R: RngCore> Driver for Rng<R> {
     gen_from_bytes!();
 
     #[inline]
-    fn depth(&mut self) -> &mut usize {
-        &mut self.depth
+    fn depth(&self) -> usize {
+        self.depth
+    }
+
+    #[inline]
+    fn set_depth(&mut self, depth: usize) {
+        self.depth = depth;
     }
 
     #[inline]
@@ -121,7 +126,7 @@ impl<R: RngCore> Driver for Rng<R> {
             (min, Some(max)) => min..=max,
         };
 
-        match self.mode() {
+        match self.mode {
             DriverMode::Direct => {
                 let len = match (hint.start(), hint.end()) {
                     (s, e) if s == e => *s,

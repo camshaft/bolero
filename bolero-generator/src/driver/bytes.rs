@@ -74,26 +74,13 @@ impl<'a> Driver for ByteSliceDriver<'a> {
     }
 
     #[inline]
-    fn gen_recursive<F, R>(&mut self, f: F) -> Option<R>
-    where
-        F: FnOnce(&mut Self) -> Option<R>,
-    {
-        if *self.depth() == self.max_depth() {
-            return None;
-        }
-
-        *self.depth() += 1;
-
-        let value = f(self);
-
-        *self.depth() -= 1;
-
-        value
+    fn depth(&self) -> usize {
+        self.depth
     }
 
     #[inline]
-    fn depth(&mut self) -> &mut usize {
-        &mut self.depth
+    fn set_depth(&mut self, depth: usize) {
+        self.depth = depth;
     }
 
     #[inline]

@@ -47,11 +47,54 @@ pub mod fuzzer {
 
             let options = &self.options;
 
+            let print = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+            {
+                let print = print.clone();
+                std::thread::spawn(move || {
+                    while std::sync::Arc::strong_count(&print) > 1 {
+                        std::thread::sleep(core::time::Duration::from_secs(1));
+                        print.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                });
+            }
+
+            let mut total_runs = 0u64;
+            let mut window_runs = 0u64;
+            let mut total_valid = 0u64;
+            let mut window_valid = 0u64;
+
             start(&mut |slice: &[u8]| -> bool {
                 let mut input = ByteSliceTestInput::new(slice, options);
 
                 match test.test(&mut input) {
-                    Ok(_) => true,
+                    Ok(valid) => {
+                        window_runs += 1;
+                        if valid {
+                            window_valid += 1;
+                        }
+
+                        // Print out stats for generator success
+                        {
+                            if window_runs != window_valid
+                                && print.swap(false, std::sync::atomic::Ordering::Relaxed)
+                            {
+                                total_runs += window_runs;
+                                total_valid += window_valid;
+
+                                let total_perc = total_valid as f32 / total_runs as f32 * 100.0;
+                                let window_perc = window_valid as f32 / window_runs as f32 * 100.0;
+                                println!(
+                                    "#{}\tGENERATE\tvalid: {} ({:.2}%) valid/s: {} ({:.2}%)",
+                                    total_runs, total_valid, total_perc, window_valid, window_perc,
+                                );
+                                window_runs = 0;
+                                window_valid = 0;
+                            }
+                        }
+
+                        true
+                    }
                     Err(error) => {
                         eprintln!("test failed; shrinking input...");
 
