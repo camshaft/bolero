@@ -91,12 +91,21 @@ pub mod fuzzer {
             ));
         }
 
-        if std::env::var("__BOLERO_LIBFUZZER_RECURSE").is_ok() {
+        // Libfuzzer can generate multiple jobs that can make the binary recurse.
+        // Still, let’s limit recursion depth to some reasonable amount.
+        let recursion_level = std::env::var("__BOLERO_LIBFUZZER_RECURSE")
+            .as_deref()
+            .unwrap_or("0")
+            .parse()
+            .unwrap_or(usize::MAX);
+        if recursion_level > 10 {
             eprintln!("LOOPING BINARY");
             std::process::exit(1);
         }
-
-        std::env::set_var("__BOLERO_LIBFUZZER_RECURSE", "1");
+        std::env::set_var(
+            "__BOLERO_LIBFUZZER_RECURSE",
+            (recursion_level + 1).to_string(),
+        );
 
         // create a vector of NULL terminated strings
         let args = std::env::args()

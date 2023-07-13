@@ -271,8 +271,8 @@ int CollectDataFlow(const std::string &DFTBinary, const std::string &DirPath,
     Cmd.addArgument(DFTBinary);
     Cmd.addArgument(F.File);
     Cmd.addArgument(OutPath);
-    Printf("CMD: %s\n", Cmd.toString().c_str());
-    ExecuteCommand(Cmd);
+    Printf("CMD: %s\n", Cmd.toString(false).c_str());
+    ExecuteCommand(Cmd, false);
   }
   // Write functions.txt if it's currently empty or doesn't exist.
   auto FunctionsTxtPath = DirPlusFile(DirPath, kFunctionsTxt);
@@ -280,7 +280,7 @@ int CollectDataFlow(const std::string &DFTBinary, const std::string &DirPath,
     Command Cmd;
     Cmd.addArgument(DFTBinary);
     Cmd.setOutputFile(FunctionsTxtPath);
-    ExecuteCommand(Cmd);
+    ExecuteCommand(Cmd, false);
   }
   return 0;
 }

@@ -428,7 +428,11 @@ static fdio_spawn_action_t clone_fd_action(int localFd, int targetFd) {
   };
 }
 
-int ExecuteCommand(const Command &Cmd) {
+int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
+  if (WithLibtestHarness) {
+    fprintf(stderr, "Currently unable to execute commands on fuchsia, please open a feature request to cargo-bolero");
+  }
+
   zx_status_t rc;
 
   // Convert arguments to C array
@@ -524,11 +528,11 @@ int ExecuteCommand(const Command &Cmd) {
   return static_cast<int>(Info.return_code);
 }
 
-bool ExecuteCommand(const Command &BaseCmd, std::string *CmdOutput) {
+bool ExecuteCommand(const Command &BaseCmd, std::string *CmdOutput, bool WithLibtestHarness) {
   auto LogFilePath = TempPath("SimPopenOut", ".txt");
   Command Cmd(BaseCmd);
   Cmd.setOutputFile(LogFilePath);
-  int Ret = ExecuteCommand(Cmd);
+  int Ret = ExecuteCommand(Cmd, WithLibtestHarness);
   *CmdOutput = FileToString(LogFilePath);
   RemoveFile(LogFilePath);
   return Ret == 0;

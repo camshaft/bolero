@@ -237,10 +237,10 @@ static void WorkerThread(const Command &BaseCmd, std::atomic<unsigned> *Counter,
     Cmd.setOutputFile(Log);
     Cmd.combineOutAndErr();
     if (Flags.verbosity) {
-      std::string CommandLine = Cmd.toString();
+      std::string CommandLine = Cmd.toString(true);
       Printf("%s\n", CommandLine.c_str());
     }
-    int ExitCode = ExecuteCommand(Cmd);
+    int ExitCode = ExecuteCommand(Cmd, true);
     if (ExitCode != 0)
       *HasErrors = true;
     std::lock_guard<std::mutex> Lock(Mu);
@@ -387,7 +387,7 @@ int CleanseCrashInput(const std::vector<std::string> &Args,
       for (auto NewByte : ReplacementBytes) {
         U[Idx] = NewByte;
         WriteToFile(U, TmpFilePath);
-        auto ExitCode = ExecuteCommand(Cmd);
+        auto ExitCode = ExecuteCommand(Cmd, true);
         RemoveFile(TmpFilePath);
         if (!ExitCode) {
           U[Idx] = OriginalByte;
@@ -434,9 +434,9 @@ int MinimizeCrashInput(const std::vector<std::string> &Args,
     Command Cmd(BaseCmd);
     Cmd.addArgument(CurrentFilePath);
 
-    Printf("CRASH_MIN: executing: %s\n", Cmd.toString().c_str());
+    Printf("CRASH_MIN: executing: %s\n", Cmd.toString(true).c_str());
     std::string CmdOutput;
-    bool Success = ExecuteCommand(Cmd, &CmdOutput);
+    bool Success = ExecuteCommand(Cmd, &CmdOutput, true);
     if (Success) {
       Printf("ERROR: the input %s did not crash\n", CurrentFilePath.c_str());
       exit(1);
@@ -454,9 +454,9 @@ int MinimizeCrashInput(const std::vector<std::string> &Args,
             : Options.ArtifactPrefix + "minimized-from-" + Hash(U);
     Cmd.addFlag("minimize_crash_internal_step", "1");
     Cmd.addFlag("exact_artifact_path", ArtifactPath);
-    Printf("CRASH_MIN: executing: %s\n", Cmd.toString().c_str());
+    Printf("CRASH_MIN: executing: %s\n", Cmd.toString(true).c_str());
     CmdOutput.clear();
-    Success = ExecuteCommand(Cmd, &CmdOutput);
+    Success = ExecuteCommand(Cmd, &CmdOutput, true);
     Printf("%s", CmdOutput.c_str());
     if (Success) {
       if (Flags.exact_artifact_path) {

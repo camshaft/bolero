@@ -1235,7 +1235,7 @@ TEST(FuzzerCommand, Create) {
   // Default constructor
   Command DefaultCmd;
 
-  CmdLine = DefaultCmd.toString();
+  CmdLine = DefaultCmd.toString(false);
   EXPECT_EQ(CmdLine, "");
 
   // Explicit constructor
@@ -1243,7 +1243,7 @@ TEST(FuzzerCommand, Create) {
   makeCommandArgs(&ArgsToAdd);
   Command InitializedCmd(ArgsToAdd);
 
-  CmdLine = InitializedCmd.toString();
+  CmdLine = InitializedCmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 
   // Compare each argument
@@ -1259,14 +1259,14 @@ TEST(FuzzerCommand, Create) {
   // Copy constructor
   Command CopiedCmd(InitializedCmd);
 
-  CmdLine = CopiedCmd.toString();
+  CmdLine = CopiedCmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 
   // Assignment operator
   Command AssignedCmd;
   AssignedCmd = CopiedCmd;
 
-  CmdLine = AssignedCmd.toString();
+  CmdLine = AssignedCmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 }
 
@@ -1277,19 +1277,19 @@ TEST(FuzzerCommand, ModifyArguments) {
   std::string CmdLine;
 
   Cmd.addArguments(ArgsToAdd);
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 
   Cmd.addArgument("waldo");
   EXPECT_TRUE(Cmd.hasArgument("waldo"));
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("waldo", ""));
 
   Cmd.removeArgument("waldo");
   EXPECT_FALSE(Cmd.hasArgument("waldo"));
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 }
 
@@ -1303,7 +1303,7 @@ TEST(FuzzerCommand, ModifyFlags) {
   Value = Cmd.getFlagValue("fred");
   EXPECT_EQ(Value, "");
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 
   Cmd.addFlag("fred", "plugh");
@@ -1312,7 +1312,7 @@ TEST(FuzzerCommand, ModifyFlags) {
   Value = Cmd.getFlagValue("fred");
   EXPECT_EQ(Value, "plugh");
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("-fred=plugh", ""));
 
   Cmd.removeFlag("fred");
@@ -1321,7 +1321,7 @@ TEST(FuzzerCommand, ModifyFlags) {
   Value = Cmd.getFlagValue("fred");
   EXPECT_EQ(Value, "");
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
 }
 
@@ -1336,7 +1336,7 @@ TEST(FuzzerCommand, SetOutput) {
   Cmd.combineOutAndErr(true);
   EXPECT_TRUE(Cmd.isOutAndErrCombined());
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", "2>&1"));
 
   Cmd.combineOutAndErr(false);
@@ -1345,19 +1345,19 @@ TEST(FuzzerCommand, SetOutput) {
   Cmd.setOutputFile("xyzzy");
   EXPECT_TRUE(Cmd.hasOutputFile());
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ">xyzzy"));
 
   Cmd.setOutputFile("thud");
   EXPECT_TRUE(Cmd.hasOutputFile());
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ">thud"));
 
   Cmd.combineOutAndErr();
   EXPECT_TRUE(Cmd.isOutAndErrCombined());
 
-  CmdLine = Cmd.toString();
+  CmdLine = Cmd.toString(false);
   EXPECT_EQ(CmdLine, makeCmdLine("", ">thud 2>&1"));
 }
 

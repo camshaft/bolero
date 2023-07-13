@@ -20,8 +20,8 @@
 
 namespace fuzzer {
 
-int ExecuteCommand(const Command &Cmd) {
-  std::string CmdLine = Cmd.toString();
+int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
+  std::string CmdLine = Cmd.toString(WithLibtestHarness);
   int exit_code = system(CmdLine.c_str());
   if (WIFEXITED(exit_code))
     return WEXITSTATUS(exit_code);

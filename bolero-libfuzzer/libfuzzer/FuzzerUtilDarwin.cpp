@@ -38,8 +38,8 @@ static sigset_t OldBlockedSignalsSet;
 // signal handlers when the first thread enters and restores them when the last
 // thread finishes execution of the function and ensures this is not racey by
 // using a mutex.
-int ExecuteCommand(const Command &Cmd) {
-  std::string CmdLine = Cmd.toString();
+int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
+  std::string CmdLine = Cmd.toString(WithLibtestHarness);
   posix_spawnattr_t SpawnAttributes;
   if (posix_spawnattr_init(&SpawnAttributes))
     return -1;

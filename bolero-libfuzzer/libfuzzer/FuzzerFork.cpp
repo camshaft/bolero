@@ -191,7 +191,7 @@ struct GlobalEnv {
 
     if (Verbosity >= 2)
       Printf("Job %zd/%p Created: %s\n", JobId, Job,
-             Job->Cmd.toString().c_str());
+             Job->Cmd.toString(true).c_str());
     // Start from very short runs and gradually increase them.
     return Job;
   }
@@ -272,7 +272,7 @@ struct GlobalEnv {
     Cmd.setOutputFile(DirPlusFile(TempDir, "dft.log"));
     Cmd.combineOutAndErr();
     // Printf("CollectDFT: %s\n", Cmd.toString().c_str());
-    ExecuteCommand(Cmd);
+    ExecuteCommand(Cmd, false);
   }
 
 };
@@ -303,7 +303,7 @@ struct JobQueue {
 void WorkerThread(JobQueue *FuzzQ, JobQueue *MergeQ) {
   while (auto Job = FuzzQ->Pop()) {
     // Printf("WorkerThread: job %p\n", Job);
-    Job->ExitCode = ExecuteCommand(Job->Cmd);
+    Job->ExitCode = ExecuteCommand(Job->Cmd, true);
     MergeQ->Push(Job);
   }
 }

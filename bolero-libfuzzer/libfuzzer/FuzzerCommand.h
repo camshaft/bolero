@@ -137,18 +137,34 @@ public:
 
   // Returns a string representation of the command.  On many systems this will
   // be the equivalent command line.
-  std::string toString() const {
+  std::string toString(bool WithLibtestHarness) const {
     std::stringstream SS;
-    for (auto arg : getArguments())
-      SS << arg << " ";
-    if (hasOutputFile())
-      SS << ">" << getOutputFile() << " ";
-    if (isOutAndErrCombined())
-      SS << "2>&1 ";
-    std::string result = SS.str();
-    if (!result.empty())
-      result = result.substr(0, result.length() - 1);
-    return result;
+    if (!WithLibtestHarness) {
+      for (auto arg : getArguments())
+        SS << arg << " ";
+      if (hasOutputFile())
+        SS << ">" << getOutputFile() << " ";
+      if (isOutAndErrCombined())
+        SS << "2>&1 ";
+      std::string result = SS.str();
+      if (!result.empty())
+        result = result.substr(0, result.length() - 1);
+      return result;
+    } else {
+      auto test_name = std::getenv("BOLERO_TEST_NAME");
+      auto args = getArguments();
+      SS << "env BOLERO_LIBTEST_HARNESS=1 BOLERO_TEST_NAME=\"" << test_name << "\" BOLERO_LIBFUZZER_ARGS=\"";
+      if (args.size() > 1)
+        SS << args[1];
+      for (unsigned i = 2; i < args.size(); ++i)
+        SS << " " << args[i];
+      SS << "\" " << args[0] << " " << test_name << " --exact --nocapture --quiet --test-threads 1";
+      if (hasOutputFile())
+        SS << " >" << getOutputFile();
+      if (isOutAndErrCombined())
+        SS << " 2>&1";
+      return SS.str();
+    }
   }
 
 private:

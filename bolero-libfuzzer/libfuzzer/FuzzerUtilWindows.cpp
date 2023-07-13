@@ -164,13 +164,13 @@ int CloseProcessPipe(FILE *F) {
   return _pclose(F);
 }
 
-int ExecuteCommand(const Command &Cmd) {
-  std::string CmdLine = Cmd.toString();
+int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
+  std::string CmdLine = Cmd.toString(WithLibtestHarness);
   return system(CmdLine.c_str());
 }
 
-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput) {
-  FILE *Pipe = _popen(Cmd.toString().c_str(), "r");
+bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness) {
+  FILE *Pipe = _popen(Cmd.toString(WithLibtestHarness).c_str(), "r");
   if (!Pipe)
     return false;
 
@@ -206,7 +206,7 @@ const void *SearchMemory(const void *Data, size_t DataLen, const void *Patt,
 std::string DisassembleCmd(const std::string &FileName) {
   std::vector<std::string> command_vector;
   command_vector.push_back("dumpbin /summary > nul");
-  if (ExecuteCommand(Command(command_vector)) == 0)
+  if (ExecuteCommand(Command(command_vector), false) == 0)
     return "dumpbin /disasm " + FileName;
   Printf("libFuzzer: couldn't find tool to disassemble (dumpbin)\n");
   exit(1);

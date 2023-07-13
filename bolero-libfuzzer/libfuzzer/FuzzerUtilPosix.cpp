@@ -90,8 +90,8 @@ static void SetSigaction(int signum,
 }
 
 // Return true on success, false otherwise.
-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput) {
-  FILE *Pipe = popen(Cmd.toString().c_str(), "r");
+bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness) {
+  FILE *Pipe = popen(Cmd.toString(WithLibtestHarness).c_str(), "r");
   if (!Pipe)
     return false;
 

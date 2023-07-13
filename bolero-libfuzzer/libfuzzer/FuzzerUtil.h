@@ -56,8 +56,9 @@ unsigned long GetPid();
 
 size_t GetPeakRSSMb();
 
-int ExecuteCommand(const Command &Cmd);
-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput);
+int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness);
+bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness);
+// TODO: ExecuteCommandWithArgs/Env
 
 // Fuchsia does not have popen/pclose.
 FILE *OpenProcessPipe(const char *Command, const char *Mode);
