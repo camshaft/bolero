@@ -74,6 +74,16 @@ libfuzzer honggfuzz:
 	@cargo run \
 	    --features $@ \
 	    test \
+	    fuzz_bytes \
+	    --manifest-path examples/basic/Cargo.toml \
+	    --runs 10 \
+	    --jobs 2 \
+	    --engine $@ \
+	    --release \
+	    --sanitizer $(SANITIZER)
+	@cargo run \
+	    --features $@ \
+	    test \
 	    fuzz_generator \
 	    --manifest-path examples/basic/Cargo.toml \
 	    --runs 100000 \
