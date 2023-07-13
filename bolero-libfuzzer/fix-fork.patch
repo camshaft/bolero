@@ -1,0 +1,400 @@
+diff -ruN libfuzzer/FuzzerCommand.h libfuzzer-new/FuzzerCommand.h
+--- libfuzzer/FuzzerCommand.h	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerCommand.h	2023-07-13 14:41:13
+@@ -137,18 +137,34 @@
+ 
+   // Returns a string representation of the command.  On many systems this will
+   // be the equivalent command line.
+-  std::string toString() const {
++  std::string toString(bool WithLibtestHarness) const {
+     std::stringstream SS;
+-    for (auto arg : getArguments())
+-      SS << arg << " ";
+-    if (hasOutputFile())
+-      SS << ">" << getOutputFile() << " ";
+-    if (isOutAndErrCombined())
+-      SS << "2>&1 ";
+-    std::string result = SS.str();
+-    if (!result.empty())
+-      result = result.substr(0, result.length() - 1);
+-    return result;
++    if (!WithLibtestHarness) {
++      for (auto arg : getArguments())
++        SS << arg << " ";
++      if (hasOutputFile())
++        SS << ">" << getOutputFile() << " ";
++      if (isOutAndErrCombined())
++        SS << "2>&1 ";
++      std::string result = SS.str();
++      if (!result.empty())
++        result = result.substr(0, result.length() - 1);
++      return result;
++    } else {
++      auto test_name = std::getenv("BOLERO_TEST_NAME");
++      auto args = getArguments();
++      SS << "env BOLERO_LIBTEST_HARNESS=1 BOLERO_TEST_NAME=\"" << test_name << "\" BOLERO_LIBFUZZER_ARGS=\"";
++      if (args.size() > 1)
++        SS << args[1];
++      for (unsigned i = 2; i < args.size(); ++i)
++        SS << " " << args[i];
++      SS << "\" " << args[0] << " " << test_name << " --exact --nocapture --quiet --test-threads 1";
++      if (hasOutputFile())
++        SS << " >" << getOutputFile();
++      if (isOutAndErrCombined())
++        SS << " 2>&1";
++      return SS.str();
++    }
+   }
+ 
+ private:
+diff -ruN libfuzzer/FuzzerDataFlowTrace.cpp libfuzzer-new/FuzzerDataFlowTrace.cpp
+--- libfuzzer/FuzzerDataFlowTrace.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerDataFlowTrace.cpp	2023-07-13 14:41:13
+@@ -271,8 +271,8 @@
+     Cmd.addArgument(DFTBinary);
+     Cmd.addArgument(F.File);
+     Cmd.addArgument(OutPath);
+-    Printf("CMD: %s\n", Cmd.toString().c_str());
+-    ExecuteCommand(Cmd);
++    Printf("CMD: %s\n", Cmd.toString(false).c_str());
++    ExecuteCommand(Cmd, false);
+   }
+   // Write functions.txt if it's currently empty or doesn't exist.
+   auto FunctionsTxtPath = DirPlusFile(DirPath, kFunctionsTxt);
+@@ -280,7 +280,7 @@
+     Command Cmd;
+     Cmd.addArgument(DFTBinary);
+     Cmd.setOutputFile(FunctionsTxtPath);
+-    ExecuteCommand(Cmd);
++    ExecuteCommand(Cmd, false);
+   }
+   return 0;
+ }
+diff -ruN libfuzzer/FuzzerDriver.cpp libfuzzer-new/FuzzerDriver.cpp
+--- libfuzzer/FuzzerDriver.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerDriver.cpp	2023-07-13 14:41:13
+@@ -237,10 +237,10 @@
+     Cmd.setOutputFile(Log);
+     Cmd.combineOutAndErr();
+     if (Flags.verbosity) {
+-      std::string CommandLine = Cmd.toString();
++      std::string CommandLine = Cmd.toString(true);
+       Printf("%s\n", CommandLine.c_str());
+     }
+-    int ExitCode = ExecuteCommand(Cmd);
++    int ExitCode = ExecuteCommand(Cmd, true);
+     if (ExitCode != 0)
+       *HasErrors = true;
+     std::lock_guard<std::mutex> Lock(Mu);
+@@ -387,7 +387,7 @@
+       for (auto NewByte : ReplacementBytes) {
+         U[Idx] = NewByte;
+         WriteToFile(U, TmpFilePath);
+-        auto ExitCode = ExecuteCommand(Cmd);
++        auto ExitCode = ExecuteCommand(Cmd, true);
+         RemoveFile(TmpFilePath);
+         if (!ExitCode) {
+           U[Idx] = OriginalByte;
+@@ -434,9 +434,9 @@
+     Command Cmd(BaseCmd);
+     Cmd.addArgument(CurrentFilePath);
+ 
+-    Printf("CRASH_MIN: executing: %s\n", Cmd.toString().c_str());
++    Printf("CRASH_MIN: executing: %s\n", Cmd.toString(true).c_str());
+     std::string CmdOutput;
+-    bool Success = ExecuteCommand(Cmd, &CmdOutput);
++    bool Success = ExecuteCommand(Cmd, &CmdOutput, true);
+     if (Success) {
+       Printf("ERROR: the input %s did not crash\n", CurrentFilePath.c_str());
+       exit(1);
+@@ -454,9 +454,9 @@
+             : Options.ArtifactPrefix + "minimized-from-" + Hash(U);
+     Cmd.addFlag("minimize_crash_internal_step", "1");
+     Cmd.addFlag("exact_artifact_path", ArtifactPath);
+-    Printf("CRASH_MIN: executing: %s\n", Cmd.toString().c_str());
++    Printf("CRASH_MIN: executing: %s\n", Cmd.toString(true).c_str());
+     CmdOutput.clear();
+-    Success = ExecuteCommand(Cmd, &CmdOutput);
++    Success = ExecuteCommand(Cmd, &CmdOutput, true);
+     Printf("%s", CmdOutput.c_str());
+     if (Success) {
+       if (Flags.exact_artifact_path) {
+diff -ruN libfuzzer/FuzzerFork.cpp libfuzzer-new/FuzzerFork.cpp
+--- libfuzzer/FuzzerFork.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerFork.cpp	2023-07-13 14:41:13
+@@ -191,7 +191,7 @@
+ 
+     if (Verbosity >= 2)
+       Printf("Job %zd/%p Created: %s\n", JobId, Job,
+-             Job->Cmd.toString().c_str());
++             Job->Cmd.toString(true).c_str());
+     // Start from very short runs and gradually increase them.
+     return Job;
+   }
+@@ -272,7 +272,7 @@
+     Cmd.setOutputFile(DirPlusFile(TempDir, "dft.log"));
+     Cmd.combineOutAndErr();
+     // Printf("CollectDFT: %s\n", Cmd.toString().c_str());
+-    ExecuteCommand(Cmd);
++    ExecuteCommand(Cmd, false);
+   }
+ 
+ };
+@@ -303,7 +303,7 @@
+ void WorkerThread(JobQueue *FuzzQ, JobQueue *MergeQ) {
+   while (auto Job = FuzzQ->Pop()) {
+     // Printf("WorkerThread: job %p\n", Job);
+-    Job->ExitCode = ExecuteCommand(Job->Cmd);
++    Job->ExitCode = ExecuteCommand(Job->Cmd, true);
+     MergeQ->Push(Job);
+   }
+ }
+diff -ruN libfuzzer/FuzzerMerge.cpp libfuzzer-new/FuzzerMerge.cpp
+--- libfuzzer/FuzzerMerge.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerMerge.cpp	2023-07-13 14:41:13
+@@ -503,7 +503,7 @@
+       Cmd.setOutputFile(getDevNull());
+       Cmd.combineOutAndErr();
+     }
+-    auto ExitCode = ExecuteCommand(Cmd);
++    auto ExitCode = ExecuteCommand(Cmd, true);
+     if (!ExitCode) {
+       VPrintf(V, "MERGE-OUTER: successful in %zd attempt(s)\n", Attempt);
+       break;
+diff -ruN libfuzzer/FuzzerUtil.h libfuzzer-new/FuzzerUtil.h
+--- libfuzzer/FuzzerUtil.h	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtil.h	2023-07-13 14:41:13
+@@ -56,8 +56,9 @@
+ 
+ size_t GetPeakRSSMb();
+ 
+-int ExecuteCommand(const Command &Cmd);
+-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput);
++int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness);
++bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness);
++// TODO: ExecuteCommandWithArgs/Env
+ 
+ // Fuchsia does not have popen/pclose.
+ FILE *OpenProcessPipe(const char *Command, const char *Mode);
+diff -ruN libfuzzer/FuzzerUtilDarwin.cpp libfuzzer-new/FuzzerUtilDarwin.cpp
+--- libfuzzer/FuzzerUtilDarwin.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtilDarwin.cpp	2023-07-13 14:41:13
+@@ -38,8 +38,8 @@
+ // signal handlers when the first thread enters and restores them when the last
+ // thread finishes execution of the function and ensures this is not racey by
+ // using a mutex.
+-int ExecuteCommand(const Command &Cmd) {
+-  std::string CmdLine = Cmd.toString();
++int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
++  std::string CmdLine = Cmd.toString(WithLibtestHarness);
+   posix_spawnattr_t SpawnAttributes;
+   if (posix_spawnattr_init(&SpawnAttributes))
+     return -1;
+diff -ruN libfuzzer/FuzzerUtilFuchsia.cpp libfuzzer-new/FuzzerUtilFuchsia.cpp
+--- libfuzzer/FuzzerUtilFuchsia.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtilFuchsia.cpp	2023-07-13 14:41:13
+@@ -428,7 +428,11 @@
+   };
+ }
+ 
+-int ExecuteCommand(const Command &Cmd) {
++int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
++  if (WithLibtestHarness) {
++    fprintf(stderr, "Currently unable to execute commands on fuchsia, please open a feature request to cargo-bolero");
++  }
++
+   zx_status_t rc;
+ 
+   // Convert arguments to C array
+@@ -524,11 +528,11 @@
+   return static_cast<int>(Info.return_code);
+ }
+ 
+-bool ExecuteCommand(const Command &BaseCmd, std::string *CmdOutput) {
++bool ExecuteCommand(const Command &BaseCmd, std::string *CmdOutput, bool WithLibtestHarness) {
+   auto LogFilePath = TempPath("SimPopenOut", ".txt");
+   Command Cmd(BaseCmd);
+   Cmd.setOutputFile(LogFilePath);
+-  int Ret = ExecuteCommand(Cmd);
++  int Ret = ExecuteCommand(Cmd, WithLibtestHarness);
+   *CmdOutput = FileToString(LogFilePath);
+   RemoveFile(LogFilePath);
+   return Ret == 0;
+diff -ruN libfuzzer/FuzzerUtilLinux.cpp libfuzzer-new/FuzzerUtilLinux.cpp
+--- libfuzzer/FuzzerUtilLinux.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtilLinux.cpp	2023-07-13 14:41:13
+@@ -20,8 +20,8 @@
+ 
+ namespace fuzzer {
+ 
+-int ExecuteCommand(const Command &Cmd) {
+-  std::string CmdLine = Cmd.toString();
++int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
++  std::string CmdLine = Cmd.toString(WithLibtestHarness);
+   int exit_code = system(CmdLine.c_str());
+   if (WIFEXITED(exit_code))
+     return WEXITSTATUS(exit_code);
+diff -ruN libfuzzer/FuzzerUtilPosix.cpp libfuzzer-new/FuzzerUtilPosix.cpp
+--- libfuzzer/FuzzerUtilPosix.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtilPosix.cpp	2023-07-13 14:41:13
+@@ -90,8 +90,8 @@
+ }
+ 
+ // Return true on success, false otherwise.
+-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput) {
+-  FILE *Pipe = popen(Cmd.toString().c_str(), "r");
++bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness) {
++  FILE *Pipe = popen(Cmd.toString(WithLibtestHarness).c_str(), "r");
+   if (!Pipe)
+     return false;
+ 
+diff -ruN libfuzzer/FuzzerUtilWindows.cpp libfuzzer-new/FuzzerUtilWindows.cpp
+--- libfuzzer/FuzzerUtilWindows.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/FuzzerUtilWindows.cpp	2023-07-13 14:41:13
+@@ -164,13 +164,13 @@
+   return _pclose(F);
+ }
+ 
+-int ExecuteCommand(const Command &Cmd) {
+-  std::string CmdLine = Cmd.toString();
++int ExecuteCommand(const Command &Cmd, bool WithLibtestHarness) {
++  std::string CmdLine = Cmd.toString(WithLibtestHarness);
+   return system(CmdLine.c_str());
+ }
+ 
+-bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput) {
+-  FILE *Pipe = _popen(Cmd.toString().c_str(), "r");
++bool ExecuteCommand(const Command &Cmd, std::string *CmdOutput, bool WithLibtestHarness) {
++  FILE *Pipe = _popen(Cmd.toString(WithLibtestHarness).c_str(), "r");
+   if (!Pipe)
+     return false;
+ 
+@@ -206,7 +206,7 @@
+ std::string DisassembleCmd(const std::string &FileName) {
+   std::vector<std::string> command_vector;
+   command_vector.push_back("dumpbin /summary > nul");
+-  if (ExecuteCommand(Command(command_vector)) == 0)
++  if (ExecuteCommand(Command(command_vector), false) == 0)
+     return "dumpbin /disasm " + FileName;
+   Printf("libFuzzer: couldn't find tool to disassemble (dumpbin)\n");
+   exit(1);
+diff -ruN libfuzzer/tests/FuzzerUnittest.cpp libfuzzer-new/tests/FuzzerUnittest.cpp
+--- libfuzzer/tests/FuzzerUnittest.cpp	2023-07-13 14:41:34
++++ libfuzzer-new/tests/FuzzerUnittest.cpp	2023-07-13 14:41:13
+@@ -1235,7 +1235,7 @@
+   // Default constructor
+   Command DefaultCmd;
+ 
+-  CmdLine = DefaultCmd.toString();
++  CmdLine = DefaultCmd.toString(false);
+   EXPECT_EQ(CmdLine, "");
+ 
+   // Explicit constructor
+@@ -1243,7 +1243,7 @@
+   makeCommandArgs(&ArgsToAdd);
+   Command InitializedCmd(ArgsToAdd);
+ 
+-  CmdLine = InitializedCmd.toString();
++  CmdLine = InitializedCmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ 
+   // Compare each argument
+@@ -1259,14 +1259,14 @@
+   // Copy constructor
+   Command CopiedCmd(InitializedCmd);
+ 
+-  CmdLine = CopiedCmd.toString();
++  CmdLine = CopiedCmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ 
+   // Assignment operator
+   Command AssignedCmd;
+   AssignedCmd = CopiedCmd;
+ 
+-  CmdLine = AssignedCmd.toString();
++  CmdLine = AssignedCmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ }
+ 
+@@ -1277,19 +1277,19 @@
+   std::string CmdLine;
+ 
+   Cmd.addArguments(ArgsToAdd);
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ 
+   Cmd.addArgument("waldo");
+   EXPECT_TRUE(Cmd.hasArgument("waldo"));
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("waldo", ""));
+ 
+   Cmd.removeArgument("waldo");
+   EXPECT_FALSE(Cmd.hasArgument("waldo"));
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ }
+ 
+@@ -1303,7 +1303,7 @@
+   Value = Cmd.getFlagValue("fred");
+   EXPECT_EQ(Value, "");
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ 
+   Cmd.addFlag("fred", "plugh");
+@@ -1312,7 +1312,7 @@
+   Value = Cmd.getFlagValue("fred");
+   EXPECT_EQ(Value, "plugh");
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("-fred=plugh", ""));
+ 
+   Cmd.removeFlag("fred");
+@@ -1321,7 +1321,7 @@
+   Value = Cmd.getFlagValue("fred");
+   EXPECT_EQ(Value, "");
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ""));
+ }
+ 
+@@ -1336,7 +1336,7 @@
+   Cmd.combineOutAndErr(true);
+   EXPECT_TRUE(Cmd.isOutAndErrCombined());
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", "2>&1"));
+ 
+   Cmd.combineOutAndErr(false);
+@@ -1345,19 +1345,19 @@
+   Cmd.setOutputFile("xyzzy");
+   EXPECT_TRUE(Cmd.hasOutputFile());
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ">xyzzy"));
+ 
+   Cmd.setOutputFile("thud");
+   EXPECT_TRUE(Cmd.hasOutputFile());
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ">thud"));
+ 
+   Cmd.combineOutAndErr();
+   EXPECT_TRUE(Cmd.isOutAndErrCombined());
+ 
+-  CmdLine = Cmd.toString();
++  CmdLine = Cmd.toString(false);
+   EXPECT_EQ(CmdLine, makeCmdLine("", ">thud 2>&1"));
+ }
+ 
