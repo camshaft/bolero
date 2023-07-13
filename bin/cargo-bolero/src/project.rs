@@ -9,7 +9,7 @@ lazy_static! {
     static ref RUST_VERSION: rustc_version::VersionMeta = rustc_version::version_meta().unwrap();
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 pub struct Project {
     /// Build with the sanitizer enabled
     #[structopt(short, long, default_value = "address")]

@@ -1,4 +1,4 @@
-use crate::{exec, reduce, test, Selection};
+use crate::{exec, project::Project, reduce, test, Selection};
 use anyhow::{anyhow, Result};
 use bit_set::BitSet;
 use core::cmp::Ordering;
@@ -25,6 +25,17 @@ const FLAGS: &[&str] = &[
     #[cfg(target_os = "linux")]
     "-Cllvm-args=-sanitizer-coverage-stack-depth",
 ];
+
+/// test_name needs to be one cargo-bolero test in the binary described by project
+///
+/// Returns the path to the binary
+pub(crate) fn build(project: Project, test_name: String) -> Result<PathBuf> {
+    Ok(PathBuf::from(
+        Selection::new(project, test_name)
+            .test_target(FLAGS, "libfuzzer")?
+            .exe,
+    ))
+}
 
 pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
     let test_target = selection.test_target(FLAGS, "libfuzzer")?;
