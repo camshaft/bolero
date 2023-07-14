@@ -13,6 +13,14 @@ bolero = "0.8"
 ```
 to `Cargo.toml`.
 
+Then, create the `fuzz` profile:
+```toml
+[profile.fuzz]
+inherits = "release"
+codegen-units = 1
+debug-assertions = true
+```
+
 ## Structured Test Generation
 
 If your crate wishes to implement structured test generation on public data structures, `bolero-generator` can be added to the main dependencies:

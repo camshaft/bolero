@@ -23,9 +23,11 @@ pub struct Project {
     #[structopt(long)]
     all_features: bool,
 
-    /// Build artifacts in release mode, with optimizations [default: true]
-    #[structopt(long)]
-    release: Option<Option<bool>>,
+    /// Build artifacts in release mode, with optimizations [default: "fuzz"]
+    ///
+    /// Note that if you do not have `codegen-units = 1` in the profile, there are known compilation bugs
+    #[structopt(long, default_value = "fuzz")]
+    profile: String,
 
     /// Do not activate the `default` feature
     #[structopt(long)]
@@ -88,10 +90,7 @@ impl Project {
         let mut cmd = self.cargo();
 
         cmd.arg(call).arg("--target").arg(&self.target);
-
-        if self.release() {
-            cmd.arg("--release");
-        }
+        cmd.arg("--profile").arg(&self.profile);
 
         if self.no_default_features {
             cmd.arg("--no-default-features");
@@ -187,12 +186,6 @@ impl Project {
         } else {
             None
         })
-        // https://github.com/rust-lang/rust/issues/47071
-        .chain(if self.release() {
-            Some("-Ccodegen-units=1")
-        } else {
-            None
-        })
         .map(String::from)
         .chain(self.sanitizer_flags())
         .chain(std::env::var(inherits).ok())
@@ -211,13 +204,5 @@ impl Project {
     fn sanitizer_flags(&self) -> impl Iterator<Item = String> + '_ {
         self.sanitizers()
             .map(|sanitizer| format!("-Zsanitizer={}", sanitizer))
-    }
-
-    fn release(&self) -> bool {
-        match self.release {
-            None => true,
-            Some(None) => true,
-            Some(Some(v)) => v,
-        }
     }
 }
