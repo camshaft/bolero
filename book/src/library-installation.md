@@ -22,6 +22,11 @@ incremental = false
 codegen-units = 1
 ```
 
+If you forget adding the profile, then you will get the following error:
+```
+error: profile `fuzz` is not defined
+```
+
 ## Structured Test Generation
 
 If your crate wishes to implement structured test generation on public data structures, `bolero-generator` can be added to the main dependencies:
