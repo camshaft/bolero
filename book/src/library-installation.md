@@ -13,12 +13,13 @@ bolero = "0.8"
 ```
 to `Cargo.toml`.
 
-Then, create the `fuzz` profile:
+Then, create the `fuzz` profile: (Note that LTO is not well-supported for the fuzzing profile)
 ```toml
 [profile.fuzz]
-inherits = "release"
+inherits = "debug"
+opt-level = 3
+incremental = false
 codegen-units = 1
-debug-assertions = true
 ```
 
 ## Structured Test Generation
