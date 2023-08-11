@@ -16,7 +16,7 @@ to `Cargo.toml`.
 Then, create the `fuzz` profile: (Note that LTO is not well-supported for the fuzzing profile)
 ```toml
 [profile.fuzz]
-inherits = "debug"
+inherits = "dev"
 opt-level = 3
 incremental = false
 codegen-units = 1
