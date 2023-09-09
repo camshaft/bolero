@@ -9,6 +9,7 @@ keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
 readme = "../README.md"
+rust-version = "1.57.0"
 
 [features]
 rng = ["rand", "bolero-generator/alloc"]
@@ -21,7 +22,7 @@ pretty-hex = "0.3"
 rand = { version = "0.8", optional = true }
 
 [target.'cfg(not(kani))'.dependencies]
-backtrace = { version = "0.3" }
+backtrace = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 bolero-generator = { version = "0.9", path = "../bolero-generator", features = ["std"] }

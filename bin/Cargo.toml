@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "tests",
+    "cargo-bolero",
 ]
 resolver = "2"
