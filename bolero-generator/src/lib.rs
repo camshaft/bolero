@@ -190,7 +190,7 @@ impl<T: TypeGenerator> Copy for TypeValueGenerator<T> {}
 
 impl<T: TypeGenerator> Clone for TypeValueGenerator<T> {
     fn clone(&self) -> Self {
-        Self(PhantomData)
+        *self
     }
 }
 

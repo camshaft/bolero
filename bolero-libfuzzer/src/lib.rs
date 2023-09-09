@@ -19,7 +19,9 @@ pub mod fuzzer {
         pub fn LLVMFuzzerStartTest(a: c_int, b: *const *const c_char) -> c_int;
     }
 
-    static mut TESTFN: Option<&mut dyn FnMut(&[u8]) -> bool> = None;
+    type TestFn<'a> = &'a mut dyn FnMut(&[u8]) -> bool;
+
+    static mut TESTFN: Option<TestFn> = None;
 
     #[derive(Debug, Default)]
     pub struct LibFuzzerEngine {

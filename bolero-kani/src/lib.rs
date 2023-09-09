@@ -39,7 +39,7 @@ pub mod lib {
 
     impl KaniEngine {
         pub fn new(_location: TargetLocation) -> Self {
-            Self::default()
+            Self
         }
     }
 
