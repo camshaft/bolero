@@ -1,7 +1,7 @@
 use crate::{Driver, TypeGenerator, TypeGeneratorWithParams, TypeValueGenerator, ValueGenerator};
 
 macro_rules! range_generator {
-    ($ty:ident, $generator:ident, $new:expr) => {
+    ($ty:ident, $generator:ident, | $start:ident, $end:ident | $new:expr) => {
         pub struct $generator<Start, End> {
             start: Start,
             end: End,
@@ -61,19 +61,17 @@ macro_rules! range_generator {
             type Output = core::ops::$ty<T>;
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                let start = self.start.generate(driver)?;
-                let end = self.end.generate(driver)?;
-                #[allow(clippy::redundant_closure)]
-                Some($new(start, end))
+                let $start = self.start.generate(driver)?;
+                let $end = self.end.generate(driver)?;
+                Some($new)
             }
         }
 
         impl<T: TypeGenerator> TypeGenerator for core::ops::$ty<T> {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                let start = driver.gen()?;
-                let end = driver.gen()?;
-                #[allow(clippy::redundant_closure)]
-                Some($new(start, end))
+                let $start = driver.gen()?;
+                let $end = driver.gen()?;
+                Some($new)
             }
         }
 
