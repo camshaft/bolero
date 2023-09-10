@@ -21,14 +21,26 @@ pub fn test() -> Result {
             supports_env: engine != "kani",
             test_crashes: engine != "afl", // TODO fix this
             runs: 10_000,
+            jobs: None,
         };
 
         test.run()?;
 
-        if ["libfuzzer", "hongfuzz"].contains(&engine) {
+        if ["libfuzzer", "honggfuzz"].contains(&engine) {
             Test {
                 sanitizer: "address".to_string(),
                 rustc_bootstrap: !is_nightly,
+                ..test.clone()
+            }
+            .run()?;
+        }
+
+        // libfuzzer supports multiple jobs
+        if ["libfuzzer"].contains(&engine) {
+            Test {
+                sanitizer: "address".to_string(),
+                rustc_bootstrap: !is_nightly,
+                jobs: Some(2),
                 ..test.clone()
             }
             .run()?;
@@ -48,6 +60,7 @@ struct Test {
     supports_env: bool,
     test_crashes: bool,
     runs: u32,
+    jobs: Option<u32>,
 }
 
 impl Test {
@@ -77,6 +90,12 @@ impl Test {
             args.push("--rustc-bootstrap".to_string());
         }
 
+        let jobs = &if let Some(jobs) = self.jobs {
+            vec!["--jobs".to_string(), jobs.to_string()]
+        } else {
+            vec![]
+        };
+
         let args = &args;
 
         for test in [
@@ -92,7 +111,11 @@ impl Test {
                 continue;
             }
 
-            cmd!(sh, "{cargo_bolero} test {test} --runs {runs} {args...}").run()?;
+            cmd!(
+                sh,
+                "{cargo_bolero} test {test} --runs {runs} {jobs...} {args...}"
+            )
+            .run()?;
 
             if self.reduce {
                 cmd!(sh, "{cargo_bolero} reduce {test} {args...}").run()?;
@@ -117,7 +140,7 @@ impl Test {
                 let _ = sh.remove_path(format!("src/__fuzz__/{test}"));
             }
 
-            let res = cmd!(sh, "{cargo_bolero} test {test} {args...}").run();
+            let res = cmd!(sh, "{cargo_bolero} test {test} {args...} {jobs...}").run();
 
             assert!(res.is_err(), "test {test} should catch a panic");
         }

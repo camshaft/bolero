@@ -139,16 +139,35 @@ public:
   // be the equivalent command line.
   std::string toString() const {
     std::stringstream SS;
-    for (auto arg : getArguments())
-      SS << arg << " ";
+    auto test_name = std::getenv("BOLERO_TEST_NAME");
+    auto libtest_harness = std::getenv("BOLERO_LIBTEST_HARNESS");
+    auto args = getArguments();
+
+    SS << "env";
+
+    if (libtest_harness) {
+      SS << " BOLERO_LIBTEST_HARNESS=1 BOLERO_TEST_NAME=\"" << test_name << "\"";
+    }
+
+    SS << " BOLERO_LIBFUZZER_ARGS=\"";
+    if (args.size() > 1)
+      SS << args[1];
+    for (unsigned i = 2; i < args.size(); ++i)
+      SS << " " << args[i];
+    SS << "\"";
+
+    SS << " " << args[0];
+
+    if (libtest_harness) {
+      SS << " " << test_name << " --exact --nocapture --quiet --test-threads 1";
+    }
+
     if (hasOutputFile())
-      SS << ">" << getOutputFile() << " ";
+      SS << " >" << getOutputFile();
     if (isOutAndErrCombined())
-      SS << "2>&1 ";
-    std::string result = SS.str();
-    if (!result.empty())
-      result = result.substr(0, result.length() - 1);
-    return result;
+      SS << " 2>&1";
+
+    return SS.str();
   }
 
 private:
