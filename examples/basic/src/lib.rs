@@ -10,6 +10,16 @@ pub fn add(a: u8, b: u8, should_panic: bool) -> u8 {
     }
 }
 
+pub fn should_panic() -> bool {
+    if cfg!(bolero_should_panic) {
+        true
+    } else if cfg!(kani) {
+        false
+    } else {
+        std::env::var("SHOULD_PANIC").is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -18,11 +28,7 @@ mod tests {
     #[test]
     #[cfg_attr(kani, kani::proof)]
     fn add_test() {
-        let should_panic = if cfg!(kani) {
-            false
-        } else {
-            std::env::var("SHOULD_PANIC").is_ok()
-        };
+        let should_panic = should_panic();
 
         check!()
             .with_generator((0..254).map_gen(|a: u8| (a, a + 1)))
@@ -33,8 +39,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(kani, kani::proof)]
     fn other_test() {
-        let should_panic = std::env::var("SHOULD_PANIC").is_ok();
+        let should_panic = should_panic();
 
         check!()
             .with_generator((0..254).map_gen(|a: u8| (a, a + 1)))
@@ -51,7 +58,7 @@ mod tests {
 
         impl TypeGenerator for T {
             fn generate<R: bolero_generator::Driver>(_: &mut R) -> Option<Self> {
-                if std::env::var("SHOULD_PANIC").is_ok() {
+                if should_panic() {
                     panic!("generator panicked!");
                 } else {
                     Some(Self)

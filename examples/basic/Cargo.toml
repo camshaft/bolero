@@ -8,7 +8,7 @@ edition = "2018"
 arrayvec = "0.5"
 
 [dev-dependencies]
-bolero = { path = "../../bolero" }
+bolero = { path = "../../lib/bolero" }
 
 [workspace]
 members = ["."]

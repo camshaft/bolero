@@ -44,44 +44,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [1.57.0, 1.64.0, stable, nightly]
+        rust: [1.57.0, stable, nightly]
         os: [ubuntu-latest, macOS-latest]
-        # TODO add honggfuzz back
-        test: [unit-tests, unit-tests-no-1.57, build-no-default-features, libfuzzer, afl, examples-tests]
-        sanitizer: [NONE]
-        exclude:
-          - rust: 1.57.0
-            test: unit-tests-no-1.57
-          # honggfuzz is broken on macOS
-          - os: macos-latest
-            test: honggfuzz
-        include:
-          - rust: nightly
-            os: ubuntu-latest
-            test: libfuzzer
-            sanitizer: address
-          # - rust: nightly
-          #   os: ubuntu-latest
-          #   test: honggfuzz
-          #   sanitizer: address
-          # TODO fix this
-          # - rust: nightly
-          #   os: ubuntu-latest
-          #   test: afl
-          #   sanitizer: address
-          - rust: nightly
-            os: macOS-latest
-            test: libfuzzer
-            sanitizer: address
-          # - rust: nightly
-          #   os: macOS-latest
-          #   test: honggfuzz
-          #   sanitizer: address
-          # TODO fix this
-          # - rust: nightly
-          #   os: macOS-latest
-          #   test: afl
-          #   sanitizer: address
 
     steps:
     - name: Ubuntu setup
@@ -101,23 +65,33 @@ jobs:
 
     - uses: actions/checkout@v3.5.3
 
+    # install stable for kani, cargo-bolero and test runner
     - uses: actions-rs/toolchain@v1.0.7
-      id: toolchain
+      with:
+        toolchain: stable
+        profile: minimal
+
+    - name: Install kani
+      run: |
+        cargo install --locked kani-verifier
+        cargo kani setup
+
+    - uses: actions-rs/toolchain@v1.0.7
       with:
         toolchain: ${{ matrix.rust }}
         profile: minimal
-        override: true
 
     - uses: camshaft/rust-cache@v1
       with:
-        key: ${{ matrix.test }}-${{ matrix.sanitizer }}
+        # kani isn't compatible with sccache
+        wrapper: false
 
-    - name: ${{ matrix.test }}
-      run: make ${{ matrix.test }}
-      env:
-        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
-        AFL_SKIP_CPUFREQ: 1
-        SANITIZER: ${{ matrix.sanitizer }}
+    - name: Setup target rustc
+      if: matrix.rust != 'stable' && matrix.rust != 'nightly'
+      run: echo "TARGET_RUSTC=${{ matrix.rust }}" >> $GITHUB_ENV
+
+    - name: Run tests
+      run: cargo +stable run
 
   kani:
     runs-on: ubuntu-latest
@@ -166,10 +140,10 @@ jobs:
       run: |
         cat <<EOF >> Cargo.toml
         [patch.crates-io]
-        bolero = { path = "../../../../bolero" }
-        bolero-engine = { path = "../../../../bolero-engine" }
-        bolero-generator = { path = "../../../../bolero-generator" }
-        bolero-generator-derive = { path = "../../../../bolero-generator-derive" }
+        bolero = { path = "../../../../lib/bolero" }
+        bolero-engine = { path = "../../../../lib/bolero-engine" }
+        bolero-generator = { path = "../../../../lib/bolero-generator" }
+        bolero-generator-derive = { path = "../../../../lib/bolero-generator-derive" }
         EOF
 
     - uses: camshaft/rust-cache@v1

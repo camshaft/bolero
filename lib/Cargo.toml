@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "bolero",
+    "bolero-*",
+]
+resolver = "2"
+
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1
+
+[profile.release]
+lto = true
+codegen-units = 1
+incremental = false

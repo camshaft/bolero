@@ -1,9 +1,9 @@
-use basic::add;
+use basic::{add, should_panic};
 use bolero::check;
 use std::env;
 
 fn main() {
-    let should_panic = env::var("SHOULD_PANIC").is_ok();
+    let should_panic = should_panic();
 
     check!().for_each(|input| {
         if input.len() < 2 {

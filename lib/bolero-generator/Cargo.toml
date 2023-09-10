@@ -9,6 +9,7 @@ keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
 edition = "2018"
 readme = "README.md"
+rust-version = "1.57.0"
 
 [features]
 default = ["either", "std"]

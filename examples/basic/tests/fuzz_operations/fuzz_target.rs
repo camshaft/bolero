@@ -1,4 +1,5 @@
 use arrayvec::ArrayVec;
+use basic::should_panic;
 use bolero::{check, generator::*};
 use std::collections::LinkedList;
 
@@ -10,11 +11,7 @@ enum Operation {
 }
 
 fn main() {
-    let len = if std::env::var("SHOULD_PANIC").is_ok() {
-        50
-    } else {
-        32
-    };
+    let len = if should_panic() { 50 } else { 32 };
 
     check!()
         .with_generator(gen::<Vec<Operation>>().with().len(0usize..=len))

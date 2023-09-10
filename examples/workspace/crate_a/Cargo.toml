@@ -5,7 +5,7 @@ authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 edition = "2018"
 
 [dev-dependencies]
-bolero = { path = "../../../bolero" }
+bolero = { path = "../../../lib/bolero" }
 
 [[test]]
 name = "fuzz_a"

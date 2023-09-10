@@ -1,0 +1,9 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+rustc_version = "0.4"
+xshell = "0.2"
