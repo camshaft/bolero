@@ -131,11 +131,9 @@ pub mod fuzzer {
             .chain(Some(core::ptr::null())) // add a null pointer to the end
             .collect::<Vec<_>>();
 
-        unsafe {
-            LLVMFuzzerStartTest(args.len() as c_int, c_args.as_ptr());
-        }
+        let res = unsafe { LLVMFuzzerStartTest(args.len() as c_int, c_args.as_ptr()) };
 
-        std::process::exit(0);
+        std::process::exit(res);
     }
 
     #[doc(hidden)]
