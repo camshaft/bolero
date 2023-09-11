@@ -10,3 +10,4 @@ git clone --depth 1 --single-branch --branch $version https://github.com/llvm/ll
 rm -rf "$project_dir/libfuzzer/"
 mv "$tmp_dir/compiler-rt/lib/fuzzer/" "$project_dir/libfuzzer"
 mv "$tmp_dir/compiler-rt/LICENSE.TXT" "$project_dir/libfuzzer/LICENSE.TXT"
+patch -p0 < bolero-fixes.patch
