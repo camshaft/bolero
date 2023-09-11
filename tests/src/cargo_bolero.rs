@@ -4,7 +4,7 @@ use xshell::{cmd, Shell};
 pub fn test() -> Result {
     let rust_version = env::rustc();
 
-    let use_stable = rust_version.major <= 1 && rust_version.minor <= 65;
+    let use_stable = rust_version.map_or(false, |v| v.major > 1 && v.minor <= 65);
 
     Test { use_stable }.run()?;
 

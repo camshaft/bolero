@@ -2,9 +2,7 @@ use crate::{env, Result};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
-    let rust_version = env::rustc();
-
-    let is_nightly = rust_version.build.as_str() == "nightly";
+    let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
     for engine in ["libfuzzer", "afl", "honggfuzz", "kani"] {
         // TODO fix honggfuzz
