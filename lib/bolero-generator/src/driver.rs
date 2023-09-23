@@ -2,7 +2,7 @@ use crate::{
     uniform::{FillBytes, Uniform},
     TypeGenerator,
 };
-use core::ops::{Bound, RangeInclusive};
+use core::ops::Bound;
 use rand_core::RngCore;
 
 #[macro_use]
@@ -12,7 +12,7 @@ mod bytes;
 mod rng;
 
 pub use bytes::ByteSliceDriver;
-pub use rng::{DirectRng, ForcedRng};
+pub use rng::Rng;
 
 macro_rules! gen_method {
     ($name:ident, $ty:ty) => {
@@ -27,9 +27,36 @@ macro_rules! gen_method {
 /// an RNG implementation.
 pub trait Driver: Sized {
     /// Generate a value with type `T`
+    #[inline]
     fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
         T::generate(self)
     }
+
+    #[inline]
+    fn depth_guard<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut Self) -> Option<R>,
+    {
+        let depth = self.depth();
+        if depth == self.max_depth() {
+            return None;
+        }
+
+        let new_depth = depth + 1;
+        self.set_depth(new_depth);
+        let value = f(self);
+        self.set_depth(depth);
+
+        value
+    }
+
+    fn depth(&self) -> usize;
+
+    fn set_depth(&mut self, depth: usize);
+
+    fn max_depth(&self) -> usize;
+
+    fn gen_variant<T: TypeGenerator + Uniform>(&mut self, variants: T, base_case: T) -> Option<T>;
 
     gen_method!(gen_u8, u8);
     gen_method!(gen_i8, i8);
@@ -63,8 +90,9 @@ pub trait Driver: Sized {
     ///
     /// Note that `gen` may be called multiple times with increasing slice lengths, eg. if the
     /// driver is in forced mode.
-    fn gen_from_bytes<Gen, T>(&mut self, len: RangeInclusive<usize>, gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, gen: Gen) -> Option<T>
     where
+        Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>;
 }
 
@@ -78,4 +106,86 @@ pub enum DriverMode {
     /// When the driver bytes are exhausted, the driver will continue to fill input bytes with 0.
     /// This is useful for engines that want to maximize the amount of time spent executing tests.
     Forced,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Options {
+    driver_mode: Option<DriverMode>,
+    shrink_time: Option<core::time::Duration>,
+    max_depth: Option<usize>,
+}
+
+impl Options {
+    pub const DEFAULT_MAX_DEPTH: usize = 32;
+    pub const DEFAULT_SHRINK_TIME: core::time::Duration = core::time::Duration::from_secs(1);
+
+    pub fn with_driver_mode(mut self, driver_mode: DriverMode) -> Self {
+        self.driver_mode = Some(driver_mode);
+        self
+    }
+
+    pub fn with_shrink_time(mut self, shrink_time: core::time::Duration) -> Self {
+        self.shrink_time = Some(shrink_time);
+        self
+    }
+
+    pub fn with_max_depth(mut self, max_depth: usize) -> Self {
+        self.max_depth = Some(max_depth);
+        self
+    }
+
+    pub fn set_driver_mode(&mut self, driver_mode: DriverMode) -> &mut Self {
+        self.driver_mode = Some(driver_mode);
+        self
+    }
+
+    pub fn set_shrink_time(&mut self, shrink_time: core::time::Duration) -> &mut Self {
+        self.shrink_time = Some(shrink_time);
+        self
+    }
+
+    pub fn set_max_depth(&mut self, max_depth: usize) -> &mut Self {
+        self.max_depth = Some(max_depth);
+        self
+    }
+
+    #[inline]
+    pub fn max_depth(&self) -> Option<usize> {
+        self.max_depth
+    }
+
+    #[inline]
+    pub fn shrink_time(&self) -> Option<core::time::Duration> {
+        self.shrink_time
+    }
+
+    #[inline]
+    pub fn driver_mode(&self) -> Option<DriverMode> {
+        self.driver_mode
+    }
+
+    #[inline]
+    pub fn max_depth_or_default(&self) -> usize {
+        self.max_depth.unwrap_or(Self::DEFAULT_MAX_DEPTH)
+    }
+
+    #[inline]
+    pub fn shrink_time_or_default(&self) -> core::time::Duration {
+        self.shrink_time.unwrap_or(Self::DEFAULT_SHRINK_TIME)
+    }
+
+    #[inline]
+    pub fn merge_from(&mut self, other: &Self) {
+        macro_rules! merge {
+            ($name:ident) => {
+                if let Some($name) = other.$name {
+                    self.$name = Some($name);
+                }
+            };
+        }
+
+        merge!(driver_mode);
+        merge!(max_depth);
+        merge!(shrink_time);
+    }
 }

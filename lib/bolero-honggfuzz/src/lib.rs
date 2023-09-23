@@ -6,9 +6,8 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_honggfuzz)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic as bolero_panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test,
+        driver, panic as bolero_panic, ByteSliceTestInput, Engine, Never, TargetLocation, Test,
     };
-    use core::time::Duration;
     use std::{mem::MaybeUninit, slice};
 
     extern "C" {
@@ -16,9 +15,7 @@ pub mod fuzzer {
     }
 
     #[derive(Debug, Default)]
-    pub struct HonggfuzzEngine {
-        driver_mode: Option<DriverMode>,
-    }
+    pub struct HonggfuzzEngine {}
 
     impl HonggfuzzEngine {
         pub fn new(_location: TargetLocation) -> Self {
@@ -29,19 +26,10 @@ pub mod fuzzer {
     impl<T: Test> Engine<T> for HonggfuzzEngine {
         type Output = Never;
 
-        fn set_driver_mode(&mut self, mode: DriverMode) {
-            self.driver_mode = Some(mode);
-        }
-
-        fn set_shrink_time(&mut self, shrink_time: Duration) {
-            // we don't shrink with honggfuzz currently
-            let _ = shrink_time;
-        }
-
-        fn run(self, mut test: T) -> Self::Output {
+        fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             bolero_panic::set_hook();
 
-            let mut input = HonggfuzzInput::new(self.driver_mode);
+            let mut input = HonggfuzzInput::new(options);
 
             loop {
                 if test.test(&mut input.test_input()).is_err() {
@@ -54,13 +42,13 @@ pub mod fuzzer {
     pub struct HonggfuzzInput {
         buf_ptr: MaybeUninit<*const u8>,
         len_ptr: MaybeUninit<usize>,
-        driver_mode: Option<DriverMode>,
+        options: driver::Options,
     }
 
     impl HonggfuzzInput {
-        fn new(driver_mode: Option<DriverMode>) -> Self {
+        fn new(options: driver::Options) -> Self {
             Self {
-                driver_mode,
+                options,
                 buf_ptr: MaybeUninit::uninit(),
                 len_ptr: MaybeUninit::uninit(),
             }
@@ -71,7 +59,7 @@ pub mod fuzzer {
                 HF_ITER(self.buf_ptr.as_mut_ptr(), self.len_ptr.as_mut_ptr());
                 slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init())
             };
-            ByteSliceTestInput::new(input, self.driver_mode)
+            ByteSliceTestInput::new(input, &self.options)
         }
     }
 }

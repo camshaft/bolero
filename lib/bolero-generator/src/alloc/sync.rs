@@ -3,24 +3,28 @@ use alloc::{rc::Rc, sync::Arc};
 
 impl<T: TypeGenerator> TypeGenerator for Arc<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        driver.depth_guard(|driver| Some(Self::new(driver.gen()?)))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        Arc::get_mut(self)
-            .expect("Arc cannot be shared while mutating")
-            .mutate(driver)
+        driver.depth_guard(|driver| {
+            Arc::get_mut(self)
+                .expect("Arc cannot be shared while mutating")
+                .mutate(driver)
+        })
     }
 }
 
 impl<T: TypeGenerator> TypeGenerator for Rc<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        driver.depth_guard(|driver| Some(Self::new(driver.gen()?)))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        Rc::get_mut(self)
-            .expect("Rc cannot be shared while mutating")
-            .mutate(driver)
+        driver.depth_guard(|driver| {
+            Rc::get_mut(self)
+                .expect("Rc cannot be shared while mutating")
+                .mutate(driver)
+        })
     }
 }

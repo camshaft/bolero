@@ -1,7 +1,7 @@
 use crate::{bounded::BoundExt, driver::DriverMode};
 use core::ops::{Bound, RangeBounds};
 
-pub trait Uniform: Sized {
+pub trait Uniform: Sized + PartialEq + Eq + PartialOrd + Ord {
     fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self>;
 }
 

@@ -3,11 +3,11 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 
 impl<T: TypeGenerator> TypeGenerator for Box<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Box::new(driver.gen()?))
+        driver.depth_guard(|driver| Some(Box::new(driver.gen()?)))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        self.as_mut().mutate(driver)
+        driver.depth_guard(|driver| self.as_mut().mutate(driver))
     }
 }
 

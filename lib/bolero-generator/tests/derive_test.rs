@@ -98,3 +98,8 @@ fn derive_enum_test() {
 fn derive_union_test() {
     let _ = generator_no_clone_test!(Union::gen());
 }
+
+#[test]
+fn derive_recursive_test() {
+    let _ = generator_test!(Expr::gen());
+}
