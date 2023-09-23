@@ -20,7 +20,7 @@ extern crate alloc;
 #[macro_use]
 pub mod alloc_generators;
 
-#[cfg(any(test, feature = "std"))]
+#[cfg(any(test, feature = "std", feature = "arbitrary"))]
 extern crate std;
 
 #[cfg(any(test, feature = "std"))]

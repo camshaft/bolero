@@ -1,9 +1,8 @@
 use bolero_engine::{
-    rng::RngEngine, test_failure::TestFailure, ByteSliceTestInput, Engine, Never, TargetLocation,
-    Test,
+    driver, rng::RngEngine, test_failure::TestFailure, ByteSliceTestInput, Engine, Never,
+    TargetLocation, Test,
 };
-use bolero_generator::driver::DriverMode;
-use core::{iter::empty, time::Duration};
+use core::iter::empty;
 use std::path::PathBuf;
 
 mod input;
@@ -15,8 +14,6 @@ use input::*;
 #[derive(Debug)]
 pub struct TestEngine {
     location: TargetLocation,
-    driver_mode: Option<DriverMode>,
-    shrink_time: Option<Duration>,
 }
 
 struct NamedTest {
@@ -27,11 +24,7 @@ struct NamedTest {
 impl TestEngine {
     #[allow(dead_code)]
     pub fn new(location: TargetLocation) -> Self {
-        Self {
-            location,
-            driver_mode: None,
-            shrink_time: None,
-        }
+        Self { location }
     }
 
     fn sub_dir<'a, D: Iterator<Item = &'a str>>(&self, dirs: D) -> PathBuf {
@@ -113,17 +106,24 @@ where
 {
     type Output = Never;
 
-    fn set_driver_mode(&mut self, mode: DriverMode) {
-        self.driver_mode = Some(mode);
-    }
+    fn run(self, mut test: T, options: driver::Options) -> Self::Output {
+        let mut file_options = options.clone();
+        let mut rng_options = options.clone();
 
-    fn set_shrink_time(&mut self, shrink_time: Duration) {
-        self.shrink_time = Some(shrink_time);
-    }
+        // set the driver mode to direct for file replays since they were likely generated with
+        // fuzzers
+        if file_options.driver_mode().is_none() {
+            file_options.set_driver_mode(crate::DriverMode::Direct);
+        }
 
-    fn run(self, mut test: T) -> Self::Output {
-        let driver_mode = self.driver_mode;
-        let shrink_time = self.shrink_time;
+        // set the driver mode to forced so we increase the likelihood of valid generators
+        if rng_options.driver_mode().is_none() {
+            rng_options.set_driver_mode(crate::DriverMode::Forced);
+        }
+
+        let file_options = &file_options;
+        let rng_options = &rng_options;
+
         let mut buffer = vec![];
         let mut testfn = |data: &TestInput| {
             buffer.clear();
@@ -131,10 +131,9 @@ where
                 TestInput::FileTest(file) => {
                     file.read_into(&mut buffer);
 
-                    let mut input = ByteSliceTestInput::new(&buffer, driver_mode);
+                    let mut input = ByteSliceTestInput::new(&buffer, file_options);
                     test.test(&mut input).map_err(|error| {
-                        let shrunken =
-                            test.shrink(buffer.clone(), data.seed(), driver_mode, shrink_time);
+                        let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
                         if let Some(shrunken) = shrunken {
                             format!("{:#}", shrunken)
@@ -151,24 +150,19 @@ where
                     })
                 }
                 TestInput::RngTest(conf) => {
-                    let mut input = conf.input(&mut buffer);
+                    let mut input = conf.input(&mut buffer, rng_options);
                     test.test(&mut input).map_err(|error| {
                         // reseed the input and buffer the rng for shrinking
-                        let mut input = conf.buffered_input(&mut buffer);
+                        let mut input = conf.buffered_input(&mut buffer, rng_options);
                         let _ = test.generate_value(&mut input);
 
-                        let shrunken = test.shrink(
-                            buffer.clone(),
-                            data.seed(),
-                            Some(DriverMode::Forced),
-                            shrink_time,
-                        );
+                        let shrunken = test.shrink(buffer.clone(), data.seed(), rng_options);
 
                         if let Some(shrunken) = shrunken {
                             format!("{:#}", shrunken)
                         } else {
                             buffer.clear();
-                            let mut input = conf.input(&mut buffer);
+                            let mut input = conf.input(&mut buffer, rng_options);
                             let input = test.generate_value(&mut input);
                             format!(
                                 "{:#}",

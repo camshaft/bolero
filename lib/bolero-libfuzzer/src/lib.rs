@@ -6,12 +6,13 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
     use bolero_engine::{
-        panic, ByteSliceTestInput, DriverMode, Engine, Never, TargetLocation, Test, TestFailure,
+        driver, panic, ByteSliceTestInput, Engine, Never, TargetLocation, Test, TestFailure,
     };
     use core::time::Duration;
     use std::{
         ffi::CString,
         os::raw::{c_char, c_int},
+        sync::atomic,
     };
 
     extern "C" {
@@ -24,10 +25,7 @@ pub mod fuzzer {
     static mut TESTFN: Option<TestFn> = None;
 
     #[derive(Debug, Default)]
-    pub struct LibFuzzerEngine {
-        driver_mode: Option<DriverMode>,
-        shrink_time: Option<Duration>,
-    }
+    pub struct LibFuzzerEngine {}
 
     impl LibFuzzerEngine {
         pub fn new(_location: TargetLocation) -> Self {
@@ -41,30 +39,26 @@ pub mod fuzzer {
     {
         type Output = Never;
 
-        fn set_driver_mode(&mut self, mode: DriverMode) {
-            self.driver_mode = Some(mode);
-        }
-
-        fn set_shrink_time(&mut self, shrink_time: Duration) {
-            self.shrink_time = Some(shrink_time);
-        }
-
-        fn run(self, mut test: T) -> Self::Output {
+        fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let driver_mode = self.driver_mode;
+            let options = &options;
+            let mut report = GeneratorReport::default();
+            report.spawn_timer();
 
             start(&mut |slice: &[u8]| -> bool {
-                let mut input = ByteSliceTestInput::new(slice, driver_mode);
+                let mut input = ByteSliceTestInput::new(slice, options);
 
                 match test.test(&mut input) {
-                    Ok(_) => true,
+                    Ok(is_valid) => {
+                        report.on_result(is_valid);
+                        true
+                    }
                     Err(error) => {
                         eprintln!("test failed; shrinking input...");
 
-                        let shrunken =
-                            test.shrink(slice.to_vec(), None, driver_mode, self.shrink_time);
+                        let shrunken = test.shrink(slice.to_vec(), None, options);
 
                         if let Some(shrunken) = shrunken {
                             eprintln!("{:#}", shrunken);
@@ -83,6 +77,55 @@ pub mod fuzzer {
                     }
                 }
             })
+        }
+    }
+
+    #[derive(Default)]
+    struct GeneratorReport {
+        total_runs: u64,
+        window_runs: u64,
+        total_valid: u64,
+        window_valid: u64,
+        should_print: std::sync::Arc<atomic::AtomicBool>,
+    }
+
+    impl GeneratorReport {
+        pub fn spawn_timer(&self) {
+            let should_print = self.should_print.clone();
+            std::thread::spawn(move || {
+                while std::sync::Arc::strong_count(&should_print) > 1 {
+                    std::thread::sleep(Duration::from_secs(1));
+                    should_print.store(true, atomic::Ordering::Relaxed);
+                }
+            });
+        }
+
+        pub fn on_result(&mut self, is_valid: bool) {
+            self.window_runs += 1;
+            if is_valid {
+                self.window_valid += 1;
+            }
+
+            // nothing to report
+            if self.window_runs == self.window_valid {
+                return;
+            }
+
+            if !self.should_print.swap(false, atomic::Ordering::Relaxed) {
+                return;
+            }
+
+            self.total_runs += self.window_runs;
+            self.total_valid += self.window_valid;
+
+            let total_perc = self.total_valid as f32 / self.total_runs as f32 * 100.0;
+            let window_perc = self.window_valid as f32 / self.window_runs as f32 * 100.0;
+            println!(
+                "#{}\tGENERATE\tvalid: {} ({:.2}%) valid/s: {} ({:.2}%)",
+                self.total_runs, self.total_valid, total_perc, self.window_valid, window_perc,
+            );
+            self.window_runs = 0;
+            self.window_valid = 0;
         }
     }
 

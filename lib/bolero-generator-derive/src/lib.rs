@@ -160,7 +160,7 @@ fn generate_enum_type_gen(
 
     let generate_method = quote!(
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            let __bolero_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
+            let __bolero_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
             Some(match __bolero_selection {
                 #(#gen_variants)*
                 _ => unreachable!("Value outside of range"),
@@ -174,7 +174,7 @@ fn generate_enum_type_gen(
                 #(#gen_lookup)*
             };
 
-            let __bolero_new_selection = #krate::ValueGenerator::generate(&(0..#variant_upper), __bolero_driver)?;
+            let __bolero_new_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
 
             if __bolero_prev_selection == __bolero_new_selection {
                 match self {
@@ -226,7 +226,7 @@ fn generate_union_type_gen(
 
     let generate_method = quote!(
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            match #krate::ValueGenerator::generate(&(0..#field_upper), __bolero_driver)? {
+            match __bolero_driver.gen_variant(#field_upper, 0)? {
                 #(#fields,)*
                 _ => unreachable!("Value outside of range"),
             }

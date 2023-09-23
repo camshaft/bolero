@@ -1,5 +1,5 @@
-use bolero_engine::ForcedRngInput;
-use bolero_generator::{driver::ForcedRng, TypeGenerator};
+use bolero_engine::RngInput;
+use bolero_generator::{driver, TypeGenerator};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{io::Read, path::PathBuf};
 
@@ -36,14 +36,22 @@ pub struct RngTest {
 }
 
 impl RngTest {
-    pub fn input<'a>(&self, buffer: &'a mut Vec<u8>) -> ForcedRngInput<'a, StdRng> {
-        ForcedRngInput::new(StdRng::seed_from_u64(self.seed), buffer)
+    pub fn input<'a>(
+        &self,
+        buffer: &'a mut Vec<u8>,
+        options: &'a driver::Options,
+    ) -> RngInput<'a, StdRng> {
+        RngInput::new(StdRng::seed_from_u64(self.seed), buffer, options)
     }
 
-    pub fn buffered_input<'a>(&self, buffer: &'a mut Vec<u8>) -> RngBufferedInput<'a> {
+    pub fn buffered_input<'a>(
+        &self,
+        buffer: &'a mut Vec<u8>,
+        options: &'a driver::Options,
+    ) -> RngBufferedInput<'a> {
         let rng = StdRng::seed_from_u64(self.seed);
         let driver = RngBufferedDriver { rng, buffer };
-        let driver = ForcedRng::new(driver);
+        let driver = driver::Rng::new(driver, options);
         RngBufferedInput {
             driver,
             slice: vec![],
@@ -81,12 +89,12 @@ impl<'a> rand::RngCore for RngBufferedDriver<'a> {
 }
 
 pub struct RngBufferedInput<'a> {
-    driver: ForcedRng<RngBufferedDriver<'a>>,
+    driver: driver::Rng<RngBufferedDriver<'a>>,
     slice: Vec<u8>,
 }
 
 impl<'a, Output> bolero_engine::TestInput<Output> for RngBufferedInput<'a> {
-    type Driver = ForcedRng<RngBufferedDriver<'a>>;
+    type Driver = driver::Rng<RngBufferedDriver<'a>>;
 
     fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
         self.slice.mutate(&mut self.driver);
