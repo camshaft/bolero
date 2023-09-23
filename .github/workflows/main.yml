@@ -86,12 +86,10 @@ jobs:
         # kani isn't compatible with sccache
         wrapper: false
 
-    - name: Setup target rustc
-      if: matrix.rust != 'stable' && matrix.rust != 'nightly'
-      run: echo "TARGET_RUSTC=${{ matrix.rust }}" >> $GITHUB_ENV
-
     - name: Run tests
       run: cargo +stable run
+      env:
+        BOLERO_RUSTUP_TOOLCHAIN: "${{ matrix.rust }}"
 
   kani:
     runs-on: ubuntu-latest
