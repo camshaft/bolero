@@ -15,6 +15,7 @@ mod list;
 mod manifest;
 mod new;
 mod project;
+mod random;
 mod reduce;
 mod selection;
 mod test;

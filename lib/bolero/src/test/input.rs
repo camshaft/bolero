@@ -1,3 +1,5 @@
+#![cfg_attr(fuzzing_random, allow(dead_code))]
+
 use bolero_engine::RngInput;
 use bolero_generator::{driver, TypeGenerator};
 use rand::{rngs::StdRng, SeedableRng};

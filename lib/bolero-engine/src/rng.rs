@@ -2,6 +2,39 @@ use crate::{driver, panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use core::fmt::Debug;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
+#[derive(Clone, Copy)]
+pub struct Options {
+    pub iterations: Option<usize>,
+    pub max_len: Option<usize>,
+    pub seed: Option<u64>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            iterations: get_var("BOLERO_RANDOM_ITERATIONS"),
+            max_len: get_var("BOLERO_RANDOM_MAX_LEN"),
+            seed: get_var("BOLERO_RANDOM_SEED"),
+        }
+    }
+}
+
+impl Options {
+    pub fn iterations_or_default(&self) -> usize {
+        // RNG tests are really slow with miri so we limit the number of iterations
+        self.iterations
+            .unwrap_or(if cfg!(miri) { 25 } else { 1000 })
+    }
+
+    pub fn max_len_or_default(&self) -> usize {
+        self.max_len.unwrap_or(if cfg!(miri) { 1024 } else { 4096 })
+    }
+
+    pub fn seed_or_rand(&self) -> u64 {
+        self.seed.unwrap_or_else(|| rand::thread_rng().next_u64())
+    }
+}
+
 /// Test engine implementation using a RNG.
 ///
 /// The inputs will only be derived from the `seed` field.
@@ -16,28 +49,16 @@ pub struct RngEngine {
 
 impl Default for RngEngine {
     fn default() -> Self {
-        if cfg!(miri) {
-            // RNG tests are really slow with miri so we limit the number of iterations
-            let iterations = get_var("BOLERO_RANDOM_ITERATIONS").unwrap_or(25);
-            let max_len = get_var("BOLERO_RANDOM_MAX_LEN").unwrap_or(1024);
-            let seed =
-                get_var("BOLERO_RANDOM_SEED").unwrap_or_else(|| rand::thread_rng().next_u64());
+        Options::default().into()
+    }
+}
 
-            return Self {
-                iterations,
-                max_len,
-                seed,
-            };
-        }
-
-        let iterations = get_var("BOLERO_RANDOM_ITERATIONS").unwrap_or(1000);
-        let max_len = get_var("BOLERO_RANDOM_MAX_LEN").unwrap_or(4096);
-        let seed = get_var("BOLERO_RANDOM_SEED").unwrap_or_else(|| rand::thread_rng().next_u64());
-
+impl From<Options> for RngEngine {
+    fn from(options: Options) -> Self {
         Self {
-            iterations,
-            max_len,
-            seed,
+            iterations: options.iterations_or_default(),
+            max_len: options.max_len_or_default(),
+            seed: options.seed_or_rand(),
         }
     }
 }
