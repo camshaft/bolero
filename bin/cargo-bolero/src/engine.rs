@@ -14,6 +14,8 @@ pub enum Engine {
 
     #[cfg(feature = "kani")]
     Kani,
+
+    Random,
 }
 
 impl Engine {
@@ -29,6 +31,8 @@ impl Engine {
 
             #[cfg(feature = "kani")]
             Self::Kani => crate::kani::test(selection, args),
+
+            Self::Random => crate::random::test(selection, args),
         }
     }
 
@@ -44,8 +48,25 @@ impl Engine {
 
             #[cfg(feature = "kani")]
             Self::Kani => Ok(()),
+
+            Self::Random => Ok(()),
         }
     }
+}
+
+macro_rules! optional_engine {
+    ($lower:literal, $upper:ident) => {{
+        #[cfg(feature = $lower)]
+        let v = Ok(Self::$upper);
+
+        #[cfg(not(feature = $lower))]
+        let v = Err(format!(
+            "cargo-bolero was not built with `{}` feature",
+            $lower
+        ));
+
+        v
+    }};
 }
 
 impl FromStr for Engine {
@@ -55,16 +76,21 @@ impl FromStr for Engine {
         match value {
             "libfuzzer" => Ok(Self::Libfuzzer),
 
-            #[cfg(feature = "afl")]
-            "afl" => Ok(Self::Afl),
+            "afl" => {
+                optional_engine!("afl", Afl)
+            }
 
-            #[cfg(feature = "honggfuzz")]
-            "honggfuzz" => Ok(Self::Honggfuzz),
+            "honggfuzz" => {
+                optional_engine!("honggfuzz", Honggfuzz)
+            }
 
-            #[cfg(feature = "kani")]
-            "kani" => Ok(Self::Kani),
+            "kani" => {
+                optional_engine!("kani", Kani)
+            }
 
-            _ => Err(format!("invalid fuzzer {:?}", value)),
+            "random" => Ok(Self::Random),
+
+            _ => Err(format!("invalid engine {:?}", value)),
         }
     }
 }

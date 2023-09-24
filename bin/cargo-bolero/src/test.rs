@@ -21,7 +21,7 @@ pub struct Test {
 #[derive(Debug, StructOpt)]
 pub struct Args {
     /// Run the engine with an initial seed
-    #[structopt(short = "S")]
+    #[structopt(short = "S", env = "BOLERO_RANDOM_SEED")]
     pub seed: Option<usize>,
 
     /// Run the engine for a specified number of runs. If unspecified

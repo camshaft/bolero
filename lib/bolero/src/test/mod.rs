@@ -1,12 +1,14 @@
-use bolero_engine::{
-    driver, rng::RngEngine, test_failure::TestFailure, ByteSliceTestInput, Engine, Never,
-    TargetLocation, Test,
-};
+#![cfg_attr(fuzzing_random, allow(dead_code))]
+
+use bolero_engine::{driver, rng, test_failure::TestFailure, Engine, TargetLocation, Test};
 use core::iter::empty;
 use std::path::PathBuf;
 
 mod input;
 use input::*;
+
+#[cfg(any(fuzzing_random, test))]
+mod report;
 
 /// Engine implementation which mimics Rust's default test
 /// harness. By default, the test inputs will include any present
@@ -57,56 +59,106 @@ impl TestEngine {
             })
     }
 
-    fn rng_tests(&self) -> impl Iterator<Item = NamedTest> {
+    fn rng_tests(&self, config: rng::Options) -> impl Iterator<Item = RngTest> {
         use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-        let rng_info = RngEngine::default();
-        let mut seed_rng = StdRng::seed_from_u64(rng_info.seed);
+        let iterations = config.iterations_or_default();
+        let max_len = config.max_len_or_default();
+        let seed = config.seed_or_rand();
+        let mut seed_rng = StdRng::seed_from_u64(seed);
 
-        (0..rng_info.iterations)
-            .scan(rng_info.seed, move |state, _index| {
+        (0..iterations)
+            .scan(seed, move |state, _index| {
                 let seed = *state;
                 *state = seed_rng.next_u64();
                 Some(seed)
             })
-            .map(move |seed| NamedTest {
-                name: format!("[BOLERO_RANDOM_SEED={}]", seed),
-                data: TestInput::RngTest(RngTest {
-                    seed,
-                    max_len: rng_info.max_len,
-                }),
-            })
+            .map(move |seed| input::RngTest { seed, max_len })
     }
 
     fn tests(&self) -> Vec<NamedTest> {
+        let rng_tests = self
+            .rng_tests(Default::default())
+            .map(move |test| NamedTest {
+                name: format!("[BOLERO_RANDOM_SEED={}]", test.seed),
+                data: TestInput::RngTest(test),
+            });
+
         empty()
             .chain(self.file_tests(["crashes"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "crashes"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "hangs"].iter().cloned()))
             .chain(self.file_tests(["corpus"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "queue"].iter().cloned()))
-            .chain(self.rng_tests())
+            .chain(rng_tests)
             .collect()
     }
-}
 
-fn progress() {
-    if cfg!(miri) {
-        use std::io::{stderr, Write};
+    #[cfg(any(fuzzing_random, test))]
+    #[cfg_attr(not(fuzzing_random), allow(dead_code))]
+    fn run_fuzzer<T>(self, mut test: T, options: driver::Options) -> bolero_engine::Never
+    where
+        T: Test,
+        T::Value: core::fmt::Debug,
+    {
+        bolero_engine::panic::set_hook();
+        bolero_engine::panic::forward_panic(false);
 
-        // miri doesn't capture explicit writes to stderr
-        #[allow(clippy::explicit_write)]
-        let _ = write!(stderr(), ".");
+        let options = &options;
+
+        let mut buffer = vec![];
+        let mut testfn = |conf: &input::RngTest| {
+            let mut input = conf.input(&mut buffer, options);
+            test.test(&mut input).map_err(|error| {
+                let seed = Some(conf.seed);
+                // reseed the input and buffer the rng for shrinking
+                let mut input = conf.buffered_input(&mut buffer, options);
+                let _ = test.generate_value(&mut input);
+
+                let shrunken = test.shrink(buffer.clone(), seed, options);
+
+                if let Some(shrunken) = shrunken {
+                    format!("{:#}", shrunken)
+                } else {
+                    buffer.clear();
+                    let mut input = conf.input(&mut buffer, options);
+                    let input = test.generate_value(&mut input);
+                    format!("{:#}", TestFailure { seed, error, input })
+                }
+            })
+        };
+
+        let mut report = report::Report::default();
+        report.spawn_timer();
+
+        let inputs = {
+            let mut config = rng::Options::default();
+            if config.iterations.is_none() {
+                config.iterations = Some(usize::MAX);
+            }
+            self.rng_tests(config)
+        };
+
+        for input in inputs {
+            match testfn(&input) {
+                Ok(is_valid) => {
+                    report.on_result(is_valid);
+                }
+                Err(err) => {
+                    bolero_engine::panic::forward_panic(true);
+                    eprintln!("{}", err);
+                    panic!("test failed");
+                }
+            }
+        }
     }
-}
 
-impl<T: Test> Engine<T> for TestEngine
-where
-    T::Value: core::fmt::Debug,
-{
-    type Output = Never;
-
-    fn run(self, mut test: T, options: driver::Options) -> Self::Output {
+    #[cfg(not(fuzzing_random))]
+    fn run_tests<T>(self, mut test: T, options: driver::Options)
+    where
+        T: Test,
+        T::Value: core::fmt::Debug,
+    {
         let mut file_options = options.clone();
         let mut rng_options = options.clone();
 
@@ -131,7 +183,7 @@ where
                 TestInput::FileTest(file) => {
                     file.read_into(&mut buffer);
 
-                    let mut input = ByteSliceTestInput::new(&buffer, file_options);
+                    let mut input = bolero_engine::ByteSliceTestInput::new(&buffer, file_options);
                     test.test(&mut input).map_err(|error| {
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
@@ -192,5 +244,36 @@ where
                 panic!("test failed: {:?}", test.name);
             }
         }
+
+        fn progress() {
+            if cfg!(miri) {
+                use std::io::{stderr, Write};
+
+                // miri doesn't capture explicit writes to stderr
+                #[allow(clippy::explicit_write)]
+                let _ = write!(stderr(), ".");
+            }
+        }
+    }
+}
+
+impl<T> Engine<T> for TestEngine
+where
+    T: Test,
+    T::Value: core::fmt::Debug,
+{
+    #[cfg(fuzzing_random)]
+    type Output = bolero_engine::Never;
+    #[cfg(not(fuzzing_random))]
+    type Output = ();
+
+    #[cfg(fuzzing_random)]
+    fn run(self, test: T, options: driver::Options) -> Self::Output {
+        self.run_fuzzer(test, options)
+    }
+
+    #[cfg(not(fuzzing_random))]
+    fn run(self, test: T, options: driver::Options) -> Self::Output {
+        self.run_tests(test, options)
     }
 }
