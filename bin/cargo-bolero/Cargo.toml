@@ -46,3 +46,7 @@ name = "fuzz_generator"
 path = "tests/fuzz_generator/fuzz_target.rs"
 harness = false
 
+[[test]]
+name = "fuzz_harnessed"
+path = "tests/fuzz_harnessed/fuzz_target.rs"
+harness = true

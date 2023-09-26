@@ -53,8 +53,9 @@ impl BuildClusterfuzz {
             let list_bin = Path::new(&list_exe).file_name().unwrap().to_string_lossy();
             let dir = PathBuf::from(format!("{}-{:x}", list_bin, hash));
 
-            let fuzz_exe = crate::libfuzzer::build(self.project.clone(), tests[0].test_name.clone())
-                .context("building to-be-fuzzed executable")?;
+            let fuzz_exe =
+                crate::libfuzzer::build(self.project.clone(), tests[0].test_name.clone())
+                    .context("building to-be-fuzzed executable")?;
             // .cargo extension is not an ALLOWED_FUZZ_TARGET_EXTENSIONS for clusterfuzz, so it doesn’t get picked up as a fuzzer
             let fuzz_bin = format!("{}.cargo", fuzz_exe.file_name().unwrap().to_string_lossy());
             tarball
@@ -72,30 +73,30 @@ impl BuildClusterfuzz {
                 let contents = if t.is_harnessed {
                     format!(
                         r#"#!/bin/sh
-    exec \
+exec \
     env BOLERO_TEST_NAME="{1}" \
-        BOLERO_LIBTEST_HARNESS=1 \
-        BOLERO_LIBFUZZER_ARGS="$*" \
-        RUST_BACKTRACE=1 \
-    "$(dirname "$0")/{0}" \
-        "{1}" \
-        --exact \
-        --nocapture \
-        --quiet \
-        --test-threads 1
-    "#,
+    BOLERO_LIBTEST_HARNESS=1 \
+    BOLERO_LIBFUZZER_ARGS="$*" \
+    RUST_BACKTRACE=1 \
+"$(dirname "$0")/{0}" \
+    "{1}" \
+    --exact \
+    --nocapture \
+    --quiet \
+    --test-threads 1
+"#,
                         fuzz_bin, t.test_name,
                     )
                     .into_bytes()
                 } else {
                     format!(
                         r#"#!/bin/sh
-    exec \
-    env BOLERO_TEST_NAME="{1}" \
-        BOLERO_LIBFUZZER_ARGS="$*" \
-        RUST_BACKTRACE=1 \
-    "$(dirname "$0")/{0}"
-    "#,
+exec \
+env BOLERO_TEST_NAME="{1}" \
+    BOLERO_LIBFUZZER_ARGS="$*" \
+    RUST_BACKTRACE=1 \
+"$(dirname "$0")/{0}"
+"#,
                         fuzz_bin, t.test_name,
                     )
                     .into_bytes()
@@ -110,12 +111,12 @@ impl BuildClusterfuzz {
                         format!("adding relay script {:?} to {:?}", path, output_path)
                     })?;
             }
-            tarball
-                .finish()
-                .with_context(|| format!("finishing writing {:?}", output_path))?;
-
-            println!("Built the tarball in {:?}", output_path);
         }
+        tarball
+            .finish()
+            .with_context(|| format!("finishing writing {:?}", output_path))?;
+
+        println!("Built the tarball in {:?}", output_path);
         Ok(())
     }
 }

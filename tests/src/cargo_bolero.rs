@@ -34,14 +34,18 @@ impl Test {
 
         // Validate `cargo bolero build-clusterfuzz` runs fine
         // This runs it in $repo/bin, which is fine as cargo-bolero does have fuzz-tests
-        cmd!(sh, "cargo {toolchain...} run build-clusterfuzz --rustc-bootstrap").run()?;
+        cmd!(
+            sh,
+            "cargo {toolchain...} run build-clusterfuzz --rustc-bootstrap"
+        )
+        .run()?;
 
         // Validate the built fuzzers work fine
         sh.change_dir("target/fuzz");
-        cmd!(sh, "tar xf clusterfuzz.tar").run()?;
-        cmd!(sh, "./fuzzer_cargo-bolero--tests--fuzz_bytes--fuzz_target -runs=10").run()?;
-        cmd!(sh, "./fuzzer_cargo-bolero--tests--fuzz_generator--fuzz_target -runs=10").run()?;
-        cmd!(sh, "./fuzzer_cargo-bolero--tests--fuzz_harnessed--fuzz_target -runs=10").run()?;
+        cmd!(sh, "tar xf clusterfuzz.tar --strip-components=1").run()?;
+        cmd!(sh, "./fuzz_bytes_fuzzer -runs=10").run()?;
+        cmd!(sh, "./fuzz_generator_fuzzer -runs=10").run()?;
+        cmd!(sh, "./harnessed_fuzzer_fuzzer -runs=10").run()?;
 
         Ok(())
     }
