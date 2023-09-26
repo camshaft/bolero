@@ -8,8 +8,6 @@ use std::{
 };
 use structopt::StructOpt;
 
-const OUTPUT_DIR: &str = "target/fuzz";
-
 /// Builds a tarball for uploading to clusterfuzz
 #[derive(Debug, StructOpt)]
 pub struct BuildClusterfuzz {
@@ -19,9 +17,17 @@ pub struct BuildClusterfuzz {
 
 impl BuildClusterfuzz {
     pub fn exec(&self) -> Result<()> {
+        // Find the target directory
+        let output_dir = cargo_metadata::MetadataCommand::new()
+            .exec()
+            .expect("running `cargo metadata`")
+            .target_directory
+            .into_std_path_buf()
+            .join("fuzz");
+
         // Create the output directory, and the archive
-        std::fs::create_dir_all(OUTPUT_DIR).context("creating clusterfuzz build directory")?;
-        let output_path = Path::new(OUTPUT_DIR).join("clusterfuzz.tar");
+        std::fs::create_dir_all(&output_dir).context("creating clusterfuzz build directory")?;
+        let output_path = output_dir.join("clusterfuzz.tar");
         let mut tarball = tar::Builder::new(
             std::fs::File::create(&output_path)
                 .with_context(|| format!("creating {:?}", output_path))?,
