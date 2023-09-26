@@ -39,25 +39,21 @@ impl BuildClusterfuzz {
             .context("listing fuzz targets")?;
         let mut targets_per_exe = HashMap::new();
         for t in targets {
-            assert!(
-                t.is_harnessed,
-                "Non-harnessed tests are not supported for clusterfuzz yet"
-            );
             targets_per_exe
-                .entry(t.exe)
+                .entry(t.exe.clone())
                 .or_insert_with(Vec::new)
-                .push(t.test_name);
+                .push(t);
         }
 
         // Add all the targets to the archive
-        for (list_exe, test_names) in targets_per_exe {
+        for (list_exe, tests) in targets_per_exe {
             let mut hasher = DefaultHasher::new();
             list_exe.hash(&mut hasher);
             let hash = hasher.finish();
             let list_bin = Path::new(&list_exe).file_name().unwrap().to_string_lossy();
             let dir = PathBuf::from(format!("{}-{:x}", list_bin, hash));
 
-            let fuzz_exe = crate::libfuzzer::build(self.project.clone(), test_names[0].clone())
+            let fuzz_exe = crate::libfuzzer::build(self.project.clone(), tests[0].test_name.clone())
                 .context("building to-be-fuzzed executable")?;
             // .cargo extension is not an ALLOWED_FUZZ_TARGET_EXTENSIONS for clusterfuzz, so it doesn’t get picked up as a fuzzer
             let fuzz_bin = format!("{}.cargo", fuzz_exe.file_name().unwrap().to_string_lossy());
@@ -69,27 +65,41 @@ impl BuildClusterfuzz {
                 )
                 .with_context(|| format!("appending {:?} to {:?}", &fuzz_exe, &output_path))?;
 
-            for test_name in test_names {
+            for t in tests {
                 // : is not in VALID_TARGET_NAME_REGEX ; so we don’t use it and make sure to end in _fuzzer so we get picked up as a fuzzer
-                let fuzzer_name = format!("{}_fuzzer", test_name.replace(':', "-"));
+                let fuzzer_name = format!("{}_fuzzer", t.test_name.replace(':', "-"));
                 let path = dir.join(&fuzzer_name);
-                let contents = format!(
-                    r#"#!/bin/sh
-exec \
-env BOLERO_TEST_NAME="{1}" \
-    BOLERO_LIBTEST_HARNESS=1 \
-    BOLERO_LIBFUZZER_ARGS="$*" \
-    RUST_BACKTRACE=1 \
-"$(dirname "$0")/{0}" \
-    "{1}" \
-    --exact \
-    --nocapture \
-    --quiet \
-    --test-threads 1
-"#,
-                    fuzz_bin, test_name,
-                )
-                .into_bytes();
+                let contents = if t.is_harnessed {
+                    format!(
+                        r#"#!/bin/sh
+    exec \
+    env BOLERO_TEST_NAME="{1}" \
+        BOLERO_LIBTEST_HARNESS=1 \
+        BOLERO_LIBFUZZER_ARGS="$*" \
+        RUST_BACKTRACE=1 \
+    "$(dirname "$0")/{0}" \
+        "{1}" \
+        --exact \
+        --nocapture \
+        --quiet \
+        --test-threads 1
+    "#,
+                        fuzz_bin, t.test_name,
+                    )
+                    .into_bytes()
+                } else {
+                    format!(
+                        r#"#!/bin/sh
+    exec \
+    env BOLERO_TEST_NAME="{1}" \
+        BOLERO_LIBFUZZER_ARGS="$*" \
+        RUST_BACKTRACE=1 \
+    "$(dirname "$0")/{0}"
+    "#,
+                        fuzz_bin, t.test_name,
+                    )
+                    .into_bytes()
+                };
                 let mut header = tar::Header::new_gnu();
                 header.set_mode(0o555);
                 header.set_size(contents.len().try_into().unwrap());
