@@ -73,6 +73,7 @@ exec \
 env BOLERO_TEST_NAME="{1}" \
     BOLERO_LIBTEST_HARNESS=1 \
     BOLERO_LIBFUZZER_ARGS="$*" \
+    RUST_BACKTRACE=1 \
 "$(dirname "$0")/{0}" \
     "{1}" \
     --exact \
