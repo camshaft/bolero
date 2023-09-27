@@ -2,7 +2,7 @@ use crate::{driver, panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use core::fmt::Debug;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Options {
     pub iterations: Option<usize>,
     pub max_len: Option<usize>,
