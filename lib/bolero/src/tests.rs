@@ -56,3 +56,14 @@ fn nested_test() {
         // println!("{:?}", input);
     });
 }
+
+#[test]
+fn iteration_number() {
+    // Atomic to avoid having to think about unwind safety
+    use std::sync::atomic::Ordering;
+    let num_iters = std::sync::atomic::AtomicUsize::new(0);
+    check!().with_iterations(5).for_each(|_| {
+        num_iters.fetch_add(1, Ordering::Relaxed);
+    });
+    assert_eq!(num_iters.load(Ordering::Relaxed), 5);
+}

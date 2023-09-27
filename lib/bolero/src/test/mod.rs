@@ -16,6 +16,7 @@ mod report;
 #[derive(Debug)]
 pub struct TestEngine {
     location: TargetLocation,
+    rng_cfg: rng::Options,
 }
 
 struct NamedTest {
@@ -26,7 +27,20 @@ struct NamedTest {
 impl TestEngine {
     #[allow(dead_code)]
     pub fn new(location: TargetLocation) -> Self {
-        Self { location }
+        Self {
+            location,
+            rng_cfg: Default::default(),
+        }
+    }
+
+    pub fn with_iterations(&mut self, iterations: usize) -> &mut Self {
+        self.rng_cfg.iterations = self.rng_cfg.iterations.or(Some(iterations));
+        self
+    }
+
+    pub fn with_max_len(&mut self, max_len: usize) -> &mut Self {
+        self.rng_cfg.max_len = self.rng_cfg.max_len.or(Some(max_len));
+        self
     }
 
     fn sub_dir<'a, D: Iterator<Item = &'a str>>(&self, dirs: D) -> PathBuf {
@@ -59,12 +73,12 @@ impl TestEngine {
             })
     }
 
-    fn rng_tests(&self, config: rng::Options) -> impl Iterator<Item = RngTest> {
+    fn rng_tests(&self) -> impl Iterator<Item = RngTest> {
         use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-        let iterations = config.iterations_or_default();
-        let max_len = config.max_len_or_default();
-        let seed = config.seed_or_rand();
+        let iterations = self.rng_cfg.iterations_or_default();
+        let max_len = self.rng_cfg.max_len_or_default();
+        let seed = self.rng_cfg.seed_or_rand();
         let mut seed_rng = StdRng::seed_from_u64(seed);
 
         (0..iterations)
@@ -77,12 +91,10 @@ impl TestEngine {
     }
 
     fn tests(&self) -> Vec<NamedTest> {
-        let rng_tests = self
-            .rng_tests(Default::default())
-            .map(move |test| NamedTest {
-                name: format!("[BOLERO_RANDOM_SEED={}]", test.seed),
-                data: TestInput::RngTest(test),
-            });
+        let rng_tests = self.rng_tests().map(move |test| NamedTest {
+            name: format!("[BOLERO_RANDOM_SEED={}]", test.seed),
+            data: TestInput::RngTest(test),
+        });
 
         empty()
             .chain(self.file_tests(["crashes"].iter().cloned()))
@@ -96,7 +108,7 @@ impl TestEngine {
 
     #[cfg(any(fuzzing_random, test))]
     #[cfg_attr(not(fuzzing_random), allow(dead_code))]
-    fn run_fuzzer<T>(self, mut test: T, options: driver::Options) -> bolero_engine::Never
+    fn run_fuzzer<T>(mut self, mut test: T, options: driver::Options) -> bolero_engine::Never
     where
         T: Test,
         T::Value: core::fmt::Debug,
@@ -132,11 +144,10 @@ impl TestEngine {
         report.spawn_timer();
 
         let inputs = {
-            let mut config = rng::Options::default();
-            if config.iterations.is_none() {
-                config.iterations = Some(usize::MAX);
+            if self.rng_cfg.iterations.is_none() {
+                self.rng_cfg.iterations = Some(usize::MAX);
             }
-            self.rng_tests(config)
+            self.rng_tests()
         };
 
         for input in inputs {
