@@ -178,11 +178,11 @@ impl<F, G, V> BorrowedGeneratorTest<F, G, V> {
     }
 }
 
-impl<F: RefUnwindSafe + FnMut(&G::Output) -> Ret, G: RefUnwindSafe + ValueGenerator, Ret> Test
+impl<F: RefUnwindSafe + FnMut(&G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for BorrowedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoTestResult,
-    G::Output: RefUnwindSafe + core::fmt::Debug,
+    G::Output: core::fmt::Debug,
 {
     type Value = G::Output;
 
@@ -193,10 +193,11 @@ where
         input.with_driver(&mut |driver| {
             let fun = &mut self.fun;
 
-            let value = generate_value!(self, driver);
+            // The value will not be reused after being captured, so it is unwind safe
+            let value = core::panic::AssertUnwindSafe(generate_value!(self, driver));
 
             panic::catch(|| {
-                let res = (fun)(value);
+                let res = (fun)(*value);
                 match res.into_test_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
@@ -231,11 +232,11 @@ impl<F, G, V> ClonedGeneratorTest<F, G, V> {
     }
 }
 
-impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: RefUnwindSafe + ValueGenerator, Ret> Test
+impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for ClonedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoTestResult,
-    G::Output: RefUnwindSafe + core::fmt::Debug + Clone,
+    G::Output: core::fmt::Debug + Clone,
 {
     type Value = G::Output;
 
@@ -257,7 +258,11 @@ where
             #[cfg(not(kani))]
             let input = value.clone();
 
-            panic::catch(|| {
+            // The value will not be reused after being captured, so it is unwind safe
+            let input = core::panic::AssertUnwindSafe(input);
+
+            panic::catch(move || {
+                let core::panic::AssertUnwindSafe(input) = input;
                 let res = (fun)(input);
                 match res.into_test_result() {
                     Ok(()) => Ok(true),
