@@ -23,12 +23,14 @@ anyhow = "1.0"
 bit-set = "0.5"
 bolero-afl = { version = "0.9", path = "../../lib/bolero-afl", default-features = false, features = ["bin"], optional = true }
 bolero-honggfuzz = { version = "0.9", path = "../../lib/bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
+cargo_metadata = "0.18"
 humantime = "2"
 lazy_static = "1"
 rustc_version = "0.4"
 structopt = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tar = "0.4"
 tempfile = "3"
 
 [dev-dependencies]
@@ -44,3 +46,7 @@ name = "fuzz_generator"
 path = "tests/fuzz_generator/fuzz_target.rs"
 harness = false
 
+[[test]]
+name = "fuzz_harnessed"
+path = "tests/fuzz_harnessed/fuzz_target.rs"
+harness = true

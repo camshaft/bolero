@@ -13,6 +13,10 @@ pub struct Selection {
 }
 
 impl Selection {
+    pub fn new(project: Project, test: String) -> Self {
+        Self { project, test }
+    }
+
     pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
         let mut build_command = self.cmd("test", flags, Some(fuzzer))?;
         build_command

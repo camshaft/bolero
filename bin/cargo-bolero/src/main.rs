@@ -1,10 +1,14 @@
-use crate::{list::List, new::New, reduce::Reduce, selection::Selection, test::Test};
+use crate::{
+    build_clusterfuzz::BuildClusterfuzz, list::List, new::New, reduce::Reduce,
+    selection::Selection, test::Test,
+};
 use anyhow::{anyhow, Result};
 use std::io::Write;
 use structopt::StructOpt;
 
 #[cfg(feature = "afl")]
 mod afl;
+mod build_clusterfuzz;
 mod engine;
 #[cfg(feature = "honggfuzz")]
 mod honggfuzz;
@@ -28,6 +32,7 @@ enum Commands {
     Reduce(Reduce),
     New(New),
     List(List),
+    BuildClusterfuzz(BuildClusterfuzz),
 }
 
 impl Commands {
@@ -37,6 +42,7 @@ impl Commands {
             Self::Reduce(cmd) => cmd.exec(),
             Self::New(cmd) => cmd.exec(),
             Self::List(cmd) => cmd.exec(),
+            Self::BuildClusterfuzz(cmd) => cmd.exec(),
         }
     }
 }
