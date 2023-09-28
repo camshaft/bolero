@@ -6,9 +6,8 @@ value generator for testing and fuzzing
 
 `bolero-generator` is on `crates.io` and can be added to a project like so:
 
-```toml
-[dependencies]
-bolero-generator = "0.9"
+```sh
+$ cargo add --dev bolero-generator
 ```
 
 ## Usage
