@@ -38,7 +38,7 @@ shrink_test!(u32_shrink_test, gen::<u32>(), [255u8; 4], 20, |value| {
 
 shrink_test!(
     vec_shrink_test,
-    gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
+    gen::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     vec![4, 0, 0],
     |value: Vec<u32>| {
@@ -50,7 +50,7 @@ shrink_test!(
 
 shrink_test!(
     non_start_vec_shrink_test,
-    gen::<Vec<u32>>().filter(|vec| vec.len() >= 3),
+    gen::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     vec![0, 5, 0],
     |value: Vec<u32>| {
@@ -61,7 +61,7 @@ shrink_test!(
 
 shrink_test!(
     middle_vec_shrink_test,
-    gen::<Vec<u8>>().filter(|vec| vec.len() >= 3),
+    gen::<Vec<u8>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     vec![1, 1, 1],
     |value: Vec<u8>| {

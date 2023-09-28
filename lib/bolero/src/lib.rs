@@ -291,7 +291,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         map: F,
     ) -> TestTarget<MapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            generator: self.generator.map(map),
+            generator: self.generator.map_gen(map),
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
@@ -307,7 +307,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         T::Output: Debug,
     {
         TestTarget {
-            generator: self.generator.and_then(map),
+            generator: self.generator.and_then_gen(map),
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
@@ -320,7 +320,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         filter: F,
     ) -> TestTarget<FilterGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            generator: self.generator.filter(filter),
+            generator: self.generator.filter_gen(filter),
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
@@ -333,7 +333,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
         filter_map: F,
     ) -> TestTarget<FilterMapGenerator<G, F>, Engine, InputOwnership> {
         TestTarget {
-            generator: self.generator.filter_map(filter_map),
+            generator: self.generator.filter_map_gen(filter_map),
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,

@@ -82,15 +82,6 @@ pub trait ValueGenerator: Sized {
     }
 
     /// Map the value of a generator
-    fn map<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
-        MapGenerator {
-            generator: self,
-            map,
-        }
-    }
-
-    /// Map the value of a generator, exists to reduce conflicts with
-    /// other `map` functions.
     fn map_gen<F: Fn(Self::Output) -> T, T>(self, map: F) -> MapGenerator<Self, F> {
         MapGenerator {
             generator: self,
@@ -99,18 +90,6 @@ pub trait ValueGenerator: Sized {
     }
 
     /// Map the value of a generator with a new generator
-    fn and_then<F: Fn(Self::Output) -> T, T: ValueGenerator>(
-        self,
-        and_then: F,
-    ) -> AndThenGenerator<Self, F> {
-        AndThenGenerator {
-            generator: self,
-            and_then,
-        }
-    }
-
-    /// Map the value of a generator with a new generator, exists to
-    /// reduce conflicts with other `map` functions.
     fn and_then_gen<F: Fn(Self::Output) -> T, T: ValueGenerator>(
         self,
         and_then: F,
@@ -122,15 +101,6 @@ pub trait ValueGenerator: Sized {
     }
 
     /// Filter the value of a generator
-    fn filter<F: Fn(&Self::Output) -> bool>(self, filter: F) -> FilterGenerator<Self, F> {
-        FilterGenerator {
-            generator: self,
-            filter,
-        }
-    }
-
-    /// Filter the value of a generator, exists to
-    /// reduce conflicts with other `filter` functions.
     fn filter_gen<F: Fn(&Self::Output) -> bool>(self, filter: F) -> FilterGenerator<Self, F> {
         FilterGenerator {
             generator: self,
@@ -139,18 +109,6 @@ pub trait ValueGenerator: Sized {
     }
 
     /// Filter the value of a generator and map it to something else
-    fn filter_map<F: Fn(Self::Output) -> Option<T>, T>(
-        self,
-        filter_map: F,
-    ) -> FilterMapGenerator<Self, F> {
-        FilterMapGenerator {
-            generator: self,
-            filter_map,
-        }
-    }
-
-    /// Filter the value of a generator and map it to something else, exists to
-    /// reduce conflicts with other `filter_map` functions.
     fn filter_map_gen<F: Fn(Self::Output) -> Option<T>, T>(
         self,
         filter_map: F,
