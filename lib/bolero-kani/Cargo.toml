@@ -8,7 +8,7 @@ repository = "https://github.com/camshaft/bolero"
 keywords = ["testing", "model", "proof"]
 license = "MIT"
 edition = "2018"
-readme = "../README.md"
+readme = "../../README.md"
 
 [features]
 default = ["lib"]
