@@ -2,7 +2,7 @@
 
 set -ex
 
-version=${1:-release/14.x}
+version=${1:-release/16.x}
 project_dir="$(pwd)"
 tmp_dir="$(mktemp -d)"
 

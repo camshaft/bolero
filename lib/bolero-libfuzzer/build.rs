@@ -23,7 +23,7 @@ fn main() {
         }
 
         build.file("src/FuzzerAPI.cpp");
-        build.flag("-std=c++11");
+        build.flag("-std=c++17");
         build.flag("-fno-omit-frame-pointer");
         build.flag("-w");
         build.cpp(true);
