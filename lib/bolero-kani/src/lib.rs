@@ -51,8 +51,13 @@ pub mod lib {
             let mut input = KaniInput { options };
             match test.test(&mut input) {
                 Ok(was_valid) => {
-                    // make sure the input that we generated was valid
-                    kani::assume(was_valid);
+                    // show if the generator was satisfiable
+                    // TODO fail the harness if it's not: https://github.com/model-checking/kani/issues/2792
+                    #[cfg(kani)]
+                    kani::cover!(
+                        was_valid,
+                        "the generator should produce at least one valid value"
+                    );
                 }
                 Err(_) => {
                     panic!("test failed");
