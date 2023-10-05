@@ -1,6 +1,7 @@
 use crate::{exec, project::Project, reduce, test, Selection};
 use anyhow::{anyhow, Result};
 use bit_set::BitSet;
+use bolero_libafl::RUNTIME_LIBRARY;
 use core::cmp::Ordering;
 use std::{
     fs,
@@ -16,29 +17,55 @@ macro_rules! optional_arg {
     };
 }
 
-const FLAGS: &[&str] = &[
-    "--cfg fuzzing_libfuzzer",
-    "-Cllvm-args=-sanitizer-coverage-level=4",
-    "-Cllvm-args=-sanitizer-coverage-inline-8bit-counters",
-    "-Cllvm-args=-sanitizer-coverage-pc-table",
-    "-Cllvm-args=-sanitizer-coverage-trace-compares",
-    #[cfg(target_os = "linux")]
-    "-Cllvm-args=-sanitizer-coverage-stack-depth",
-];
+const FLAGS: &[&str] = &[];
+
+fn flags<F: FnOnce(&[&str]) -> R, R>(f: F) -> R {
+    let mut flags = vec![
+        "--cfg fuzzing_libafl",
+        "-Cllvm-args=-sanitizer-coverage-inline-8bit-counters",
+        // TODO
+        "-Cllvm-args=-sanitizer-coverage-level=1",
+        "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
+        //"-Cllvm-args=-sanitizer-coverage-pc-table",
+        // "-Cllvm-args=-sanitizer-coverage-trace-compares",
+        //#[cfg(target_os = "linux")]
+        //"-Cllvm-args=-sanitizer-coverage-stack-depth",
+    ];
+
+    // TODO put this in a more permanent place
+    let runtime_out_dir = std::env::current_dir().unwrap();
+
+    std::fs::write(
+        runtime_out_dir.join("libbolero_libafl_runtime.so"),
+        RUNTIME_LIBRARY,
+    )
+    .unwrap();
+
+    let runtime_cfg = format!(
+        "--cfg bolero_libafl_runtime_dir={:?}",
+        runtime_out_dir.display()
+    );
+
+    flags.push(&runtime_cfg);
+
+    f(&flags)
+}
 
 /// test_name needs to be one cargo-bolero test in the binary described by project
 ///
 /// Returns the path to the binary
 pub(crate) fn build(project: Project, test_name: String) -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        Selection::new(project, test_name)
-            .test_target(FLAGS, "libfuzzer")?
-            .exe,
-    ))
+    flags(|flags| {
+        Ok(PathBuf::from(
+            Selection::new(project, test_name)
+                .test_target(flags, "libafl")?
+                .exe,
+        ))
+    })
 }
 
 pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> {
-    let test_target = selection.test_target(FLAGS, "libfuzzer")?;
+    let test_target = flags(|flags| selection.test_target(flags, "libafl"))?;
     let corpus_dir = test_args
         .corpus_dir
         .clone()
@@ -53,6 +80,7 @@ pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> 
 
     let mut cmd = test_target.command();
 
+    /*
     let mut args = vec![
         format!("{}", corpus_dir.display()),
         format!("{}", crashes_dir.display()),
@@ -71,6 +99,7 @@ pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> 
     args.extend(test_args.engine_args.iter().cloned());
 
     cmd.env("BOLERO_LIBFUZZER_ARGS", args.join(" "));
+    */
 
     exec(cmd)?;
 

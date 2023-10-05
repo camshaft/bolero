@@ -8,6 +8,9 @@ cfg_if::cfg_if! {
     if #[cfg(fuzzing_libfuzzer)] {
         /// The default engine used when defining a test target
         pub use bolero_libfuzzer::LibFuzzerEngine as DefaultEngine;
+    } else if #[cfg(fuzzing_libafl)] {
+        /// The default engine used when defining a test target
+        pub use bolero_libafl::LibAflEngine as DefaultEngine;
     } else if #[cfg(fuzzing_afl)] {
         /// The default engine used when defining a test target
         pub use bolero_afl::AflEngine as DefaultEngine;

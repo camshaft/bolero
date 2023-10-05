@@ -4,9 +4,9 @@ pub use bolero_generator::{
     TypeGenerator, ValueGenerator,
 };
 
-#[cfg(not(kani))]
+#[cfg(not(any(kani, fuzzing_libafl)))]
 pub mod panic;
-#[cfg(kani)]
+#[cfg(any(kani, fuzzing_libafl))]
 #[path = "./noop/panic.rs"]
 pub mod panic;
 

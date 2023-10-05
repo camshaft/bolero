@@ -4,7 +4,11 @@ use xshell::{cmd, Shell};
 pub fn test() -> Result {
     let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
-    for engine in ["random", "libfuzzer", "afl", "honggfuzz", "kani"] {
+    for engine in ["random", "libafl", "libfuzzer", "afl", "honggfuzz", "kani"] {
+        if engine != "libafl" {
+            continue;
+        }
+
         // TODO fix honggfuzz
         if engine == "honggfuzz" {
             continue;

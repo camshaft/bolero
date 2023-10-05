@@ -84,7 +84,7 @@ class TracePC {
   void ResetMaps() {
     ValueProfileMap.Reset();
     ClearExtraCounters();
-    ClearInlineCounters();
+    //ClearInlineCounters();
   }
 
   void ClearInlineCounters();
@@ -248,6 +248,7 @@ TracePC::CollectFeatures(Callback HandleFeature) const {
 
   size_t FirstFeature = 0;
 
+  /*
   for (size_t i = 0; i < NumModules; i++) {
     for (size_t r = 0; r < Modules[i].NumRegions; r++) {
       if (!Modules[i].Regions[r].Enabled) continue;
@@ -256,6 +257,7 @@ TracePC::CollectFeatures(Callback HandleFeature) const {
                                              FirstFeature, Handle8bitCounter);
     }
   }
+  */
 
   FirstFeature +=
       8 * ForEachNonZeroByte(ExtraCountersBegin(), ExtraCountersEnd(),

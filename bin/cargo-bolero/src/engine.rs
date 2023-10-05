@@ -6,6 +6,9 @@ use std::str::FromStr;
 pub enum Engine {
     Libfuzzer,
 
+    #[cfg(feature = "libafl")]
+    Libafl,
+
     #[cfg(feature = "afl")]
     Afl,
 
@@ -23,6 +26,9 @@ impl Engine {
         match self {
             Self::Libfuzzer => crate::libfuzzer::test(selection, args),
 
+            #[cfg(feature = "libafl")]
+            Self::Libafl => crate::libafl::test(selection, args),
+
             #[cfg(feature = "afl")]
             Self::Afl => crate::afl::test(selection, args),
 
@@ -39,6 +45,9 @@ impl Engine {
     pub fn reduce(&self, selection: &Selection, args: &reduce::Args) -> Result<()> {
         match self {
             Self::Libfuzzer => crate::libfuzzer::reduce(selection, args),
+
+            #[cfg(feature = "libafl")]
+            Self::Libafl => crate::libafl::reduce(selection, args),
 
             #[cfg(feature = "afl")]
             Self::Afl => crate::afl::reduce(selection, args),
@@ -75,6 +84,9 @@ impl FromStr for Engine {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "libfuzzer" => Ok(Self::Libfuzzer),
+
+            #[cfg(feature = "libafl")]
+            "libafl" => Ok(Self::Libafl),
 
             "afl" => {
                 optional_engine!("afl", Afl)

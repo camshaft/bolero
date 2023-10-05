@@ -1,0 +1,23 @@
+[package]
+name = "bolero-libafl-runtime"
+version = "0.10.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "bolero_libafl_runtime"
+crate-type = ["dylib"]
+
+[dependencies]
+libafl = { version = "0.11", default-features = false, features = ["std", "derive", "introspection", "prelude"] }
+libafl_bolts = { version = "0.11" }
+libafl_targets = { version = "0.11", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "sancov_8bit", "sancov_pcguard"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[workspace]
+members = ["."]

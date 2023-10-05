@@ -14,6 +14,8 @@ mod engine;
 mod honggfuzz;
 #[cfg(feature = "kani")]
 mod kani;
+#[cfg(feature = "libafl")]
+mod libafl;
 mod libfuzzer;
 mod list;
 mod manifest;

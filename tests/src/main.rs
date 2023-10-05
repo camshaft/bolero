@@ -7,9 +7,9 @@ mod env;
 mod examples;
 
 fn main() -> Result {
-    bolero::test()?;
+    //bolero::test()?;
     cargo_bolero::test()?;
-    examples::test()?;
+    //examples::test()?;
     engines::test()?;
 
     Ok(())

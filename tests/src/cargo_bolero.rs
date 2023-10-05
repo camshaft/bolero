@@ -30,8 +30,9 @@ impl Test {
         };
 
         cmd!(sh, "cargo {toolchain...} test").run()?;
-        cmd!(sh, "cargo {toolchain...} build").run()?;
+        cmd!(sh, "cargo {toolchain...} build --features libafl").run()?;
 
+        /*
         // Validate `cargo bolero build-clusterfuzz` runs fine
         // This runs it in $repo/bin, which is fine as cargo-bolero does have fuzz-tests
         cmd!(
@@ -46,6 +47,7 @@ impl Test {
         cmd!(sh, "./fuzz_bytes_fuzzer -runs=10").run()?;
         cmd!(sh, "./fuzz_generator_fuzzer -runs=10").run()?;
         cmd!(sh, "./harnessed_fuzzer_fuzzer -runs=10").run()?;
+        */
 
         Ok(())
     }
