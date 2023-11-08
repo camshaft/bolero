@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "failing_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bolero = { path = "../../../../lib/bolero" }
+
+[profile.fuzz]
+inherits = "dev"

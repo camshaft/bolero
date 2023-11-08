@@ -32,6 +32,17 @@ impl Test {
         cmd!(sh, "cargo {toolchain...} test").run()?;
         cmd!(sh, "cargo {toolchain...} build").run()?;
 
+        // Validate failing tests don’t prevent fuzzers from being found
+        sh.change_dir("cargo-bolero/test_crates/failing_tests");
+        let listed_fuzzers = cmd!(
+            sh,
+            "cargo {toolchain...} run --manifest-path ../../Cargo.toml list"
+        )
+        .read()?;
+        sh.change_dir("../../..");
+        assert!(listed_fuzzers.contains("unit_bolero"));
+        assert!(listed_fuzzers.contains("integ_bolero"));
+
         // Validate `cargo bolero build-clusterfuzz` runs fine
         // This runs it in $repo/bin, which is fine as cargo-bolero does have fuzz-tests
         cmd!(
