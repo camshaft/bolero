@@ -34,7 +34,11 @@ impl Test {
 
         // Validate failing tests don’t prevent fuzzers from being found
         sh.change_dir("cargo-bolero/test_crates/failing_tests");
-        let listed_fuzzers = cmd!(sh, "cargo {toolchain...} run --manifest-path ../../Cargo.toml list").read()?;
+        let listed_fuzzers = cmd!(
+            sh,
+            "cargo {toolchain...} run --manifest-path ../../Cargo.toml list"
+        )
+        .read()?;
         sh.change_dir("../../..");
         assert!(listed_fuzzers.find("unit_bolero").is_some());
         assert!(listed_fuzzers.find("integ_bolero").is_some());
