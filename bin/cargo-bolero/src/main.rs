@@ -2,7 +2,7 @@ use crate::{
     build_clusterfuzz::BuildClusterfuzz, list::List, new::New, reduce::Reduce,
     selection::Selection, test::Test,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use std::io::Write;
 use structopt::StructOpt;
 
@@ -65,7 +65,12 @@ fn main() {
 }
 
 pub(crate) fn exec(mut cmd: std::process::Command) -> Result<()> {
-    cmd.spawn()?.wait()?.status_as_result()
+    cmd.spawn()
+        .with_context(|| format!("spawning command {:?}", cmd))?
+        .wait()
+        .with_context(|| format!("waiting for command {:?}", cmd))?
+        .status_as_result()
+        .with_context(|| format!("getting status result from command {:?}", cmd))
 }
 
 pub(crate) trait StatusAsResult {

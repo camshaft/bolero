@@ -1,5 +1,5 @@
 use crate::{exec, project::Project, test_target::TestTarget, StatusAsResult};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use core::ops::Deref;
 use structopt::StructOpt;
 
@@ -26,15 +26,18 @@ impl Selection {
             .arg("--exact");
         exec(build_command)?;
 
-        let output = self
-            .cmd("test", flags, Some(fuzzer))?
+        let mut output_command = self.cmd("test", flags, Some(fuzzer))?;
+        output_command
             .arg(&self.test)
             .arg("--")
             .arg("--nocapture")
             .arg("--exact")
-            .env("CARGO_BOLERO_SELECT", "one")
-            .output()?
-            .status_as_result()?;
+            .env("CARGO_BOLERO_SELECT", "one");
+        let output = output_command
+            .output()
+            .with_context(|| format!("getting output of command {:?}", output_command))?
+            .status_as_result()
+            .with_context(|| format!("getting status of command {:?}", output_command))?;
 
         TestTarget::from_stdout(&output.stdout)
     }
