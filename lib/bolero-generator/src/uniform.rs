@@ -77,8 +77,6 @@ macro_rules! uniform_int {
                 }
 
                 $({
-                    use core::convert::TryInto;
-
                     // if the range fits in a smaller data type use that instead
                     if let Ok(range_inclusive) = range_inclusive.try_into() {
                         let value: $smaller = Uniform::sample(fill, Bound::Unbounded, Bound::Included(&range_inclusive))?;
