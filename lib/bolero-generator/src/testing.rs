@@ -62,6 +62,19 @@ macro_rules! generator_test {
             }
         }
 
+        {
+            let mut grammar = crate::grammar::Driver::default();
+            ValueGenerator::generate(&gen, &mut grammar);
+            let grammar = grammar.finish();
+            let estimate = grammar.estimate_state_space(&Default::default());
+            dbg!(&grammar);
+            //dbg!(&estimate);
+            dbg!(estimate.eval());
+            let shape = grammar.shape(&Default::default());
+            dbg!(shape.max_outcomes());
+            dbg!(&shape);
+        }
+
         assert_ne!(failed_forced, inputs.len(), "all the forced inputs failed");
 
         ValueGenerator::generate(&gen, &mut rng_driver)

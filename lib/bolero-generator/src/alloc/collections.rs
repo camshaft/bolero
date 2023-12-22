@@ -42,7 +42,7 @@ macro_rules! impl_values_collection_generator {
                 }
             }
 
-            pub fn len<Gen: $crate::ValueGenerator<Output = Len>, Len: Into<usize>>(
+            pub fn len<Gen: $crate::ValueGenerator<Output = usize>>(
                 self,
                 len: Gen,
             ) -> $generator<V, Gen> {
@@ -53,9 +53,8 @@ macro_rules! impl_values_collection_generator {
             }
 
             pub fn map_len<
-                Gen: $crate::ValueGenerator<Output = Len>,
+                Gen: $crate::ValueGenerator<Output = usize>,
                 F: Fn(L) -> Gen,
-                Len: Into<usize>,
             >(
                 self,
                 map: F,
@@ -69,8 +68,7 @@ macro_rules! impl_values_collection_generator {
 
         impl<
                 V: $crate::ValueGenerator,
-                L: $crate::ValueGenerator<Output = Len>,
-                Len: Into<usize>,
+                L: $crate::ValueGenerator<Output = usize>,
             > $crate::ValueGenerator for $generator<V, L>
         $( where V::Output: Sized $(+ $params)*, )?
         {
@@ -83,9 +81,9 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
-
+                driver.enter_list(
+                    ::core::any::type_name::<Self>(),
+                    &self.len, |driver, len| {
                     $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &self.values)?;
 
                     if value.len() != len {
@@ -106,9 +104,9 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
-
+                driver.enter_list(
+                    ::core::any::type_name::<Self>(),
+                    &$default_len_range, |driver, len| {
                     $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
 
                     if self.len() != len {
@@ -145,8 +143,10 @@ macro_rules! impl_values_collection_generator {
             }
 
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
+                driver.enter_list(
+                    ::core::any::type_name::<Self>(),
+                    &$default_len_range, |driver, len| {
+                    // TODO remove the allocation here
                     let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                     let gen_item = $crate::one_of(&generators[..]);
 
@@ -219,7 +219,7 @@ macro_rules! impl_key_values_collection_generator {
                 }
             }
 
-            pub fn len<Gen: $crate::ValueGenerator<Output = Len>, Len: Into<usize>>(
+            pub fn len<Gen: $crate::ValueGenerator<Output = usize>>(
                 self,
                 len: Gen,
             ) -> $generator<K, V, Gen> {
@@ -231,9 +231,8 @@ macro_rules! impl_key_values_collection_generator {
             }
 
             pub fn map_len<
-                Gen: $crate::ValueGenerator<Output = Len>,
+                Gen: $crate::ValueGenerator<Output = usize>,
                 F: Fn(L) -> Gen,
-                Len: Into<usize>,
             >(
                 self,
                 map: F,
@@ -249,8 +248,7 @@ macro_rules! impl_key_values_collection_generator {
         impl<
                 K: $crate::ValueGenerator,
                 V: $crate::ValueGenerator,
-                L: $crate::ValueGenerator<Output = Len>,
-                Len: Into<usize>,
+                L: $crate::ValueGenerator<Output = usize>,
             > $crate::ValueGenerator for $generator<K, V, L>
         $( where K::Output: Sized $(+ $params)*, )?
         {

@@ -166,16 +166,12 @@ pub mod lib {
         }
 
         #[inline]
-        fn gen_variant<T: TypeGenerator + PartialOrd>(
-            &mut self,
-            variants: T,
-            base_case: T,
-        ) -> Option<T> {
+        fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
             if self.depth == self.max_depth {
                 return Some(base_case);
             }
 
-            let selected = self.gen::<T>()?;
+            let selected = self.gen::<usize>()?;
             kani::assume(selected < variants);
             Some(selected)
         }

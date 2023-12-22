@@ -1,6 +1,6 @@
 use crate::{
     uniform::{FillBytes, Uniform},
-    TypeGenerator,
+    TypeGenerator, ValueGenerator,
 };
 use core::ops::Bound;
 use rand_core::RngCore;
@@ -15,8 +15,13 @@ pub use bytes::ByteSliceDriver;
 pub use rng::Rng;
 
 macro_rules! gen_method {
-    ($name:ident, $ty:ty) => {
+    ($name:ident, $constant:ident, $ty:ty) => {
         fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty>;
+
+        #[inline(always)]
+        fn $constant(&mut self, value: $ty) -> Option<$ty> {
+            Some(value)
+        }
     };
 }
 
@@ -56,23 +61,63 @@ pub trait Driver: Sized {
 
     fn max_depth(&self) -> usize;
 
-    fn gen_variant<T: TypeGenerator + Uniform>(&mut self, variants: T, base_case: T) -> Option<T>;
+    #[inline]
+    fn enter_product<F, R>(&mut self, name: &'static str, mut f: F) -> Option<R>
+    where
+        F: FnMut(&mut Self) -> Option<R>,
+    {
+        let _ = name;
+        f(self)
+    }
 
-    gen_method!(gen_u8, u8);
-    gen_method!(gen_i8, i8);
-    gen_method!(gen_u16, u16);
-    gen_method!(gen_i16, i16);
-    gen_method!(gen_u32, u32);
-    gen_method!(gen_i32, i32);
-    gen_method!(gen_u64, u64);
-    gen_method!(gen_i64, i64);
-    gen_method!(gen_u128, u128);
-    gen_method!(gen_i128, i128);
-    gen_method!(gen_usize, usize);
-    gen_method!(gen_isize, isize);
-    gen_method!(gen_f32, f32);
-    gen_method!(gen_f64, f64);
-    gen_method!(gen_char, char);
+    #[inline]
+    fn enter_sum<F, R>(
+        &mut self,
+        name: &'static str,
+        element_names: Option<&'static [&'static str]>,
+        elements: usize,
+        base_case: usize,
+        mut f: F,
+    ) -> Option<R>
+    where
+        F: FnMut(&mut Self, usize) -> Option<R>,
+    {
+        let _ = name;
+        let _ = element_names;
+        let idx = self.gen_variant(elements, base_case)?;
+        f(self, idx)
+    }
+
+    #[inline]
+    fn enter_list<F, L, R>(&mut self, name: &'static str, lens: &L, mut f: F) -> Option<R>
+    where
+        F: FnMut(&mut Self, usize) -> Option<R>,
+        L: ValueGenerator<Output = usize>,
+    {
+        let _ = name;
+        self.depth_guard(|driver| {
+            let len = lens.generate(driver)?;
+            f(driver, len)
+        })
+    }
+
+    fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize>;
+
+    gen_method!(gen_u8, gen_u8_constant, u8);
+    gen_method!(gen_i8, gen_i8_constant, i8);
+    gen_method!(gen_u16, gen_u16_constant, u16);
+    gen_method!(gen_i16, gen_i16_constant, i16);
+    gen_method!(gen_u32, gen_u32_constant, u32);
+    gen_method!(gen_i32, gen_i32_constant, i32);
+    gen_method!(gen_u64, gen_u64_constant, u64);
+    gen_method!(gen_i64, gen_i64_constant, i64);
+    gen_method!(gen_u128, gen_u128_constant, u128);
+    gen_method!(gen_i128, gen_i128_constant, i128);
+    gen_method!(gen_usize, gen_usize_constant, usize);
+    gen_method!(gen_isize, gen_isize_constant, isize);
+    gen_method!(gen_f32, gen_f32_constant, f32);
+    gen_method!(gen_f64, gen_f64_constant, f64);
+    gen_method!(gen_char, gen_char_constant, char);
 
     fn gen_bool(&mut self, probability: Option<f32>) -> Option<bool>;
 

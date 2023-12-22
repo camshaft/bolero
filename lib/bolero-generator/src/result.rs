@@ -15,118 +15,94 @@ macro_rules! impl_either {
         $map_b:ident
     ) => {
         #[derive(Debug, Clone)]
-        pub struct $generator<$A, $B, Selector> {
+        pub struct $generator<$A, $B> {
             a: $A,
             b: $B,
-            selector: Selector,
         }
 
-        impl<$A: ValueGenerator, $B: ValueGenerator, Selector: ValueGenerator<Output = bool>>
-            $generator<$A, $B, Selector>
-        {
+        impl<$A: ValueGenerator, $B: ValueGenerator> $generator<$A, $B> {
             pub fn $with_a<Gen: ValueGenerator<Output = $A::Output>>(
                 self,
                 gen: Gen,
-            ) -> $generator<Gen, $B, Selector> {
-                $generator {
-                    a: gen,
-                    b: self.b,
-                    selector: self.selector,
-                }
+            ) -> $generator<Gen, $B> {
+                $generator { a: gen, b: self.b }
             }
 
             pub fn $map_a<Gen: ValueGenerator<Output = $A::Output>, F: Fn($A) -> Gen>(
                 self,
                 map: F,
-            ) -> $generator<Gen, $B, Selector> {
+            ) -> $generator<Gen, $B> {
                 $generator {
                     a: map(self.a),
                     b: self.b,
-                    selector: self.selector,
                 }
             }
 
             pub fn $with_b<Gen: ValueGenerator<Output = $B::Output>>(
                 self,
                 gen: Gen,
-            ) -> $generator<$A, Gen, Selector> {
-                $generator {
-                    a: self.a,
-                    b: gen,
-                    selector: self.selector,
-                }
+            ) -> $generator<$A, Gen> {
+                $generator { a: self.a, b: gen }
             }
 
             pub fn $map_b<Gen: ValueGenerator<Output = $B::Output>, F: Fn($B) -> Gen>(
                 self,
                 map: F,
-            ) -> $generator<$A, Gen, Selector> {
+            ) -> $generator<$A, Gen> {
                 $generator {
                     a: self.a,
                     b: map(self.b),
-                    selector: self.selector,
-                }
-            }
-
-            pub fn with_selector<Gen: ValueGenerator<Output = bool>>(
-                self,
-                selector: Gen,
-            ) -> $generator<$A, $B, Gen> {
-                $generator {
-                    a: self.a,
-                    b: self.b,
-                    selector,
-                }
-            }
-
-            pub fn map_selector<Gen: ValueGenerator<Output = bool>, F: Fn(Selector) -> Gen>(
-                self,
-                map: F,
-            ) -> $generator<$A, $B, Gen> {
-                $generator {
-                    a: self.a,
-                    b: self.b,
-                    selector: map(self.selector),
                 }
             }
         }
 
-        impl<$A: ValueGenerator, $B: ValueGenerator, Selector: ValueGenerator<Output = bool>>
-            ValueGenerator for $generator<$A, $B, Selector>
-        {
+        impl<$A: ValueGenerator, $B: ValueGenerator> ValueGenerator for $generator<$A, $B> {
             type Output = $ty<$A::Output, $B::Output>;
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                Some(if self.selector.generate(driver)? {
-                    $ty::$A(self.a.generate(driver)?)
-                } else {
-                    $ty::$B(self.b.generate(driver)?)
-                })
+                driver.enter_sum(
+                    ::core::any::type_name::<Self>(),
+                    Some(&[stringify!($A), stringify!($B)]),
+                    2,
+                    0,
+                    |driver, idx| {
+                        if idx == 0 {
+                            Some($ty::$A(self.a.generate(driver)?))
+                        } else {
+                            Some($ty::$B(self.b.generate(driver)?))
+                        }
+                    },
+                )
             }
 
             fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                #[allow(clippy::redundant_pattern_matching)]
-                let prev_selection = match value {
-                    $ty::$A(_) => true,
-                    $ty::$B(_) => false,
-                };
+                driver.enter_sum(
+                    ::core::any::type_name::<Self>(),
+                    Some(&[stringify!($A), stringify!($B)]),
+                    2,
+                    0,
+                    |driver, new_selection| {
+                        #[allow(clippy::redundant_pattern_matching)]
+                        let prev_selection = match value {
+                            $ty::$A(_) => 0,
+                            $ty::$B(_) => 1,
+                        };
 
-                let mut new_selection = prev_selection;
-                self.selector.mutate(driver, &mut new_selection)?;
-
-                if prev_selection == new_selection {
-                    match value {
-                        $ty::$A(value) => self.a.mutate(driver, value),
-                        $ty::$B(value) => self.b.mutate(driver, value),
-                    }
-                } else {
-                    if new_selection {
-                        *value = $ty::$A(self.a.generate(driver)?);
-                    } else {
-                        *value = $ty::$B(self.b.generate(driver)?);
-                    }
-                    Some(())
-                }
+                        if prev_selection == new_selection {
+                            match value {
+                                $ty::$A(value) => self.a.mutate(driver, value),
+                                $ty::$B(value) => self.b.mutate(driver, value),
+                            }
+                        } else {
+                            if new_selection == 0 {
+                                *value = $ty::$A(self.a.generate(driver)?);
+                            } else {
+                                *value = $ty::$B(self.b.generate(driver)?);
+                            }
+                            Some(())
+                        }
+                    },
+                )
             }
         }
 
@@ -143,17 +119,12 @@ macro_rules! impl_either {
         }
 
         impl<$A: TypeGenerator, $B: TypeGenerator> TypeGeneratorWithParams for $ty<$A, $B> {
-            type Output = $generator<
-                TypeValueGenerator<$A>,
-                TypeValueGenerator<$B>,
-                TypeValueGenerator<bool>,
-            >;
+            type Output = $generator<TypeValueGenerator<$A>, TypeValueGenerator<$B>>;
 
             fn gen_with() -> Self::Output {
                 $generator {
                     a: Default::default(),
                     b: Default::default(),
-                    selector: Default::default(),
                 }
             }
         }
@@ -174,85 +145,71 @@ impl_either!(
     map_right
 );
 
-pub struct OptionGenerator<V, Selector> {
+pub struct OptionGenerator<V> {
     value: V,
-    selector: Selector,
 }
 
-impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> OptionGenerator<V, Selector> {
+impl<V: ValueGenerator> OptionGenerator<V> {
     pub fn value<Gen: ValueGenerator<Output = V::Output>>(
         self,
         value: Gen,
-    ) -> OptionGenerator<Gen, Selector> {
-        OptionGenerator {
-            value,
-            selector: self.selector,
-        }
+    ) -> OptionGenerator<Gen> {
+        OptionGenerator { value }
     }
 
     pub fn map_value<Gen: ValueGenerator<Output = V::Output>, F: Fn(V) -> Gen>(
         self,
         map: F,
-    ) -> OptionGenerator<Gen, Selector> {
+    ) -> OptionGenerator<Gen> {
         OptionGenerator {
             value: map(self.value),
-            selector: self.selector,
-        }
-    }
-
-    pub fn selector<Gen: ValueGenerator<Output = bool>>(
-        self,
-        selector: Gen,
-    ) -> OptionGenerator<V, Gen> {
-        OptionGenerator {
-            value: self.value,
-            selector,
-        }
-    }
-
-    pub fn map_selector<Gen: ValueGenerator<Output = bool>, F: Fn(Selector) -> Gen>(
-        self,
-        map: F,
-    ) -> OptionGenerator<V, Gen> {
-        OptionGenerator {
-            value: self.value,
-            selector: map(self.selector),
         }
     }
 }
 
-impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
-    for OptionGenerator<V, Selector>
-{
+impl<V: ValueGenerator> ValueGenerator for OptionGenerator<V> {
     type Output = Option<V::Output>;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        Some(if self.selector.generate(driver)? {
-            Some(self.value.generate(driver)?)
-        } else {
-            None
-        })
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            Some(&["None", "Some"]),
+            2,
+            0,
+            |driver, idx| {
+                if idx == 0 {
+                    Some(None)
+                } else {
+                    Some(Some(self.value.generate(driver)?))
+                }
+            },
+        )
     }
 
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        let prev_selection = value.is_some();
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            Some(&["None", "Some"]),
+            2,
+            0,
+            |driver, new_selection| {
+                let prev_selection = if value.is_some() { 1 } else { 0 };
 
-        let mut new_selection = prev_selection;
-        self.selector.mutate(driver, &mut new_selection)?;
-
-        if prev_selection == new_selection {
-            match value {
-                Some(value) => self.value.mutate(driver, value),
-                None => Some(()),
-            }
-        } else {
-            if new_selection {
-                *value = Some(self.value.generate(driver)?);
-            } else {
-                *value = None;
-            }
-            Some(())
-        }
+                if prev_selection == new_selection {
+                    match value {
+                        Some(value) => self.value.mutate(driver, value),
+                        None => Some(()),
+                    }
+                } else {
+                    if new_selection == 1 {
+                        *value = Some(self.value.generate(driver)?);
+                    } else {
+                        *value = None;
+                    }
+                    Some(())
+                }
+            },
+        )
     }
 }
 
@@ -269,12 +226,11 @@ impl<V: TypeGenerator> TypeGenerator for Option<V> {
 }
 
 impl<V: TypeGenerator> TypeGeneratorWithParams for Option<V> {
-    type Output = OptionGenerator<TypeValueGenerator<V>, TypeValueGenerator<bool>>;
+    type Output = OptionGenerator<TypeValueGenerator<V>>;
 
     fn gen_with() -> Self::Output {
         OptionGenerator {
             value: Default::default(),
-            selector: Default::default(),
         }
     }
 }

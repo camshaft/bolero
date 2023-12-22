@@ -92,7 +92,7 @@ macro_rules! gen_from_bytes {
         }
 
         #[inline]
-        fn gen_variant<T: Uniform>(&mut self, variants: T, base_case: T) -> Option<T> {
+        fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
             match FillBytes::mode(self) {
                 DriverMode::Direct => {
                     Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))

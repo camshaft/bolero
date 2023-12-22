@@ -11,7 +11,7 @@ impl<T: TypeGenerator> TypeGenerator for Box<T> {
     }
 }
 
-impl<T: TypeGenerator> TypeGenerator for Box<[T]> {
+impl<T: 'static + TypeGenerator> TypeGenerator for Box<[T]> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
         Some(driver.gen::<Vec<T>>()?.into_boxed_slice())
     }

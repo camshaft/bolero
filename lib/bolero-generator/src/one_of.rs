@@ -84,13 +84,23 @@ impl<Output, T: ValueGenerator<Output = Output>> OneOfGenerator for &[T] {
     type Output = Output;
 
     fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0..self.len()).generate(driver)?;
-        self[index].generate(driver)
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            self.len(),
+            0,
+            |driver, idx| self[idx].generate(driver),
+        )
     }
 
     fn mutate_one_of<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        let index = (0..self.len()).generate(driver)?;
-        self[index].mutate(driver, value)
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            self.len(),
+            0,
+            |driver, idx| self[idx].mutate(driver, value),
+        )
     }
 }
 
@@ -98,8 +108,13 @@ impl<T: Clone> OneValueOfGenerator for &[T] {
     type Output = T;
 
     fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0..self.len()).generate(driver)?;
-        Some(self[index].clone())
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            self.len(),
+            0,
+            |_driver, idx| Some(self[idx].clone()),
+        )
     }
 
     fn mutate_one_value_of<D: Driver>(
@@ -107,9 +122,71 @@ impl<T: Clone> OneValueOfGenerator for &[T] {
         driver: &mut D,
         value: &mut Self::Output,
     ) -> Option<()> {
-        let index = (0..self.len()).generate(driver)?;
-        *value = self[index].clone();
-        Some(())
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            self.len(),
+            0,
+            |_driver, idx| {
+                *value = self[idx].clone();
+                Some(())
+            },
+        )
+    }
+}
+
+impl<Output, T: ValueGenerator<Output = Output>, const L: usize> OneOfGenerator for [T; L] {
+    type Output = Output;
+
+    fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            L,
+            0,
+            |driver, index| self[index].generate(driver),
+        )
+    }
+
+    fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            L,
+            0,
+            |driver, index| self[index].mutate(driver, value),
+        )
+    }
+}
+
+impl<T: Clone, const L: usize> OneValueOfGenerator for [T; L] {
+    type Output = T;
+
+    fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            L,
+            0,
+            |_driver, index| Some(self[index].clone()),
+        )
+    }
+
+    fn mutate_one_value_of<D: Driver>(
+        &self,
+        driver: &mut D,
+        value: &mut Self::Output,
+    ) -> Option<()> {
+        driver.enter_sum(
+            ::core::any::type_name::<Self>(),
+            None,
+            L,
+            0,
+            |_driver, index| {
+                *value = self[index].clone();
+                Some(())
+            },
+        )
     }
 }
 
@@ -122,64 +199,47 @@ macro_rules! impl_selectors {
             type Output = Output;
 
             fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                match (0u8..=$h_value).generate(driver)? {
-                    $(
-                        $a_value => {
-                            self.$a_value.generate(driver)
-                        },
-                    )*
-                    $h_value => {
-                        self.$h_value.generate(driver)
+                driver.enter_sum(
+                    ::core::any::type_name::<Self>(),
+                    None,
+                    $h_value + 1,
+                    0,
+                    |driver, index| {
+                        match index {
+                            $(
+                                $a_value => {
+                                    self.$a_value.generate(driver)
+                                },
+                            )*
+                            $h_value => {
+                                self.$h_value.generate(driver)
+                            }
+                            _ => unreachable!("generated value out of bounds")
+                        }
                     }
-                    _ => unreachable!("generated value out of bounds")
-                }
+                )
             }
 
             fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
-                match (0u8..=$h_value).generate(driver)? {
-                    $(
-                        $a_value => {
-                            self.$a_value.mutate(driver, value)
-                        },
-                    )*
-                    $h_value => {
-                        self.$h_value.mutate(driver, value)
+                driver.enter_sum(
+                    ::core::any::type_name::<Self>(),
+                    None,
+                    $h_value + 1,
+                    0,
+                    |driver, index| {
+                        match index {
+                            $(
+                                $a_value => {
+                                    self.$a_value.mutate(driver, value)
+                                },
+                            )*
+                            $h_value => {
+                                self.$h_value.mutate(driver, value)
+                            }
+                            _ => unreachable!("generated value out of bounds")
+                        }
                     }
-                    _ => unreachable!("generated value out of bounds")
-                }
-            }
-        }
-
-        impl<Output, T: ValueGenerator<Output = Output>> OneOfGenerator for [T; $h_value + 1] {
-            type Output = Output;
-
-            fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
-                self[index].generate(driver)
-            }
-
-            fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
-                self[index].mutate(driver, value)
-            }
-        }
-
-        impl<T: Clone> OneValueOfGenerator for [T; $h_value + 1] {
-            type Output = T;
-
-            fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
-                Some(self[index].clone())
-            }
-
-            fn mutate_one_value_of<D: Driver>(
-                &self,
-                driver: &mut D,
-                value: &mut Self::Output,
-            ) -> Option<()> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
-                *value = self[index].clone();
-                Some(())
+                )
             }
         }
 

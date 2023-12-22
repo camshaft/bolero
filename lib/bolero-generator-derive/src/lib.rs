@@ -90,14 +90,16 @@ fn generate_struct_type_gen(
 
     let generate_method = quote!(
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            Some(#value)
+            __bolero_driver.enter_product(::core::any::type_name::<Self>(), |__bolero_driver| Some(#value))
         }
     );
     let mutate_method = quote!(
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-            let #destructure = self;
-            #mutate_body
-            Some(())
+            __bolero_driver.enter_product(::core::any::type_name::<Self>(), |__bolero_driver| {
+                let #destructure = self;
+                #mutate_body
+                Some(())
+            })
         }
     );
     (generate_method, mutate_method)
@@ -110,7 +112,17 @@ fn generate_enum_type_gen(
     data_enum: DataEnum,
 ) -> (TokenStream2, TokenStream2) {
     let variant_max = data_enum.variants.len();
-    let variant_upper = lower_type_index(variant_max, variant_max, name.span());
+
+    let variant_names: Vec<_> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let span = variant.span();
+            let name = variant.ident.to_string();
+            quote_spanned!(span=> #name,)
+        })
+        .collect();
+    let variant_names = quote_spanned!(name.span()=> &[#(#variant_names)*]);
 
     let gen_variants: Vec<_> = data_enum
         .variants
@@ -160,33 +172,34 @@ fn generate_enum_type_gen(
 
     let generate_method = quote!(
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            let __bolero_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
-            Some(match __bolero_selection {
-                #(#gen_variants)*
-                _ => unreachable!("Value outside of range"),
+            __bolero_driver.enter_sum(::core::any::type_name::<Self>(), Some(#variant_names), #variant_max, 0, |__bolero_driver, __bolero_selection| {
+                Some(match __bolero_selection {
+                    #(#gen_variants)*
+                    _ => unreachable!("Value outside of range"),
+                })
             })
         }
     );
 
     let mutate_method = quote!(
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-            let __bolero_prev_selection = match self {
-                #(#gen_lookup)*
-            };
-
-            let __bolero_new_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
-
-            if __bolero_prev_selection == __bolero_new_selection {
-                match self {
-                    #(#gen_mutate)*
-                }
-            } else {
-                *self = match __bolero_new_selection {
-                    #(#gen_variants)*
-                    _ => unreachable!("Value outside of range"),
+            __bolero_driver.enter_sum(::core::any::type_name::<Self>(), Some(#variant_names), #variant_max, 0, |__bolero_driver, __bolero_new_selection| {
+                let __bolero_prev_selection = match self {
+                    #(#gen_lookup)*
                 };
-                Some(())
-            }
+
+                if __bolero_prev_selection == __bolero_new_selection {
+                    match self {
+                        #(#gen_mutate)*
+                    }
+                } else {
+                    *self = match __bolero_new_selection {
+                        #(#gen_variants)*
+                        _ => unreachable!("Value outside of range"),
+                    };
+                    Some(())
+                }
+            })
         }
     );
     (generate_method, mutate_method)
@@ -246,18 +259,6 @@ fn lower_type_index(value: usize, max: usize, span: Span) -> TokenStream2 {
         return Error::new(span, "Empty enums cannot be generated").to_compile_error();
     }
 
-    if max < core::u8::MAX as usize {
-        let value = value as u8;
-        return quote_spanned!(span=> #value);
-    }
-
-    if max < core::u16::MAX as usize {
-        let value = value as u16;
-        return quote_spanned!(span=> #value);
-    }
-
-    assert!(max < core::u32::MAX as usize);
-    let value = value as u32;
     quote_spanned!(span=> #value)
 }
 

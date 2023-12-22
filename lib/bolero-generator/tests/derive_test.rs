@@ -47,8 +47,28 @@ pub enum Expr {
     If {
         test_expr: Box<Expr>,
         then_expr: Box<Expr>,
-        else_expr: Box<Expr>,
+        //else_expr: Box<Expr>,
     },
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Person {
+    Normal { sex: Sex, country: Country },
+    Abnormal {},
+    ReallyWeird,
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Sex {
+    Male,
+    Female,
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Country {
+    Us,
+    Mexico,
+    NotUs,
 }
 
 #[derive(Debug, Clone, TypeGenerator, PartialEq)]
@@ -92,6 +112,11 @@ fn derive_struct_test() {
 #[test]
 fn derive_enum_test() {
     let _ = generator_test!(Enum::gen());
+}
+
+#[test]
+fn derive_enum_level_test() {
+    let _ = generator_test!(Person::gen());
 }
 
 #[test]
