@@ -45,6 +45,8 @@ pub mod result;
 pub mod time;
 pub mod tuple;
 
+pub mod grammar;
+
 #[cfg(feature = "arbitrary")]
 pub use crate::arbitrary::gen_arbitrary;
 
