@@ -58,6 +58,7 @@ pub mod lib {
                         was_valid,
                         "the generator should produce at least one valid value"
                     );
+                    let _ = was_valid;
                 }
                 Err(_) => {
                     panic!("test failed");

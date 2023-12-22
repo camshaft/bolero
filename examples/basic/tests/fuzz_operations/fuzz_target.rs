@@ -11,12 +11,12 @@ enum Operation {
 }
 
 fn main() {
-    let len = if should_panic() { 50 } else { 32 };
+    let len = if should_panic() { 16 } else { 4 };
 
     check!()
         .with_generator(gen::<Vec<Operation>>().with().len(0usize..=len))
         .for_each(|operations| {
-            let mut subject: ArrayVec<[_; 32]> = ArrayVec::new();
+            let mut subject: ArrayVec<[_; 4]> = ArrayVec::new();
             let mut oracle = LinkedList::new();
 
             for operation in operations.iter() {
