@@ -88,7 +88,26 @@ impl<T: Copy + fmt::Debug + Eq> Drop for Model<T> {
 
 #[test]
 fn model_test() {
-    check!().with_type::<Vec<Operation<u8>>>().for_each(|ops| {
+    use bolero::generator::bolero_generator::grammar;
+
+    let g = bolero::gen::<Vec<Operation<u8>>>().with().len(0..=8);
+
+    let grammar = grammar::Grammar::from_generator(&g);
+    let options = grammar::Options {
+        max_depth: Some(3),
+        ..Default::default()
+    };
+    dbg!(grammar.estimate_topology(&options));
+    dbg!(grammar.estimate_state_space(&options));
+    let topology = grammar.topology(&options);
+    dbg!(topology.len());
+    for selection in topology.iter() {
+        //dbg!(selection);
+        let _ = selection;
+    }
+    let g = grammar::topology::Generator::new(g, topology);
+
+    check!().with_generator(g).for_each(|ops| {
         let mut model = Model::default();
         for op in ops {
             model.apply(*op);

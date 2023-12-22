@@ -49,6 +49,35 @@ macro_rules! generator_test {
 
         assert_ne!(failed, inputs.len(), "all the inputs failed");
 
+        {
+            let mut grammar = $crate::grammar::Driver::default();
+            ValueGenerator::generate(&gen, &mut grammar);
+            let grammar = grammar.finish();
+            let grammar_opts = $crate::grammar::Options {
+                max_depth: Some(3),
+                ..Default::default()
+            };
+            dbg!(grammar.estimate_state_space(&grammar_opts));
+            dbg!(grammar.estimate_topology(&grammar_opts));
+
+            let topology = grammar.topology(&grammar_opts);
+
+            //assert_eq!(expected_topology, topology.len() as u128, "{topology:#?}");
+
+            let mut selection = $crate::grammar::topology::Selection::default();
+            for node in topology.iter() {
+                node.select(&mut selection);
+                let mut driver = ByteSliceDriver::new(&[], &options);
+                let mut driver = selection.with_driver(&mut driver);
+                let out = ValueGenerator::generate(&gen, &mut driver);
+                if out.is_none() {
+                    panic!("selection returned none {selection:#?}");
+                }
+                dbg!(out);
+                selection.clear();
+            }
+        }
+
         results
     }};
 }
