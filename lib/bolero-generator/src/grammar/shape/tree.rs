@@ -2,11 +2,12 @@ use core::{fmt, ops};
 
 #[derive(Clone)]
 pub struct Tree {
-    events: Vec<(usize, usize)>,
     left: Vec<usize>,
     right: Vec<usize>,
     parents: Vec<usize>,
     heights: Vec<u16>,
+    values: Vec<(usize, usize)>,
+    leaves: Vec<bool>,
     root: usize,
 }
 
@@ -14,11 +15,12 @@ impl Default for Tree {
     #[inline]
     fn default() -> Self {
         Self {
-            events: vec![],
             left: vec![],
             right: vec![],
             parents: vec![],
             heights: vec![],
+            values: vec![],
+            leaves: vec![],
             root: usize::MAX,
         }
     }
@@ -132,9 +134,13 @@ impl Tree {
         }
     }
 
-    fn event(&self, node: usize) -> Option<&(usize, usize)> {
-        let node = &self.events[node];
-        if node.0 == usize::MAX {
+    fn value(&self, node: usize) -> usize {
+        self.values[node].0
+    }
+
+    fn parent_value(&self, node: usize) -> Option<usize> {
+        let node = self.values[node].1;
+        if node == usize::MAX {
             None
         } else {
             Some(node)
@@ -220,22 +226,54 @@ impl Tree {
         }
     }
 
-    fn push(&mut self) -> usize {
-        if self.root == usize::MAX {
-            self.root = self.push_impl();
-        }
-
-        self.push_impl()
-    }
-
-    fn push_impl(&mut self) -> usize {
+    fn push(&mut self, choice: usize, parent_value: usize) -> usize {
         let id = self.heights.len();
         self.heights.push(0);
         self.left.push(usize::MAX);
         self.right.push(usize::MAX);
         self.parents.push(usize::MAX);
-        self.events.push((usize::MAX, 0));
+        self.values.push((choice, parent_value));
+        self.leaves.push(false);
+
         id
+    }
+
+    fn insert_right(&mut self, node: usize, mut parent: usize) {
+        if self.root == usize::MAX {
+            self.root = node;
+            return;
+        }
+
+        if parent == usize::MAX {
+            parent = self.root;
+        }
+
+        while let Some(next) = self.right(parent) {
+            parent = next;
+        }
+        self.right[parent] = node;
+        self.parents[node] = parent;
+
+        //self.rebalance(node);
+    }
+
+    fn insert_left(&mut self, node: usize, mut parent: usize) {
+        if self.root == usize::MAX {
+            self.root = node;
+            return;
+        }
+
+        if parent == usize::MAX {
+            parent = self.root;
+        }
+
+        while let Some(next) = self.left(parent) {
+            parent = next;
+        }
+        self.left[parent] = node;
+        self.parents[node] = parent;
+
+        //self.rebalance(node);
     }
 }
 
@@ -252,8 +290,18 @@ impl<'a> fmt::Debug for Node<'a> {
 
         n.field("height", &tree.heights[self.idx]);
 
-        if let Some(event) = tree.event(self.idx) {
-            n.field("event", event);
+        if tree.leaves[self.idx] {
+            let mut idx = Some(self.idx);
+            let mut path = vec![];
+            while let Some(id) = idx {
+                path.push(tree.value(id));
+                idx = tree.parent_value(id);
+            }
+            path.reverse();
+
+            if !path.is_empty() {
+                n.field("value", &path);
+            }
         }
 
         if let Some(idx) = tree.left(self.idx) {
@@ -269,15 +317,12 @@ impl<'a> fmt::Debug for Node<'a> {
 }
 
 pub trait Output {
-    fn emit(&mut self, index: usize, choice: usize);
+    fn emit(&mut self, choice: usize);
 }
 
 impl Output for Vec<usize> {
-    fn emit(&mut self, index: usize, choice: usize) {
-        // if index >= self.len() {
-        self.resize(index + 1, 0);
-        // }
-        self[index] = choice;
+    fn emit(&mut self, choice: usize) {
+        self.push(choice);
     }
 }
 
@@ -293,13 +338,15 @@ impl Tree {
         let (byte, mut bytes) = bytes.split_at(1);
         let mut byte = byte[0];
         let mut remaining = 8u8;
+        let mut selected = usize::MAX;
+
         while let Some(current) = idx {
             debug_assert!(self.len() > current);
-
-            if let Some((index, choice)) = self.event(current) {
-                o.emit(*index, *choice);
+            if self.leaves[current] {
+                selected = current;
             }
 
+            // eprintln!("{byte:b}, {remaining}, {}", byte >> remaining);
             let value = byte & 0b1 == 1;
             if value {
                 idx = self.right(current);
@@ -317,6 +364,12 @@ impl Tree {
                 remaining = 8;
             }
         }
+
+        while selected != usize::MAX {
+            let (value, parent_value) = self.values[selected];
+            o.emit(value);
+            selected = parent_value;
+        }
     }
 
     pub fn height(&self) -> usize {
@@ -327,62 +380,34 @@ impl Tree {
         }
     }
 
-    pub fn leafs(&self) -> usize {
+    pub fn choices(&self) -> usize {
         self.heights.iter().filter(|v| **v == 0).count()
     }
 
     pub fn bytes(&self) -> usize {
         (self.height() + 7) / 8
     }
-
-    fn insert_right(&mut self, stack: &mut Vec<usize>, node: usize) {
-        let mut parent = usize::MAX;
-
-        if let Some(p) = stack.last().copied() {
-            parent = p;
-        } else {
-            debug_assert_ne!(self.root, usize::MAX);
-            parent = self.root;
-        }
-
-        while let Some(next) = self.right(parent) {
-            parent = next;
-        }
-        debug_assert_eq!(self.right[parent], usize::MAX);
-        debug_assert_eq!(self.parents[node], usize::MAX);
-        self.right[parent] = node;
-        self.parents[node] = parent;
-
-        self.rebalance(node);
-    }
-
-    fn insert_left(&mut self, stack: &mut Vec<usize>, node: usize) {
-        let mut parent = usize::MAX;
-
-        if let Some(p) = stack.last().copied() {
-            parent = p;
-        } else {
-            debug_assert_ne!(self.root, usize::MAX);
-            parent = self.root;
-        }
-
-        while let Some(next) = self.left(parent) {
-            parent = next;
-        }
-        debug_assert_eq!(self.left[parent], usize::MAX);
-        debug_assert_eq!(self.parents[node], usize::MAX);
-        self.left[parent] = node;
-        self.parents[node] = parent;
-
-        self.rebalance(node);
-    }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     tree: Tree,
-    index: usize,
-    stack: Vec<usize>,
+    parent_node: usize,
+    parent_value: usize,
+    is_leaf: bool,
+    insert_left: bool,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            tree: Default::default(),
+            parent_node: usize::MAX,
+            parent_value: usize::MAX,
+            is_leaf: true,
+            insert_left: true,
+        }
+    }
 }
 
 impl Builder {
@@ -398,52 +423,45 @@ impl Builder {
             return f(self, 0);
         }
 
-        let prev_index = self.index;
-        self.index += 1;
-
-        let initial_depth = self.stack.len();
-
-        let mut tmp_stack = vec![];
-
-        let last = choices - 1;
+        let mut parent_node = self.parent_node;
         for choice in 0..choices {
-            match choice {
-                0 => {
-                    let id = self.tree.push();
-                    self.tree.events[id] = (prev_index, choice);
+            let is_first = choice == 0;
+            let is_last = choice == choices - 1;
 
-                    self.tree.insert_left(&mut self.stack, id);
-                    tmp_stack.push(id);
-                }
-                choice if choice == last => {
-                    let id = self.tree.push();
-                    self.tree.events[id] = (prev_index, choice);
-
-                    self.tree.insert_right(&mut self.stack, id);
-                    tmp_stack.push(id);
-                }
-                _ => {
-                    let decision = self.tree.push();
-                    self.tree.insert_right(&mut self.stack, decision);
-                    self.stack.push(decision);
-
-                    let id = self.tree.push();
-                    self.tree.events[id] = (prev_index, choice);
-                    self.tree.insert_left(&mut self.stack, id);
-
-                    self.tree.events[id] = (prev_index, choice);
-                }
+            let new_parent_node;
+            if !is_first {
+                new_parent_node = self.tree.push(choice, self.parent_value);
+                self.tree.insert_right(new_parent_node, parent_node);
+            } else {
+                new_parent_node = parent_node;
             }
-        }
 
-        for (choice, node) in tmp_stack.into_iter().enumerate().rev() {
-            self.stack.push(node);
+            let id;
+            if !is_last {
+                id = self.tree.push(choice, self.parent_node);
+                self.tree.insert_left(id, new_parent_node);
+            } else {
+                id = new_parent_node;
+            }
+
+            let prev_node = core::mem::replace(&mut self.parent_node, id);
+            let prev_value = core::mem::replace(&mut self.parent_value, id);
+
+            self.is_leaf = true;
             f(self, choice);
-            self.stack.pop();
+
+            self.parent_node = prev_node;
+            self.parent_value = prev_value;
+
+            if self.is_leaf {
+                //self.tree.leaves[id] = true;
+                self.tree.leaves[id] = true;
+            }
+
+            parent_node = new_parent_node;
         }
 
-        self.stack.truncate(initial_depth);
-        self.index -= 1;
+        self.is_leaf = false;
     }
 
     pub fn finish(self) -> Tree {
@@ -466,28 +484,103 @@ mod tests {
         });
 
         let tree = builder.finish();
-        dump(&tree);
-        // panic!();
+        check(&tree, &[&[0, 0], &[0, 1], &[1, 0], &[1, 1], &[1, 2]]);
+    }
+
+    fn skew(builder: &mut Builder, limit: usize) {
+        builder.insert(2, |builder, choice| match choice {
+            0 => {}
+            1 if limit == 0 => {}
+            1 => skew(builder, limit - 1),
+            _ => panic!(),
+        })
     }
 
     #[test]
-    fn skew_test() {
+    fn skew_2_test() {
         let mut builder = Builder::default();
 
-        fn skew(builder: &mut Builder, limit: usize) {
-            builder.insert(2, |builder, choice| match choice {
-                0 => {}
-                1 if limit == 0 => {}
-                1 => skew(builder, limit - 1),
-                _ => panic!(),
-            })
-        }
+        skew(&mut builder, 2);
+
+        let tree = builder.finish();
+        check(&tree, &[&[0], &[1, 0], &[1, 1, 0], &[1, 1, 1]]);
+    }
+
+    #[test]
+    fn skew_3_test() {
+        let mut builder = Builder::default();
 
         skew(&mut builder, 3);
 
         let tree = builder.finish();
-        dump(&tree);
-        panic!();
+        check(
+            &tree,
+            &[&[0], &[1, 0], &[1, 1, 0], &[1, 1, 1, 0], &[1, 1, 1, 1]],
+        );
+    }
+
+    #[test]
+    fn skew_4_test() {
+        let mut builder = Builder::default();
+
+        skew(&mut builder, 4);
+
+        let tree = builder.finish();
+        check(
+            &tree,
+            &[
+                &[0],
+                &[1, 0],
+                &[1, 1, 0],
+                &[1, 1, 1, 0],
+                &[1, 1, 1, 1, 0],
+                &[1, 1, 1, 1, 1],
+            ],
+        );
+    }
+
+    #[test]
+    fn balanced_test() {
+        let mut builder = Builder::default();
+
+        builder.insert(2, |builder, choice| match choice {
+            0 => builder.insert(2, |_builder, _choice| {}),
+            1 => builder.insert(2, |_builder, _choice| {}),
+            _ => panic!(),
+        });
+
+        let tree = builder.finish();
+        check(&tree, &[&[0, 0], &[0, 1], &[1, 0], &[1, 1]]);
+    }
+
+    #[test]
+    fn unbalanced_test() {
+        let mut builder = Builder::default();
+
+        builder.insert(2, |builder, choice| match choice {
+            0 => builder.insert(2, |_builder, _choice| {}),
+            1 => builder.insert(10, |_builder, _choice| {}),
+            _ => panic!(),
+        });
+
+        let tree = builder.finish();
+        check(
+            &tree,
+            &[
+                &[0, 0],
+                &[0, 1],
+                &[1, 0],
+                &[1, 1],
+                &[1, 2],
+                &[1, 3],
+                &[1, 4],
+                &[1, 5],
+                &[1, 6],
+                &[1, 7],
+                &[1, 8],
+                &[1, 9],
+            ],
+        );
     }
 
     #[test]
@@ -497,21 +590,20 @@ mod tests {
         builder.insert(8, |_builder, _choice| {});
 
         let tree = builder.finish();
-        dump(&tree);
-        // panic!();
+        check(&tree, &[&[0], &[1], &[2], &[3], &[4], &[5], &[6], &[7]]);
     }
 
-    fn dump(tree: &Tree) {
+    fn check(tree: &Tree, expected: &[&[usize]]) {
         let iterations = 1u64 << tree.height();
-        let leafs = tree.leafs() as u64;
-        eprintln!(
-            "iterations: {iterations}, leafs: {leafs}, duplicates: {}",
-            iterations - leafs
-        );
+        let choices = tree.choices() as u64;
+        eprintln!("iterations: {iterations} choices: {choices}",);
         eprintln!("{tree:#?}");
         let len = tree.bytes();
         let mut out = vec![];
         let dup = 2;
+
+        let mut actual = std::collections::BTreeSet::new();
+
         for v in 0..(iterations * dup) {
             if v == iterations {
                 eprintln!("===");
@@ -519,8 +611,19 @@ mod tests {
             let bytes = v.to_le_bytes();
             let bytes = &bytes[..len];
             tree.traverse(bytes, &mut out);
+            out.reverse();
             eprintln!("{:b} {:?}", v, out);
+            actual.insert(out.clone());
             out.clear();
         }
+
+        for expected in expected {
+            assert!(
+                actual.remove(*expected),
+                "expected {expected:?} to be present"
+            );
+        }
+
+        assert!(actual.is_empty(), "{actual:?}");
     }
 }
