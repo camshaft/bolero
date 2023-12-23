@@ -32,13 +32,10 @@ impl<G: ValueGenerator, H: ValueGenerator, F: Fn(G::Output) -> H> ValueGenerator
     type Output = H::Output;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        driver.enter_product(
-            ::core::any::type_name::<(G::Output, H::Output)>(),
-            |driver| {
-                let value = self.generator.generate(driver)?;
-                (self.and_then)(value).generate(driver)
-            },
-        )
+        driver.enter_product(::core::any::type_name::<Self>(), |driver| {
+            let value = self.generator.generate(driver)?;
+            (self.and_then)(value).generate(driver)
+        })
     }
 }
 
