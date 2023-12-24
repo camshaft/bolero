@@ -2,6 +2,7 @@ use super::*;
 use core::fmt;
 
 pub mod tree;
+pub mod tree2;
 
 #[derive(Clone)]
 pub enum Shape {
