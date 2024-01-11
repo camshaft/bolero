@@ -123,7 +123,7 @@ jobs:
         override: true
 
     - name: Kani run
-      uses: model-checking/kani-github-action@v1.0
+      uses: model-checking/kani-github-action@v1.1
       with:
         working-directory: examples/basic
         args: --tests
