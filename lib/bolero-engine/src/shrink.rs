@@ -96,6 +96,11 @@ impl<'a, T: Test> Shrinker<'a, T> {
                 }
 
                 self.apply_transforms(index, &mut was_changed);
+
+                // put a time limit on the number of shrink attempts
+                if start_time.elapsed() > shrink_time {
+                    break;
+                }
             }
 
             // we made it through all of the transforms without shrinking
