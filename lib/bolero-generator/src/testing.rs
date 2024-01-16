@@ -67,11 +67,11 @@ macro_rules! generator_test {
             ValueGenerator::generate(&gen, &mut grammar);
             let grammar = grammar.finish();
             let estimate = grammar.estimate_state_space(&Default::default());
-            dbg!(&grammar);
+            //dbg!(&grammar);
             //dbg!(&estimate);
             dbg!(estimate.eval());
             let shape = grammar.shape(&Default::default());
-            dbg!(shape.max_outcomes());
+            //dbg!(shape.max_outcomes());
             dbg!(&shape);
         }
 
