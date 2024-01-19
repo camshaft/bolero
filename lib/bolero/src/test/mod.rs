@@ -2,7 +2,6 @@
 
 use bolero_engine::{driver, rng, test_failure::TestFailure, Engine, TargetLocation, Test};
 use core::iter::empty;
-use std::path::PathBuf;
 
 mod input;
 use input::*;
@@ -14,6 +13,7 @@ mod report;
 /// harness. By default, the test inputs will include any present
 /// `corpus` and `crashes` files, as well as generating
 #[derive(Debug)]
+#[cfg_attr(target_os = "unknown", allow(dead_code))]
 pub struct TestEngine {
     location: TargetLocation,
     rng_cfg: rng::Options,
@@ -43,7 +43,8 @@ impl TestEngine {
         self
     }
 
-    fn sub_dir<'a, D: Iterator<Item = &'a str>>(&self, dirs: D) -> PathBuf {
+    #[cfg(not(target_os = "unknown"))]
+    fn sub_dir<'a, D: Iterator<Item = &'a str>>(&self, dirs: D) -> std::path::PathBuf {
         let mut fuzz_target_path = self
             .location
             .work_dir()
@@ -54,11 +55,13 @@ impl TestEngine {
         fuzz_target_path
     }
 
+    #[cfg_attr(target_os = "unknown", allow(unused_variables))]
     fn file_tests<'a, D: Iterator<Item = &'a str> + std::panic::UnwindSafe>(
         &self,
         sub_dirs: D,
     ) -> impl Iterator<Item = NamedTest> {
-        std::fs::read_dir(self.sub_dir(sub_dirs))
+        #[cfg(not(target_os = "unknown"))]
+        let res = std::fs::read_dir(self.sub_dir(sub_dirs))
             .ok()
             .into_iter()
             .flat_map(move |dir| {
@@ -70,7 +73,10 @@ impl TestEngine {
                         name: format!("{}", path.display()),
                         data: TestInput::FileTest(FileTest { path }),
                     })
-            })
+            });
+        #[cfg(target_os = "unknown")]
+        let res = std::iter::empty();
+        res
     }
 
     fn rng_tests(&self) -> impl Iterator<Item = RngTest> {
