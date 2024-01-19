@@ -5,6 +5,7 @@ use bolero_generator::{driver, TypeGenerator};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{io::Read, path::PathBuf};
 
+#[cfg_attr(target_os = "unknown", allow(dead_code))]
 pub enum TestInput {
     FileTest(FileTest),
     RngTest(RngTest),
@@ -19,6 +20,7 @@ impl TestInput {
     }
 }
 
+#[cfg_attr(target_os = "unknown", allow(dead_code))]
 pub struct FileTest {
     pub path: PathBuf,
 }
