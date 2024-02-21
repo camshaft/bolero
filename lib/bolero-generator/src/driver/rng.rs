@@ -116,7 +116,7 @@ impl<R: RngCore> Driver for Rng<R> {
     {
         // Even attempting an alloc of more than 0x10000000000 bytes makes asan crash.
         // LibFuzzer limits memory to 2G (by default) and try_reserve() does not fail in oom situations then.
-        // With all the above, limit memory allocations to 1M at a time here.
+        // With all the above, limit memory allocations to 1M total here.
         const NONSENSICAL_SIZE: usize = 1024 * 1024;
         const ABUSIVE_SIZE: usize = 1024;
         const MIN_INCREASE: usize = 32;
@@ -166,6 +166,9 @@ impl<R: RngCore> Driver for Rng<R> {
                                 Bound::Included(&max_additional_size),
                             )?;
                             len += additional_size;
+                            if len >= NONSENSICAL_SIZE {
+                                return None;
+                            }
                         }
                     }
                 }

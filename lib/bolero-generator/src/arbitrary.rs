@@ -80,4 +80,22 @@ mod tests {
     fn vec() {
         let _ = generator_test!(gen_arbitrary::<Vec<usize>>());
     }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct UnlikelyToBeValid(u128);
+
+    impl<'a> arbitrary::Arbitrary<'a> for UnlikelyToBeValid {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<UnlikelyToBeValid> {
+            let v = u.arbitrary::<u128>()?;
+            if v >= 1024 {
+                return Err(arbitrary::Error::IncorrectFormat);
+            }
+            Ok(UnlikelyToBeValid(v))
+        }
+    }
+
+    #[test]
+    fn unlikely_to_be_valid() {
+        let _ = generator_test!(gen_arbitrary::<UnlikelyToBeValid>());
+    }
 }
