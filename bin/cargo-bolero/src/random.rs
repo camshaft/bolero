@@ -19,6 +19,9 @@ pub(crate) fn test(selection: &Selection, test_args: &test::Args) -> Result<()> 
     optional_arg!(seed, "BOLERO_RANDOM_SEED");
     optional_arg!(runs, "BOLERO_RANDOM_ITERATIONS");
     optional_arg!(max_input_length, "BOLERO_RANDOM_MAX_LEN");
+    if let Some(t) = test_args.time {
+        cmd.env("BOLERO_RANDOM_TEST_TIME_MS", t.as_millis().to_string());
+    }
 
     // TODO implement other options
     /*

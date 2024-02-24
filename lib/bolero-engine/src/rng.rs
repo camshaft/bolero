@@ -1,9 +1,11 @@
 use crate::{driver, panic, ByteSliceTestInput, Engine, TargetLocation, Test};
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use std::time::Instant;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
+    pub test_time: Option<Duration>,
     pub iterations: Option<usize>,
     pub max_len: Option<usize>,
     pub seed: Option<u64>,
@@ -12,6 +14,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            test_time: get_var("BOLERO_RANDOM_TEST_TIME_MS").map(Duration::from_millis),
             iterations: get_var("BOLERO_RANDOM_ITERATIONS"),
             max_len: get_var("BOLERO_RANDOM_MAX_LEN"),
             seed: get_var("BOLERO_RANDOM_SEED"),
@@ -20,10 +23,18 @@ impl Default for Options {
 }
 
 impl Options {
+    pub fn test_time_or_default(&self) -> Duration {
+        self.test_time.unwrap_or_else(|| {
+            if self.iterations.is_some() {
+                Duration::from_secs(3600 * 24 * 365 * 100)
+            } else {
+                Duration::from_secs(1)
+            }
+        })
+    }
+
     pub fn iterations_or_default(&self) -> usize {
-        // RNG tests are really slow with miri so we limit the number of iterations
-        self.iterations
-            .unwrap_or(if cfg!(miri) { 25 } else { 1000 })
+        self.iterations.unwrap_or(usize::MAX)
     }
 
     pub fn max_len_or_default(&self) -> usize {
@@ -42,6 +53,7 @@ impl Options {
 /// enough to find edge cases.
 #[derive(Clone)]
 pub struct RngEngine {
+    pub test_time: Duration,
     pub iterations: usize,
     pub max_len: usize,
     pub seed: u64,
@@ -56,6 +68,7 @@ impl Default for RngEngine {
 impl From<Options> for RngEngine {
     fn from(options: Options) -> Self {
         Self {
+            test_time: options.test_time_or_default(),
             iterations: options.iterations_or_default(),
             max_len: options.max_len_or_default(),
             seed: options.seed_or_rand(),
@@ -68,6 +81,11 @@ impl RngEngine {
     pub fn new(location: TargetLocation) -> Self {
         let _ = location;
         Self::default()
+    }
+
+    /// Set the test time
+    pub fn with_test_time(self, test_time: Duration) -> Self {
+        Self { test_time, ..self }
     }
 
     /// Set the number of test iterations
@@ -97,9 +115,10 @@ where
 
         let mut state = RngState::new(self.seed, self.max_len, options);
 
+        let start_time = Instant::now();
         let mut valid = 0;
         let mut invalid = 0;
-        while valid < self.iterations {
+        while valid < self.iterations && start_time.elapsed() < self.test_time {
             match test.test(&mut state.next_input()) {
                 Ok(true) => {
                     valid += 1;
@@ -108,22 +127,8 @@ where
                 Ok(false) => {
                     invalid += 1;
                     if invalid > self.iterations * 2 {
-                        panic!(
-                            concat!(
-                                "Test input could not be satisfied after {} iterations:\n",
-                                "         valid: {}\n",
-                                "       invalid: {}\n",
-                                "  target count: {}\n",
-                                "\n",
-                                "Try reconfiguring the input generator to produce more valid inputs",
-                            ),
-                            valid + invalid,
-                            valid,
-                            invalid,
-                            self.iterations
-                        );
+                        break;
                     }
-                    continue;
                 }
                 #[cfg(not(miri))]
                 Err(_) => {
@@ -146,6 +151,20 @@ where
                     std::panic::resume_unwind(Box::new(failure));
                 }
             }
+        }
+        if invalid > valid * 2 {
+            panic!(
+                concat!(
+                    "Test input generator had too many rejected inputs after {} iterations:\n",
+                    "         valid: {}\n",
+                    "       invalid: {}\n",
+                    "\n",
+                    "Try reconfiguring the input generator to produce more valid inputs",
+                ),
+                valid + invalid,
+                valid,
+                invalid,
+            );
         }
     }
 }

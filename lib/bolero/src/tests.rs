@@ -53,7 +53,7 @@ fn range_generator_cloned_test() {
 #[test]
 fn nested_test() {
     check!().with_generator(0..=5).for_each(|_input: &u8| {
-        // println!("{:?}", input);
+        // println!("{:?}", _input);
     });
 }
 
@@ -66,4 +66,17 @@ fn iteration_number() {
         num_iters.fetch_add(1, Ordering::Relaxed);
     });
     assert_eq!(num_iters.load(Ordering::Relaxed), 5);
+}
+
+#[test]
+fn with_test_time() {
+    // Atomic to avoid having to think about unwind safety
+    use std::sync::atomic::Ordering;
+    let num_iters = std::sync::atomic::AtomicUsize::new(0);
+    check!()
+        .with_test_time(core::time::Duration::from_millis(5))
+        .for_each(|_| {
+            num_iters.fetch_add(1, Ordering::Relaxed);
+        });
+    assert!(num_iters.load(Ordering::Relaxed) > 10);
 }
