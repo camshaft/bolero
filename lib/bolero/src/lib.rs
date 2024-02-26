@@ -358,6 +358,12 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
 cfg_if::cfg_if! {
     if #[cfg(any(fuzzing, kani))] {
         impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
+            /// Set the maximum runtime of the tests
+            pub fn with_test_time(self, test_time: Duration) -> Self {
+                let _ = test_time;
+                self
+            }
+
             /// Set the number of iterations executed
             pub fn with_iterations(self, iterations: usize) -> Self {
                 let _ = iterations;
@@ -372,6 +378,12 @@ cfg_if::cfg_if! {
         }
     } else {
         impl<G, InputOwnership> TestTarget<G, crate::test::TestEngine, InputOwnership> {
+            /// Set the maximum runtime of the tests
+            pub fn with_test_time(mut self, test_time: Duration) -> Self {
+                self.engine.with_test_time(test_time);
+                self
+            }
+
             /// Set the number of iterations executed
             pub fn with_iterations(mut self, iterations: usize) -> Self {
                 self.engine.with_iterations(iterations);

@@ -1,8 +1,8 @@
 #![cfg_attr(fuzzing_random, allow(dead_code))]
 
 use bolero_engine::{driver, rng, test_failure::TestFailure, Engine, TargetLocation, Test};
-use core::iter::empty;
-use std::path::PathBuf;
+use core::{iter::empty, time::Duration};
+use std::{path::PathBuf, time::Instant};
 
 mod input;
 use input::*;
@@ -31,6 +31,11 @@ impl TestEngine {
             location,
             rng_cfg: Default::default(),
         }
+    }
+
+    pub fn with_test_time(&mut self, test_time: Duration) -> &mut Self {
+        self.rng_cfg.test_time = self.rng_cfg.test_time.or(Some(test_time));
+        self
     }
 
     pub fn with_iterations(&mut self, iterations: usize) -> &mut Self {
@@ -90,7 +95,7 @@ impl TestEngine {
             .map(move |seed| input::RngTest { seed, max_len })
     }
 
-    fn tests(&self) -> Vec<NamedTest> {
+    fn tests(&self) -> impl Iterator<Item = NamedTest> {
         let rng_tests = self.rng_tests().map(move |test| NamedTest {
             name: format!("[BOLERO_RANDOM_SEED={}]", test.seed),
             data: TestInput::RngTest(test),
@@ -103,7 +108,6 @@ impl TestEngine {
             .chain(self.file_tests(["corpus"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "queue"].iter().cloned()))
             .chain(rng_tests)
-            .collect()
     }
 
     #[cfg(any(fuzzing_random, test))]
@@ -246,7 +250,13 @@ impl TestEngine {
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
+        let start_time = Instant::now();
+        let test_time = self.rng_cfg.test_time_or_default();
         for test in tests {
+            if start_time.elapsed() > test_time {
+                break;
+            }
+
             progress();
 
             if let Err(err) = testfn(&test.data) {
