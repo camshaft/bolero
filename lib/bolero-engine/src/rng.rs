@@ -26,7 +26,7 @@ impl Options {
     pub fn test_time_or_default(&self) -> Duration {
         self.test_time.unwrap_or_else(|| {
             if self.iterations.is_some() {
-                Duration::from_secs(3600 * 24 * 365 * 100)
+                Duration::MAX
             } else {
                 Duration::from_secs(1)
             }
