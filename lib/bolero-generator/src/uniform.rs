@@ -226,6 +226,8 @@ impl Uniform for char {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::redundant_closure_call)]
+
     use super::*;
     use core::fmt;
 
@@ -343,9 +345,9 @@ mod tests {
         driver_mode: DriverMode,
         map: impl Fn(u8, u8) -> (Bound<T>, Bound<T>),
     ) {
-        for min in 0..=255 {
-            for max in 0..=255 {
-                let (min_b, max_b) = map(min, max);
+        for min in 0..=T::ENTRIES {
+            for max in 0..=T::ENTRIES {
+                let (min_b, max_b) = map(min as _, max as _);
                 let mut expected = Seen::default();
                 T::fill_expected(min_b, max_b, &mut expected);
 
@@ -353,9 +355,9 @@ mod tests {
                 let max_b = BoundExt::as_ref(&max_b);
 
                 let mut actual = Seen::default();
-                for seed in 0..=255 {
+                for seed in 0..=T::ENTRIES {
                     let mut driver = Byte {
-                        value: Some(seed),
+                        value: Some(seed as _),
                         driver_mode,
                     };
                     let result = T::sample(&mut driver, min_b, max_b);

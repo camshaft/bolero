@@ -20,9 +20,9 @@ macro_rules! backtrace {
 }
 
 thread_local! {
-    static ERROR: RefCell<Option<PanicError>> = RefCell::new(None);
+    static ERROR: RefCell<Option<PanicError>> = const { RefCell::new(None) };
     static CAPTURE_BACKTRACE: RefCell<bool> = RefCell::new(*RUST_BACKTRACE);
-    static FORWARD_PANIC: RefCell<bool> = RefCell::new(true);
+    static FORWARD_PANIC: RefCell<bool> = const { RefCell::new(true) };
     static THREAD_NAME: String = String::from(std::thread::current().name().unwrap_or("main"));
 }
 

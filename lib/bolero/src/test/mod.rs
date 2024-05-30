@@ -176,7 +176,7 @@ impl TestEngine {
         T::Value: core::fmt::Debug,
     {
         let mut file_options = options.clone();
-        let mut rng_options = options.clone();
+        let mut rng_options = options;
 
         // set the driver mode to direct for file replays since they were likely generated with
         // fuzzers

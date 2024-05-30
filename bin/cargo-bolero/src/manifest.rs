@@ -60,7 +60,7 @@ impl Package {
     pub fn resolve(manifest_path: Option<&str>, package: Option<&str>) -> Result<Self> {
         Metadata::from_manifest_path(manifest_path)?
             .resolve_package(package)
-            .map(|package| package.clone())
+            .cloned()
     }
 
     pub fn manifest_dir(&self) -> PathBuf {

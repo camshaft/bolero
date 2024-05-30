@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [1.57.0, stable, nightly]
+        rust: ['1.66.0', stable, nightly]
         os: [ubuntu-latest, macOS-latest]
 
     steps:

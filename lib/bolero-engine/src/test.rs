@@ -197,7 +197,7 @@ where
             let value = core::panic::AssertUnwindSafe(generate_value!(self, driver));
 
             panic::catch(|| {
-                let res = (fun)(*value);
+                let res = (fun)(&value);
                 match res.into_test_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
