@@ -89,6 +89,11 @@ pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()>
 
     let inputs = write_control_file(&mut control_file, &corpus_dir)?;
 
+    // no point in shrinking an empty corpus
+    if inputs.is_empty() {
+        return Ok(());
+    }
+
     let mut cmd = test_target.command();
 
     let mut args = vec![

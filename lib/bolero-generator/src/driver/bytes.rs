@@ -30,31 +30,32 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
 
     #[inline]
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
-        match self.mode {
-            DriverMode::Direct => {
-                if (offset + bytes.len()) > self.input.len() {
-                    None
-                } else {
-                    bytes.copy_from_slice(&self.input[offset..(offset + bytes.len())]);
-                    Some(())
-                }
+        match self.input.len().checked_sub(offset) {
+            None | Some(0) => {
+                // no bytes left so fill in zeros
+                bytes.fill(0);
             }
-            DriverMode::Forced => {
-                if offset < self.input.len() {
-                    let copy_len = core::cmp::min(bytes.len(), self.input.len() - offset);
-                    bytes[..copy_len].copy_from_slice(&self.input[offset..(offset + copy_len)]);
-                    bytes[copy_len..].fill(0);
-                } else {
-                    bytes.fill(0);
-                }
-                Some(())
+            Some(remaining_len) if remaining_len >= bytes.len() => {
+                let input = &self.input[offset..];
+                let input = &input[..bytes.len()];
+                bytes.copy_from_slice(input);
+            }
+            Some(remaining_len) => {
+                let input = &self.input[offset..];
+                // we don't have enough bytes to fill the whole output
+                let (head, tail) = bytes.split_at_mut(remaining_len);
+                head.copy_from_slice(input);
+                tail.fill(0);
             }
         }
+
+        Some(())
     }
 
     #[inline]
     fn consume_bytes(&mut self, consumed: usize) {
-        self.input = &self.input[core::cmp::min(consumed, self.input.len())..];
+        let consumed = consumed.min(self.input.len());
+        self.input = &self.input[consumed..];
     }
 }
 
