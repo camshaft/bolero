@@ -12,7 +12,7 @@ readme = "../../README.md"
 rust-version = "1.57.0"
 
 [features]
-rng = ["rand", "bolero-generator/alloc"]
+rng = ["rand", "rand_xoshiro", "bolero-generator/alloc"]
 
 [dependencies]
 anyhow = "1"
@@ -20,6 +20,7 @@ bolero-generator = { version = "0.10", path = "../bolero-generator", default-fea
 lazy_static = "1"
 pretty-hex = "0.3"
 rand = { version = "0.8", optional = true }
+rand_xoshiro = { version = "0.6", optional = true }
 
 [target.'cfg(not(kani))'.dependencies]
 backtrace = { version = "0.3", default-features = false, features = ["std"] }
@@ -27,3 +28,4 @@ backtrace = { version = "0.3", default-features = false, features = ["std"] }
 [dev-dependencies]
 bolero-generator = { path = "../bolero-generator", features = ["std"] }
 rand = "^0.8"
+rand_xoshiro = "0.6"

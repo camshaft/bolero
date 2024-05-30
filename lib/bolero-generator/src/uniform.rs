@@ -3,6 +3,7 @@ use core::ops::{Bound, RangeBounds};
 
 pub trait Uniform: Sized + PartialEq + Eq + PartialOrd + Ord {
     fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self>;
+    fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self>;
 }
 
 pub trait FillBytes {
@@ -19,8 +20,15 @@ pub trait FillBytes {
 }
 
 macro_rules! uniform_int {
-    ($ty:ident, $unsigned:ident $(, $smaller:ident)?) => {
+    ($ty:ident, $unsigned:ident $(, $smaller:ident)*) => {
         impl Uniform  for $ty {
+            #[inline(always)]
+            fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<$ty> {
+                let mut bytes = [0u8; core::mem::size_of::<$ty>()];
+                fill.fill_bytes(&mut bytes)?;
+                return Some(<$ty>::from_le_bytes(bytes));
+            }
+
             #[inline]
             fn sample<F: FillBytes>(fill: &mut F, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
                 match (min, max) {
@@ -45,17 +53,9 @@ macro_rules! uniform_int {
                     | (Bound::Unbounded, Bound::Included(&$ty::MAX))
                     | (Bound::Included(&$ty::MIN), Bound::Unbounded)
                     | (Bound::Included(&$ty::MIN), Bound::Included(&$ty::MAX)) => {
-                        let mut bytes = [0u8; core::mem::size_of::<$ty>()];
-                        fill.fill_bytes(&mut bytes)?;
-                        return Some(<$ty>::from_le_bytes(bytes));
+                        return Self::sample_unbound(fill);
                     }
                     _ => {}
-                }
-
-                // if we're in direct mode, just sample a value and check if it's within the provided range
-                if fill.mode() == DriverMode::Direct {
-                    return Self::sample(fill, Bound::Unbounded, Bound::Unbounded)
-                        .filter(|value| (min, max).contains(value));
                 }
 
                 let lower = match min {
@@ -90,16 +90,15 @@ macro_rules! uniform_int {
 
                         return Some(value);
                     }
-                })?
+                })*
 
-                let value: $unsigned = Uniform::sample(fill, Bound::Unbounded, Bound::Unbounded)?;
+                let value: $unsigned = Uniform::sample_unbound(fill)?;
 
                 if cfg!(test) {
                     assert!(range_inclusive < $unsigned::MAX, "range inclusive should always be less than the max value");
                 }
                 let range_exclusive = range_inclusive.wrapping_add(1);
-                // TODO make this less biased
-                let value = value % range_exclusive;
+                let value = value.scale(range_exclusive);
                 let value = value as $ty;
                 let value = lower.wrapping_add(value);
 
@@ -118,23 +117,77 @@ uniform_int!(u8, u8);
 uniform_int!(i8, u8);
 uniform_int!(u16, u16, u8);
 uniform_int!(i16, u16, u8);
-uniform_int!(u32, u32, u16);
-uniform_int!(i32, u32, u16);
-uniform_int!(u64, u64, u32);
-uniform_int!(i64, u64, u32);
-uniform_int!(u128, u128, u64);
-uniform_int!(i128, u128, u64);
-uniform_int!(usize, usize, u64);
-uniform_int!(isize, usize, u64);
+uniform_int!(u32, u32, u8, u16);
+uniform_int!(i32, u32, u8, u16);
+uniform_int!(u64, u64, u8, u16, u32);
+uniform_int!(i64, u64, u8, u16, u32);
+uniform_int!(usize, usize, u8, u16, u32);
+uniform_int!(isize, usize, u8, u16, u32);
+uniform_int!(u128, u128, u8, u16, u32, u64);
+uniform_int!(i128, u128, u8, u16, u32, u64);
+
+trait Scaled: Sized {
+    fn scale(self, range: Self) -> Self;
+}
+
+macro_rules! scaled {
+    ($s:ty, $upper:ty) => {
+        impl Scaled for $s {
+            #[inline(always)]
+            fn scale(self, range: Self) -> Self {
+                // similar approach to Lemire random sampling
+                // see https://lemire.me/blog/2019/06/06/nearly-divisionless-random-integer-generation-on-various-systems/
+                let m = self as $upper * range as $upper;
+                (m >> Self::BITS) as Self
+            }
+        }
+    };
+}
+
+scaled!(u8, u16);
+scaled!(u16, u32);
+scaled!(u32, u64);
+scaled!(u64, u128);
+scaled!(usize, u128);
+
+impl Scaled for u128 {
+    #[inline(always)]
+    fn scale(self, range: Self) -> Self {
+        // adapted from mulddi3 https://github.com/llvm/llvm-project/blob/6a3982f8b7e37987659706cb3e6427c54c9bc7ce/compiler-rt/lib/builtins/multi3.c#L19
+        const BITS_IN_DWORD_2: u32 = 64;
+        const LOWER_MASK: u128 = u128::MAX >> BITS_IN_DWORD_2;
+
+        let a = self;
+        let b = range;
+
+        let mut low = (a & LOWER_MASK) * (b & LOWER_MASK);
+        let mut t = low >> BITS_IN_DWORD_2;
+        low &= LOWER_MASK;
+        t += (a >> BITS_IN_DWORD_2) * (b & LOWER_MASK);
+        low += (t & LOWER_MASK) << BITS_IN_DWORD_2;
+        let mut high = t >> BITS_IN_DWORD_2;
+        t = low >> BITS_IN_DWORD_2;
+        low &= LOWER_MASK;
+        t += (b >> BITS_IN_DWORD_2) * (a & LOWER_MASK);
+        low += (t & LOWER_MASK) << BITS_IN_DWORD_2;
+        high += t >> BITS_IN_DWORD_2;
+        high += (a >> BITS_IN_DWORD_2) * (b >> BITS_IN_DWORD_2);
+
+        // discard the low bits
+        let _ = low;
+
+        high
+    }
+}
 
 impl Uniform for char {
+    #[inline(always)]
+    fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self> {
+        Self::sample(fill, Bound::Unbounded, Bound::Unbounded)
+    }
+
     #[inline]
     fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self> {
-        if fill.mode() == DriverMode::Direct {
-            let value = u32::sample(fill, Bound::Unbounded, Bound::Unbounded)?;
-            return char::from_u32(value);
-        }
-
         const START: u32 = 0xD800;
         const LEN: u32 = 0xE000 - START;
 
@@ -174,6 +227,15 @@ impl Uniform for char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::fmt;
+
+    #[test]
+    fn scaled_u128_test() {
+        assert_eq!(0u128.scale(3), 0);
+        assert_eq!(u128::MAX.scale(3), 2);
+        assert_eq!((u128::MAX - 1).scale(3), 2);
+        assert_eq!((u128::MAX / 2).scale(3), 1);
+    }
 
     #[derive(Clone, Copy, Debug)]
     struct Byte {
@@ -210,12 +272,25 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, PartialEq)]
     struct Seen<T: SeenValue>([bool; 256], core::marker::PhantomData<T>);
 
     impl<T: SeenValue> Default for Seen<T> {
         fn default() -> Self {
             Self([false; 256], Default::default())
+        }
+    }
+
+    impl<T: SeenValue> fmt::Debug for Seen<T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.debug_list()
+                .entries(
+                    self.0
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, seen)| if *seen { Some(idx) } else { None }),
+                )
+                .finish()
         }
     }
 
@@ -226,11 +301,15 @@ mod tests {
     }
 
     trait SeenValue: Copy + Uniform + core::fmt::Debug {
+        const ENTRIES: usize;
+
         fn index(self) -> usize;
         fn fill_expected(min: Bound<Self>, max: Bound<Self>, seen: &mut Seen<Self>);
     }
 
     impl SeenValue for u8 {
+        const ENTRIES: usize = 256;
+
         fn index(self) -> usize {
             self as _
         }
@@ -245,6 +324,8 @@ mod tests {
     }
 
     impl SeenValue for i8 {
+        const ENTRIES: usize = 256;
+
         fn index(self) -> usize {
             (self as isize + -(i8::MIN as isize)).try_into().unwrap()
         }

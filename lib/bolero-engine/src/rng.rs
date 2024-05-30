@@ -1,7 +1,9 @@
 use crate::{driver, panic, ByteSliceTestInput, Engine, TargetLocation, Test};
 use core::{fmt::Debug, time::Duration};
-use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use rand::{Rng, RngCore, SeedableRng};
 use std::time::Instant;
+
+pub use rand_xoshiro::Xoshiro256PlusPlus as Recommended;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
@@ -170,7 +172,7 @@ where
 }
 
 struct RngState {
-    rng: StdRng,
+    rng: Recommended,
     max_len: usize,
     options: driver::Options,
     buffer: Vec<u8>,
@@ -179,7 +181,7 @@ struct RngState {
 impl RngState {
     fn new(seed: u64, max_len: usize, options: driver::Options) -> Self {
         Self {
-            rng: StdRng::seed_from_u64(seed),
+            rng: SeedableRng::seed_from_u64(seed),
             max_len,
             options,
             buffer: vec![],

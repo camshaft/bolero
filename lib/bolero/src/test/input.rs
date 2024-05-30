@@ -1,8 +1,8 @@
 #![cfg_attr(fuzzing_random, allow(dead_code))]
 
-use bolero_engine::RngInput;
+use bolero_engine::{rng::Recommended as Rng, RngInput};
 use bolero_generator::{driver, TypeGenerator};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::SeedableRng;
 use std::{io::Read, path::PathBuf};
 
 pub enum TestInput {
@@ -42,8 +42,8 @@ impl RngTest {
         &self,
         buffer: &'a mut Vec<u8>,
         options: &'a driver::Options,
-    ) -> RngInput<'a, StdRng> {
-        RngInput::new(StdRng::seed_from_u64(self.seed), buffer, options)
+    ) -> RngInput<'a, Rng> {
+        RngInput::new(Rng::seed_from_u64(self.seed), buffer, options)
     }
 
     pub fn buffered_input<'a>(
@@ -51,7 +51,7 @@ impl RngTest {
         buffer: &'a mut Vec<u8>,
         options: &'a driver::Options,
     ) -> RngBufferedInput<'a> {
-        let rng = StdRng::seed_from_u64(self.seed);
+        let rng = Rng::seed_from_u64(self.seed);
         let driver = RngBufferedDriver { rng, buffer };
         let driver = driver::Rng::new(driver, options);
         RngBufferedInput {
@@ -62,7 +62,7 @@ impl RngTest {
 }
 
 pub struct RngBufferedDriver<'a> {
-    rng: StdRng,
+    rng: Rng,
     buffer: &'a mut Vec<u8>,
 }
 
