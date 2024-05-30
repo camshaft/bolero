@@ -84,6 +84,7 @@ impl TestEngine {
         let iterations = self.rng_cfg.iterations_or_default();
         let max_len = self.rng_cfg.max_len_or_default();
         let seed = self.rng_cfg.seed_or_rand();
+        // use StdRng for high entropy seeds
         let mut seed_rng = StdRng::seed_from_u64(seed);
 
         (0..iterations)
