@@ -1,0 +1,16 @@
+[package]
+name = "rle-stack"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+bolero = { path = "../../lib/bolero" }
+
+[workspace]
+members = ["."]
+
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1
