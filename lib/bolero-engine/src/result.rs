@@ -2,18 +2,18 @@ use crate::panic::PanicError;
 use anyhow::Error;
 
 /// Trait that turns the test return value into a `Result`
-pub trait IntoTestResult {
-    fn into_test_result(self) -> Result<(), PanicError>;
+pub trait IntoResult {
+    fn into_result(self) -> Result<(), PanicError>;
 }
 
-impl IntoTestResult for () {
-    fn into_test_result(self) -> Result<(), PanicError> {
+impl IntoResult for () {
+    fn into_result(self) -> Result<(), PanicError> {
         Ok(())
     }
 }
 
-impl IntoTestResult for bool {
-    fn into_test_result(self) -> Result<(), PanicError> {
+impl IntoResult for bool {
+    fn into_result(self) -> Result<(), PanicError> {
         if self {
             Ok(())
         } else {
@@ -22,8 +22,8 @@ impl IntoTestResult for bool {
     }
 }
 
-impl<T, E: Into<Error>> IntoTestResult for Result<T, E> {
-    fn into_test_result(self) -> Result<(), PanicError> {
+impl<T, E: Into<Error>> IntoResult for Result<T, E> {
+    fn into_result(self) -> Result<(), PanicError> {
         if let Err(err) = self {
             let err = err.into();
             Err(PanicError::new(err.to_string()))
@@ -33,8 +33,8 @@ impl<T, E: Into<Error>> IntoTestResult for Result<T, E> {
     }
 }
 
-impl<T> IntoTestResult for Option<T> {
-    fn into_test_result(self) -> Result<(), PanicError> {
+impl<T> IntoResult for Option<T> {
+    fn into_result(self) -> Result<(), PanicError> {
         if self.is_none() {
             Err(PanicError::new("test returned `None`".to_string()))
         } else {

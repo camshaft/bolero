@@ -82,16 +82,15 @@ macro_rules! gen_from_bytes {
         #[inline]
         fn gen_bool(&mut self, probability: Option<f32>) -> Option<bool> {
             if let Some(probability) = probability {
-                let value = u32::sample_unbound(self)? as f32 / core::u32::MAX as f32;
+                let value = self.sample_u32()? as f32 / core::u32::MAX as f32;
                 Some(value < probability)
             } else {
-                let value = u8::sample_unbound(self)?;
-                Some(value < (u8::MAX / 2))
+                self.sample_bool()
             }
         }
 
         #[inline]
-        fn gen_variant<T: Uniform>(&mut self, variants: T, base_case: T) -> Option<T> {
+        fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
             match FillBytes::mode(self) {
                 DriverMode::Direct => {
                     Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))

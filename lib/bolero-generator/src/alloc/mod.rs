@@ -107,7 +107,9 @@ impl<T> CollectionGenerator for LinkedList<T> {
             }
         } else {
             // remove extras
-            self.split_off(new_len);
+            for item in self.split_off(new_len) {
+                item_gen.driver_cache(driver, item);
+            }
         }
 
         #[cfg(test)]
@@ -147,7 +149,9 @@ impl<T> CollectionGenerator for VecDeque<T> {
             }
         } else {
             // remove extras
-            self.drain(new_len..);
+            for item in self.drain(new_len..) {
+                item_gen.driver_cache(driver, item);
+            }
         }
 
         #[cfg(test)]
@@ -187,7 +191,9 @@ impl<T> CollectionGenerator for Vec<T> {
             }
         } else {
             // remove extras
-            self.drain(new_len..);
+            for item in self.drain(new_len..) {
+                item_gen.driver_cache(driver, item);
+            }
         }
 
         #[cfg(test)]

@@ -5,9 +5,7 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
-    use bolero_engine::{
-        driver, panic, ByteSliceTestInput, Engine, Never, TargetLocation, Test, TestFailure,
-    };
+    use bolero_engine::{driver, input, panic, Engine, Failure, Never, TargetLocation, Test};
     use core::time::Duration;
     use std::{
         ffi::CString,
@@ -44,11 +42,12 @@ pub mod fuzzer {
             panic::forward_panic(false);
 
             let options = &options;
+            let mut cache = driver::cache::Cache::default();
             let mut report = GeneratorReport::default();
             report.spawn_timer();
 
             start(&mut |slice: &[u8]| {
-                let mut input = ByteSliceTestInput::new(slice, options);
+                let mut input = input::cache::Bytes::new(slice, options, &mut cache);
 
                 match test.test(&mut input) {
                     Ok(is_valid) => {
@@ -62,9 +61,10 @@ pub mod fuzzer {
                         if let Some(shrunken) = shrunken {
                             eprintln!("{:#}", shrunken);
                         } else {
+                            let input = input::Bytes::new(slice, options);
                             eprintln!(
                                 "{:#}",
-                                TestFailure {
+                                Failure {
                                     seed: None,
                                     error,
                                     input
