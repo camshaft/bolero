@@ -7,3 +7,5 @@ crash-*
 *.o
 corpus
 crashes
+perf.data*
+*.svg

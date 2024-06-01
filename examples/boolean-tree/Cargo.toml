@@ -1,0 +1,19 @@
+[package]
+name = "boolean-tree"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bolero-generator = { path = "../../lib/bolero-generator" }
+
+[dev-dependencies]
+bolero = { path = "../../lib/bolero" }
+
+[workspace]
+members = ["."]
+
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1

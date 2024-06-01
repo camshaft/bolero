@@ -63,9 +63,37 @@ struct Test {
 
 impl Test {
     fn run(&self) -> Result {
+        let examples = [
+            (
+                "basic",
+                true,
+                &[
+                    "tests::add_test",
+                    "tests::other_test",
+                    "fuzz_bytes",
+                    "fuzz_generator",
+                    "fuzz_operations",
+                ][..],
+            ),
+            ("rle-stack", self.engine != "kani", &["tests::model_test"]),
+            (
+                "boolean-tree",
+                self.engine != "kani",
+                &["tests::model_test"],
+            ),
+        ];
+        for (example, should_run, tests) in examples {
+            if should_run {
+                self.run_example(example, tests)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn run_example(&self, example: &str, tests: &[&str]) -> Result {
         let sh = Shell::new()?;
         sh.change_dir(env::examples());
-        sh.change_dir("basic");
+        sh.change_dir(example);
 
         if self.engine == "afl" {
             sh.set_var("AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES", "1");
@@ -96,13 +124,7 @@ impl Test {
 
         let args = &args;
 
-        for test in [
-            "tests::add_test",
-            "tests::other_test",
-            "fuzz_bytes",
-            "fuzz_generator",
-            "fuzz_operations",
-        ] {
+        for test in tests {
             let is_integration = test.starts_with("fuzz");
 
             if !self.integrations && is_integration {
