@@ -4,6 +4,8 @@ pub use bolero_generator::{
     TypeGenerator, ValueGenerator,
 };
 
+pub type Seed = u128;
+
 #[cfg(not(kani))]
 pub mod panic;
 #[cfg(kani)]
@@ -16,19 +18,19 @@ pub mod shrink;
 mod test;
 pub use test::*;
 
-pub mod test_failure;
-pub use crate::test_failure::TestFailure;
+pub mod failure;
+pub use crate::failure::Failure;
 
-mod test_input;
-pub use test_input::*;
+pub mod input;
+pub use input::Input;
 
 #[doc(hidden)]
 pub mod target_location;
 #[doc(hidden)]
 pub use target_location::TargetLocation;
 
-mod test_result;
-pub use test_result::*;
+mod result;
+pub use result::IntoResult;
 
 /// Trait for defining an engine that executes a test
 pub trait Engine<T: Test>: Sized {

@@ -84,12 +84,12 @@ impl<Output, T: ValueGenerator<Output = Output>> OneOfGenerator for &[T] {
     type Output = Output;
 
     fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0..self.len()).generate(driver)?;
+        let index = driver.gen_variant(self.len(), 0)?;
         self[index].generate(driver)
     }
 
     fn mutate_one_of<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        let index = (0..self.len()).generate(driver)?;
+        let index = driver.gen_variant(self.len(), 0)?;
         self[index].mutate(driver, value)
     }
 }
@@ -98,7 +98,7 @@ impl<T: Clone> OneValueOfGenerator for &[T] {
     type Output = T;
 
     fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-        let index = (0..self.len()).generate(driver)?;
+        let index = driver.gen_variant(self.len(), 0)?;
         Some(self[index].clone())
     }
 
@@ -107,7 +107,7 @@ impl<T: Clone> OneValueOfGenerator for &[T] {
         driver: &mut D,
         value: &mut Self::Output,
     ) -> Option<()> {
-        let index = (0..self.len()).generate(driver)?;
+        let index = driver.gen_variant(self.len(), 0)?;
         *value = self[index].clone();
         Some(())
     }
@@ -122,7 +122,7 @@ macro_rules! impl_selectors {
             type Output = Output;
 
             fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                match (0u8..=$h_value).generate(driver)? {
+                match driver.gen_variant($h_value, 0)? {
                     $(
                         $a_value => {
                             self.$a_value.generate(driver)
@@ -131,12 +131,12 @@ macro_rules! impl_selectors {
                     $h_value => {
                         self.$h_value.generate(driver)
                     }
-                    _ => unreachable!("generated value out of bounds")
+                    idx => unreachable!("generated value ({idx}) out of bounds {}", $h_value)
                 }
             }
 
             fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
-                match (0u8..=$h_value).generate(driver)? {
+                match driver.gen_variant($h_value, 0)? {
                     $(
                         $a_value => {
                             self.$a_value.mutate(driver, value)
@@ -145,7 +145,7 @@ macro_rules! impl_selectors {
                     $h_value => {
                         self.$h_value.mutate(driver, value)
                     }
-                    _ => unreachable!("generated value out of bounds")
+                    idx => unreachable!("generated value ({idx}) out of bounds {}", $h_value)
                 }
             }
         }
@@ -154,12 +154,12 @@ macro_rules! impl_selectors {
             type Output = Output;
 
             fn generate_one_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
+                let index = driver.gen_variant($h_value, 0)?;
                 self[index].generate(driver)
             }
 
             fn mutate_one_of<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
+                let index = driver.gen_variant($h_value, 0)?;
                 self[index].mutate(driver, value)
             }
         }
@@ -168,7 +168,7 @@ macro_rules! impl_selectors {
             type Output = T;
 
             fn generate_one_value_of<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
+                let index = driver.gen_variant($h_value, 0)?;
                 Some(self[index].clone())
             }
 
@@ -177,7 +177,7 @@ macro_rules! impl_selectors {
                 driver: &mut D,
                 value: &mut Self::Output,
             ) -> Option<()> {
-                let index = (0u8..=$h_value).generate(driver)? as usize;
+                let index = driver.gen_variant($h_value, 0)?;
                 *value = self[index].clone();
                 Some(())
             }

@@ -96,6 +96,7 @@ macro_rules! impl_either {
         {
             type Output = $ty<$A::Output, $B::Output>;
 
+            #[inline]
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 Some(if self.selector.generate(driver)? {
                     $ty::$A(self.a.generate(driver)?)
@@ -104,6 +105,7 @@ macro_rules! impl_either {
                 })
             }
 
+            #[inline]
             fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
                 #[allow(clippy::redundant_pattern_matching)]
                 let prev_selection = match value {
@@ -120,12 +122,22 @@ macro_rules! impl_either {
                         $ty::$B(value) => self.b.mutate(driver, value),
                     }
                 } else {
-                    if new_selection {
-                        *value = $ty::$A(self.a.generate(driver)?);
+                    let next = if new_selection {
+                        $ty::$A(self.a.generate(driver)?)
                     } else {
-                        *value = $ty::$B(self.b.generate(driver)?);
-                    }
+                        $ty::$B(self.b.generate(driver)?)
+                    };
+                    let prev = core::mem::replace(value, next);
+                    self.driver_cache(driver, prev);
                     Some(())
+                }
+            }
+
+            #[inline]
+            fn driver_cache<D: Driver>(&self, driver: &mut D, value: Self::Output) {
+                match value {
+                    $ty::$A(value) => self.a.driver_cache(driver, value),
+                    $ty::$B(value) => self.b.driver_cache(driver, value),
                 }
             }
         }
@@ -139,6 +151,11 @@ macro_rules! impl_either {
             #[inline]
             fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
                 crate::gen_with::<Self>().mutate(driver, self)
+            }
+
+            #[inline]
+            fn driver_cache<D: Driver>(self, driver: &mut D) {
+                crate::gen_with::<Self>().driver_cache(driver, self)
             }
         }
 
@@ -226,6 +243,7 @@ impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
 {
     type Output = Option<V::Output>;
 
+    #[inline]
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         Some(if self.selector.generate(driver)? {
             Some(self.value.generate(driver)?)
@@ -234,6 +252,7 @@ impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
         })
     }
 
+    #[inline]
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
         let prev_selection = value.is_some();
 
@@ -246,12 +265,21 @@ impl<V: ValueGenerator, Selector: ValueGenerator<Output = bool>> ValueGenerator
                 None => Some(()),
             }
         } else {
-            if new_selection {
-                *value = Some(self.value.generate(driver)?);
+            let next = if new_selection {
+                Some(self.value.generate(driver)?)
             } else {
-                *value = None;
-            }
+                None
+            };
+            let prev = core::mem::replace(value, next);
+            self.driver_cache(driver, prev);
             Some(())
+        }
+    }
+
+    #[inline]
+    fn driver_cache<D: Driver>(&self, driver: &mut D, value: Self::Output) {
+        if let Some(value) = value {
+            self.value.driver_cache(driver, value);
         }
     }
 }
@@ -265,6 +293,11 @@ impl<V: TypeGenerator> TypeGenerator for Option<V> {
     #[inline]
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
         crate::gen_with::<Self>().mutate(driver, self)
+    }
+
+    #[inline]
+    fn driver_cache<D: Driver>(self, driver: &mut D) {
+        crate::gen_with::<Self>().driver_cache(driver, self)
     }
 }
 

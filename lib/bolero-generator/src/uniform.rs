@@ -6,11 +6,43 @@ pub trait Uniform: Sized + PartialEq + Eq + PartialOrd + Ord {
     fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self>;
 }
 
+macro_rules! fill_bytes_sample {
+    ($name:ident, $ty:ty) => {
+        #[inline(always)]
+        fn $name(&mut self) -> Option<$ty> {
+            let mut bytes = [0u8; core::mem::size_of::<$ty>()];
+            self.fill_bytes(&mut bytes)?;
+            Some(<$ty>::from_le_bytes(bytes))
+        }
+    };
+}
+
 pub trait FillBytes {
+    const SHOULD_SHRINK: bool = true;
+
     fn mode(&self) -> DriverMode;
 
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()>;
     fn consume_bytes(&mut self, consumed: usize);
+
+    fill_bytes_sample!(sample_u8, u8);
+    fill_bytes_sample!(sample_i8, i8);
+    fill_bytes_sample!(sample_u16, u16);
+    fill_bytes_sample!(sample_i16, i16);
+    fill_bytes_sample!(sample_u32, u32);
+    fill_bytes_sample!(sample_i32, i32);
+    fill_bytes_sample!(sample_u64, u64);
+    fill_bytes_sample!(sample_i64, i64);
+    fill_bytes_sample!(sample_u128, u128);
+    fill_bytes_sample!(sample_i128, i128);
+    fill_bytes_sample!(sample_usize, usize);
+    fill_bytes_sample!(sample_isize, isize);
+
+    #[inline(always)]
+    fn sample_bool(&mut self) -> Option<bool> {
+        let value = self.sample_u8()?;
+        Some(value < (u8::MAX / 2))
+    }
 
     fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
         self.peek_bytes(0, bytes)?;
@@ -20,13 +52,11 @@ pub trait FillBytes {
 }
 
 macro_rules! uniform_int {
-    ($ty:ident, $unsigned:ident $(, $smaller:ident)*) => {
-        impl Uniform  for $ty {
+    ($sample:ident, $ty:ident, $unsigned:ident $(, $smaller:ident)*) => {
+        impl Uniform for $ty {
             #[inline(always)]
             fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<$ty> {
-                let mut bytes = [0u8; core::mem::size_of::<$ty>()];
-                fill.fill_bytes(&mut bytes)?;
-                return Some(<$ty>::from_le_bytes(bytes));
+                fill.$sample()
             }
 
             #[inline]
@@ -76,6 +106,8 @@ macro_rules! uniform_int {
                     return Some(lower);
                 }
 
+                // try to shrink the range if the FillBytes says we should
+                if F::SHOULD_SHRINK {
                 $({
                     // if the range fits in a smaller data type use that instead
                     if let Ok(range_inclusive) = range_inclusive.try_into() {
@@ -91,6 +123,7 @@ macro_rules! uniform_int {
                         return Some(value);
                     }
                 })*
+                }
 
                 let value: $unsigned = Uniform::sample_unbound(fill)?;
 
@@ -113,18 +146,18 @@ macro_rules! uniform_int {
     };
 }
 
-uniform_int!(u8, u8);
-uniform_int!(i8, u8);
-uniform_int!(u16, u16, u8);
-uniform_int!(i16, u16, u8);
-uniform_int!(u32, u32, u8, u16);
-uniform_int!(i32, u32, u8, u16);
-uniform_int!(u64, u64, u8, u16, u32);
-uniform_int!(i64, u64, u8, u16, u32);
-uniform_int!(usize, usize, u8, u16, u32);
-uniform_int!(isize, usize, u8, u16, u32);
-uniform_int!(u128, u128, u8, u16, u32, u64);
-uniform_int!(i128, u128, u8, u16, u32, u64);
+uniform_int!(sample_u8, u8, u8);
+uniform_int!(sample_i8, i8, u8);
+uniform_int!(sample_u16, u16, u16, u8);
+uniform_int!(sample_i16, i16, u16, u8);
+uniform_int!(sample_u32, u32, u32, u8, u16);
+uniform_int!(sample_i32, i32, u32, u8, u16);
+uniform_int!(sample_u64, u64, u64, u8, u16, u32);
+uniform_int!(sample_i64, i64, u64, u8, u16, u32);
+uniform_int!(sample_usize, usize, usize, u8, u16, u32);
+uniform_int!(sample_isize, isize, usize, u8, u16, u32);
+uniform_int!(sample_u128, u128, u128, u8, u16, u32, u64);
+uniform_int!(sample_i128, i128, u128, u8, u16, u32, u64);
 
 trait Scaled: Sized {
     fn scale(self, range: Self) -> Self;

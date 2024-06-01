@@ -87,17 +87,26 @@ fn generate_struct_type_gen(
     let value = generate_fields_type_gen(krate, name, &data_struct.fields);
     let destructure = generate_fields_type_destructure(name, &data_struct.fields);
     let mutate_body = generate_fields_type_mutate(krate, &data_struct.fields);
+    let driver_cache = generate_fields_type_driver_cache(krate, &data_struct.fields);
 
     let generate_method = quote!(
+        #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
             Some(#value)
         }
     );
     let mutate_method = quote!(
+        #[inline]
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
             let #destructure = self;
             #mutate_body
             Some(())
+        }
+
+        #[inline]
+        fn driver_cache<__BOLERO_DRIVER: #krate::driver::Driver>(self, __bolero_driver: &mut __BOLERO_DRIVER) {
+            let #destructure = self;
+            #driver_cache
         }
     );
     (generate_method, mutate_method)
@@ -158,7 +167,24 @@ fn generate_enum_type_gen(
         })
         .collect();
 
+    let gen_driver_cache: Vec<_> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_name = &variant.ident;
+            let span = variant_name.span();
+            let constructor = quote_spanned!(span=> #name::#variant_name);
+            let destructure = generate_fields_type_destructure(constructor, &variant.fields);
+            let driver_cache = generate_fields_type_driver_cache(krate, &variant.fields);
+
+            quote_spanned!(span=> #destructure => {
+                #driver_cache
+            })
+        })
+        .collect();
+
     let generate_method = quote!(
+        #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
             let __bolero_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
             Some(match __bolero_selection {
@@ -169,23 +195,34 @@ fn generate_enum_type_gen(
     );
 
     let mutate_method = quote!(
+        #[inline]
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
+            let __bolero_new_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
+
             let __bolero_prev_selection = match self {
                 #(#gen_lookup)*
             };
-
-            let __bolero_new_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
 
             if __bolero_prev_selection == __bolero_new_selection {
                 match self {
                     #(#gen_mutate)*
                 }
             } else {
-                *self = match __bolero_new_selection {
+                let next = match __bolero_new_selection {
                     #(#gen_variants)*
                     _ => unreachable!("Value outside of range"),
                 };
+                match ::core::mem::replace(self, next) {
+                    #(#gen_driver_cache)*
+                }
                 Some(())
+            }
+        }
+
+        #[inline]
+        fn driver_cache<__BOLERO_DRIVER: #krate::driver::Driver>(self, __bolero_driver: &mut __BOLERO_DRIVER) {
+            match self {
+                #(#gen_driver_cache)*
             }
         }
     );
@@ -225,6 +262,7 @@ fn generate_union_type_gen(
         .collect();
 
     let generate_method = quote!(
+        #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
             match __bolero_driver.gen_variant(#field_upper, 0)? {
                 #(#fields,)*
@@ -246,18 +284,6 @@ fn lower_type_index(value: usize, max: usize, span: Span) -> TokenStream2 {
         return Error::new(span, "Empty enums cannot be generated").to_compile_error();
     }
 
-    if max < core::u8::MAX as usize {
-        let value = value as u8;
-        return quote_spanned!(span=> #value);
-    }
-
-    if max < core::u16::MAX as usize {
-        let value = value as u16;
-        return quote_spanned!(span=> #value);
-    }
-
-    assert!(max < core::u32::MAX as usize);
-    let value = value as u32;
     quote_spanned!(span=> #value)
 }
 
@@ -277,6 +303,14 @@ fn generate_fields_type_mutate(krate: &TokenStream2, fields: &Fields) -> TokenSt
     match fields {
         Fields::Named(fields) => generate_fields_named_type_mutate(krate, fields),
         Fields::Unnamed(fields) => generate_fields_unnamed_type_mutate(krate, fields),
+        Fields::Unit => quote!(),
+    }
+}
+
+fn generate_fields_type_driver_cache(krate: &TokenStream2, fields: &Fields) -> TokenStream2 {
+    match fields {
+        Fields::Named(fields) => generate_fields_named_type_driver_cache(krate, fields),
+        Fields::Unnamed(fields) => generate_fields_unnamed_type_driver_cache(krate, fields),
         Fields::Unit => quote!(),
     }
 }
@@ -321,6 +355,22 @@ fn generate_fields_unnamed_type_mutate(
         let span = generator.span();
         quote_spanned!(span=>
             #krate::ValueGenerator::mutate(&(#generator), __bolero_driver, #value)?
+        )
+    });
+    quote!(#(#fields;)*)
+}
+
+fn generate_fields_unnamed_type_driver_cache(
+    krate: &TokenStream2,
+    fields: &FieldsUnnamed,
+) -> TokenStream2 {
+    let fields = fields.unnamed.iter().enumerate().map(|(index, field)| {
+        let value = Ident::new(&format!("__bolero_unnamed_{}", index), field.span());
+        let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
+
+        let span = generator.span();
+        quote_spanned!(span=>
+            #krate::ValueGenerator::driver_cache(&(#generator), __bolero_driver, #value)
         )
     });
     quote!(#(#fields;)*)
@@ -371,6 +421,22 @@ fn generate_fields_named_type_mutate(krate: &TokenStream2, fields: &FieldsNamed)
         let span = generator.span();
         quote_spanned!(span=>
             #krate::ValueGenerator::mutate(&(#generator), __bolero_driver, #name)?
+        )
+    });
+    quote!(#(#fields;)*)
+}
+
+fn generate_fields_named_type_driver_cache(
+    krate: &TokenStream2,
+    fields: &FieldsNamed,
+) -> TokenStream2 {
+    let fields = fields.named.iter().map(|field| {
+        let name = &field.ident;
+        let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
+
+        let span = generator.span();
+        quote_spanned!(span=>
+            #krate::ValueGenerator::driver_cache(&(#generator), __bolero_driver, #name)
         )
     });
     quote!(#(#fields;)*)

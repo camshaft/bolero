@@ -56,9 +56,21 @@ pub trait TypeGenerator: Sized {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self>;
 
     /// Mutates an existing value with the given driver
+    #[inline]
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        *self = Self::generate(driver)?;
-        Some(())
+        match Self::generate(driver) {
+            Some(next) => {
+                let prev = core::mem::replace(self, next);
+                Self::driver_cache(prev, driver);
+                Some(())
+            }
+            None => None,
+        }
+    }
+
+    #[inline(always)]
+    fn driver_cache<D: Driver>(self, driver: &mut D) {
+        let _ = driver;
     }
 
     /// Returns a generator for a given type
@@ -76,9 +88,22 @@ pub trait ValueGenerator: Sized {
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output>;
 
     /// Mutates an existing value with the given driver
+    #[inline]
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        *value = self.generate(driver)?;
-        Some(())
+        match self.generate(driver) {
+            Some(next) => {
+                let prev = core::mem::replace(value, next);
+                self.driver_cache(driver, prev);
+                Some(())
+            }
+            None => None,
+        }
+    }
+
+    #[inline(always)]
+    fn driver_cache<D: Driver>(&self, driver: &mut D, value: Self::Output) {
+        let _ = driver;
+        let _ = value;
     }
 
     /// Map the value of a generator
@@ -123,12 +148,19 @@ pub trait ValueGenerator: Sized {
 impl<'a, T: ValueGenerator> ValueGenerator for &'a T {
     type Output = T::Output;
 
+    #[inline]
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         (*self).generate(driver)
     }
 
+    #[inline]
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
         (*self).mutate(driver, value)
+    }
+
+    #[inline]
+    fn driver_cache<D: Driver>(&self, driver: &mut D, value: Self::Output) {
+        (*self).driver_cache(driver, value)
     }
 }
 
@@ -167,12 +199,19 @@ impl<T: TypeGenerator + TypeGeneratorWithParams> TypeValueGenerator<T> {
 impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
     type Output = T;
 
+    #[inline(always)]
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         T::generate(driver)
     }
 
+    #[inline(always)]
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut T) -> Option<()> {
         T::mutate(value, driver)
+    }
+
+    #[inline(always)]
+    fn driver_cache<D: Driver>(&self, driver: &mut D, value: T) {
+        T::driver_cache(value, driver)
     }
 }
 

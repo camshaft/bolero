@@ -1,6 +1,6 @@
 use crate::{
-    driver, panic, panic::PanicError, test_input::SliceDebug, IntoTestResult, TestFailure,
-    TestInput, ValueGenerator,
+    driver, input::SliceDebug, panic, panic::PanicError, Failure, Input, IntoResult, Seed,
+    ValueGenerator,
 };
 use std::panic::RefUnwindSafe;
 
@@ -10,7 +10,7 @@ pub trait Test: Sized {
     type Value;
 
     /// Execute one test with the given input
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError>;
@@ -18,33 +18,33 @@ pub trait Test: Sized {
     /// Generate a value for the given input.
     ///
     /// Note: this is used for printing the value related to a test failure
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value;
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value;
 
     /// Shrink the input to a simpler form
-    fn shrink(
+    fn shrink<I: crate::shrink::Input>(
         &mut self,
-        input: Vec<u8>,
-        seed: Option<u64>,
+        input: I,
+        seed: Option<Seed>,
         options: &driver::Options,
-    ) -> Option<TestFailure<Self::Value>> {
+    ) -> Option<Failure<Self::Value>> {
         crate::shrink::shrink(self, input, seed, options)
     }
 }
 
 impl<F: RefUnwindSafe + FnMut(&[u8]) -> Ret, Ret> Test for F
 where
-    Ret: IntoTestResult,
+    Ret: IntoResult,
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError> {
         input.with_slice(&mut |slice| {
             panic::catch(|| {
                 let res = (self)(slice);
-                match res.into_test_result() {
+                match res.into_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
@@ -52,7 +52,7 @@ where
         })
     }
 
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
 }
@@ -69,18 +69,18 @@ impl<F> BorrowedSliceTest<F> {
 
 impl<F: RefUnwindSafe + FnMut(&[u8]) -> Ret, Ret> Test for BorrowedSliceTest<F>
 where
-    Ret: IntoTestResult,
+    Ret: IntoResult,
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError> {
         input.with_slice(&mut |slice| {
             panic::catch(|| {
                 let res = (self.fun)(slice);
-                match res.into_test_result() {
+                match res.into_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
@@ -88,7 +88,7 @@ where
         })
     }
 
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
 }
@@ -105,11 +105,11 @@ impl<F> ClonedSliceTest<F> {
 
 impl<F: RefUnwindSafe + FnMut(Vec<u8>) -> Ret, Ret> Test for ClonedSliceTest<F>
 where
-    Ret: IntoTestResult,
+    Ret: IntoResult,
 {
     type Value = SliceDebug<Vec<u8>>;
 
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError> {
@@ -117,7 +117,7 @@ where
             panic::catch(|| {
                 let input = slice.to_vec();
                 let res = (self.fun)(input);
-                match res.into_test_result() {
+                match res.into_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
@@ -125,7 +125,7 @@ where
         })
     }
 
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
 }
@@ -181,12 +181,12 @@ impl<F, G, V> BorrowedGeneratorTest<F, G, V> {
 impl<F: RefUnwindSafe + FnMut(&G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for BorrowedGeneratorTest<F, G, G::Output>
 where
-    Ret: IntoTestResult,
+    Ret: IntoResult,
     G::Output: core::fmt::Debug,
 {
     type Value = G::Output;
 
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError> {
@@ -198,7 +198,7 @@ where
 
             panic::catch(|| {
                 let res = (fun)(&value);
-                match res.into_test_result() {
+                match res.into_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
@@ -206,7 +206,7 @@ where
         })
     }
 
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
             let value = self.gen.generate(driver).unwrap();
@@ -235,12 +235,12 @@ impl<F, G, V> ClonedGeneratorTest<F, G, V> {
 impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for ClonedGeneratorTest<F, G, G::Output>
 where
-    Ret: IntoTestResult,
+    Ret: IntoResult,
     G::Output: core::fmt::Debug + Clone,
 {
     type Value = G::Output;
 
-    fn test<T: TestInput<Result<bool, PanicError>>>(
+    fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
     ) -> Result<bool, PanicError> {
@@ -264,7 +264,7 @@ where
             panic::catch(move || {
                 let core::panic::AssertUnwindSafe(input) = input;
                 let res = (fun)(input);
-                match res.into_test_result() {
+                match res.into_result() {
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
@@ -272,7 +272,7 @@ where
         })
     }
 
-    fn generate_value<T: TestInput<Self::Value>>(&self, input: &mut T) -> Self::Value {
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
             let value = self.gen.generate(driver).unwrap();

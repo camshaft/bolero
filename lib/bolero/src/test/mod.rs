@@ -1,11 +1,10 @@
 #![cfg_attr(fuzzing_random, allow(dead_code))]
 
-use bolero_engine::{driver, rng, test_failure::TestFailure, Engine, TargetLocation, Test};
-use core::{iter::empty, time::Duration};
-use std::{path::PathBuf, time::Instant};
+use bolero_engine::{driver, rng, Engine, Failure, Seed, TargetLocation, Test};
+use core::{fmt, mem::size_of, time::Duration};
+use std::path::PathBuf;
 
 mod input;
-use input::*;
 
 #[cfg(any(fuzzing_random, test))]
 mod report;
@@ -21,7 +20,27 @@ pub struct TestEngine {
 
 struct NamedTest {
     name: String,
-    data: TestInput,
+    data: input::Test,
+}
+
+impl fmt::Display for NamedTest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let input::Test::Rng(test) = &self.data {
+            write!(f, "[BOLERO_RANDOM_SEED={}]", test.seed)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
+}
+
+impl From<input::RngTest> for NamedTest {
+    #[inline]
+    fn from(value: input::RngTest) -> Self {
+        Self {
+            name: String::new(),
+            data: input::Test::Rng(value),
+        }
+    }
 }
 
 impl TestEngine {
@@ -73,42 +92,42 @@ impl TestEngine {
                     .filter(|path| !path.file_name().unwrap().to_str().unwrap().starts_with('.'))
                     .map(move |path| NamedTest {
                         name: format!("{}", path.display()),
-                        data: TestInput::FileTest(FileTest { path }),
+                        data: input::Test::File(input::FileTest { path }),
                     })
             })
     }
 
-    fn rng_tests(&self) -> impl Iterator<Item = RngTest> {
+    fn seed_tests(&self) -> impl Iterator<Item = input::RngTest> {
+        self.rng_cfg
+            .seed
+            .into_iter()
+            .map(move |seed| input::RngTest { seed })
+    }
+
+    fn rng_tests(&self) -> impl Iterator<Item = input::RngTest> {
         use rand::{rngs::StdRng, RngCore, SeedableRng};
 
         let iterations = self.rng_cfg.iterations_or_default();
-        let max_len = self.rng_cfg.max_len_or_default();
-        let seed = self.rng_cfg.seed_or_rand();
         // use StdRng for high entropy seeds
-        let mut seed_rng = StdRng::seed_from_u64(seed);
+        let mut seed_rng = StdRng::from_entropy();
 
-        (0..iterations)
-            .scan(seed, move |state, _index| {
-                let seed = *state;
-                *state = seed_rng.next_u64();
-                Some(seed)
-            })
-            .map(move |seed| input::RngTest { seed, max_len })
+        (0..iterations).map(move |_| {
+            let mut seed = [0; size_of::<Seed>()];
+            seed_rng.fill_bytes(&mut seed);
+            let seed = Seed::from_le_bytes(seed);
+            input::RngTest { seed }
+        })
     }
 
     fn tests(&self) -> impl Iterator<Item = NamedTest> {
-        let rng_tests = self.rng_tests().map(move |test| NamedTest {
-            name: format!("[BOLERO_RANDOM_SEED={}]", test.seed),
-            data: TestInput::RngTest(test),
-        });
-
-        empty()
+        self.seed_tests()
+            .map(|t| t.into())
             .chain(self.file_tests(["crashes"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "crashes"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "hangs"].iter().cloned()))
             .chain(self.file_tests(["corpus"].iter().cloned()))
             .chain(self.file_tests(["afl_state", "queue"].iter().cloned()))
-            .chain(rng_tests)
+            .chain(self.rng_tests().map(|t| t.into()))
     }
 
     #[cfg(any(fuzzing_random, test))]
@@ -123,39 +142,49 @@ impl TestEngine {
 
         let options = &options;
 
+        let mut report = report::Report::default();
+        report.spawn_timer();
+
+        if self.rng_cfg.iterations.is_none() {
+            self.rng_cfg.iterations = Some(usize::MAX);
+        }
+
+        let start_time = std::time::Instant::now();
+        let test_time = self.rng_cfg.test_time;
+
         let mut buffer = vec![];
+        let mut cache = bolero_generator::driver::cache::Cache::default();
         let mut testfn = |conf: &input::RngTest| {
-            let mut input = conf.input(&mut buffer, options);
+            let mut input = conf.input(&mut buffer, &mut cache, options);
             test.test(&mut input).map_err(|error| {
                 let seed = Some(conf.seed);
                 // reseed the input and buffer the rng for shrinking
                 let mut input = conf.buffered_input(&mut buffer, options);
                 let _ = test.generate_value(&mut input);
 
-                let shrunken = test.shrink(buffer.clone(), seed, options);
+                let input = input::RngReplayInput {
+                    buffer: &mut buffer.clone(),
+                };
+                let shrunken = test.shrink(input, seed, options);
 
                 if let Some(shrunken) = shrunken {
                     format!("{:#}", shrunken)
                 } else {
                     buffer.clear();
-                    let mut input = conf.input(&mut buffer, options);
+                    let mut input = conf.input(&mut buffer, &mut cache, options);
                     let input = test.generate_value(&mut input);
-                    format!("{:#}", TestFailure { seed, error, input })
+                    format!("{:#}", Failure { seed, error, input })
                 }
             })
         };
 
-        let mut report = report::Report::default();
-        report.spawn_timer();
-
-        let inputs = {
-            if self.rng_cfg.iterations.is_none() {
-                self.rng_cfg.iterations = Some(usize::MAX);
+        for input in self.rng_tests() {
+            if let Some(test_time) = test_time {
+                if start_time.elapsed() > test_time {
+                    break;
+                }
             }
-            self.rng_tests()
-        };
 
-        for input in inputs {
             match testfn(&input) {
                 Ok(is_valid) => {
                     report.on_result(is_valid);
@@ -193,13 +222,14 @@ impl TestEngine {
         let rng_options = &rng_options;
 
         let mut buffer = vec![];
-        let mut testfn = |data: &TestInput| {
+        let mut cache = driver::cache::Cache::default();
+        let mut testfn = |data: &input::Test| {
             buffer.clear();
             match data {
-                TestInput::FileTest(file) => {
+                input::Test::File(file) => {
                     file.read_into(&mut buffer);
 
-                    let mut input = bolero_engine::ByteSliceTestInput::new(&buffer, file_options);
+                    let mut input = input::Bytes::new(&buffer, file_options);
                     test.test(&mut input).map_err(|error| {
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
@@ -208,7 +238,7 @@ impl TestEngine {
                         } else {
                             format!(
                                 "{:#}",
-                                TestFailure {
+                                Failure {
                                     seed: data.seed(),
                                     error,
                                     input: buffer.clone()
@@ -217,8 +247,8 @@ impl TestEngine {
                         }
                     })
                 }
-                TestInput::RngTest(conf) => {
-                    let mut input = conf.input(&mut buffer, rng_options);
+                input::Test::Rng(conf) => {
+                    let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                     test.test(&mut input).map_err(|error| {
                         // reseed the input and buffer the rng for shrinking
                         let mut input = conf.buffered_input(&mut buffer, rng_options);
@@ -230,11 +260,11 @@ impl TestEngine {
                             format!("{:#}", shrunken)
                         } else {
                             buffer.clear();
-                            let mut input = conf.input(&mut buffer, rng_options);
+                            let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                             let input = test.generate_value(&mut input);
                             format!(
                                 "{:#}",
-                                TestFailure {
+                                Failure {
                                     seed: data.seed(),
                                     error,
                                     input
@@ -251,7 +281,7 @@ impl TestEngine {
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
-        let start_time = Instant::now();
+        let start_time = std::time::Instant::now();
         let test_time = self.rng_cfg.test_time_or_default();
         for test in tests {
             if start_time.elapsed() > test_time {
@@ -263,7 +293,7 @@ impl TestEngine {
             if let Err(err) = testfn(&test.data) {
                 bolero_engine::panic::forward_panic(true);
                 eprintln!("{}", err);
-                panic!("test failed: {:?}", test.name);
+                panic!("test failed: {}", test);
             }
         }
 

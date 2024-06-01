@@ -6,10 +6,37 @@ struct Buffer {
     bytes: alloc::vec::Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 impl Buffer {
-    #[cfg(feature = "alloc")]
+    #[inline]
+    fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R, mode: DriverMode) -> Option<()> {
+        let data = &mut self.bytes;
+
+        let initial_len = data.len();
+
+        // we don't need any more bytes, just return what we have
+        if initial_len >= len {
+            return Some(());
+        }
+
+        // extend the random bytes
+        data.try_reserve(len).ok()?;
+        data.resize(len, 0);
+        fill_bytes(rng, &mut data[initial_len..], mode)?;
+
+        Some(())
+    }
+
+    #[inline]
+    fn slice_mut(&mut self, len: usize) -> &mut [u8] {
+        &mut self.bytes[..len]
+    }
+
+    #[inline]
     fn consume(&mut self, len: usize) {
-        self.bytes.drain(..len);
+        // just ignore the consumed len since we don't actually pull from it
+        let _ = len;
+        self.bytes.clear();
     }
 }
 
@@ -40,25 +67,21 @@ impl<R: RngCore> Rng<R> {
     }
 
     #[cfg(feature = "alloc")]
+    #[inline]
     fn fill_buffer(&mut self, len: usize) -> Option<&[u8]> {
-        let data = &mut self.buffer.bytes;
-
-        let initial_len = data.len();
-
-        // we don't need any more bytes, just return what we have
-        if initial_len >= len {
-            return Some(&data[..len]);
-        }
-
-        // extend the random bytes
-        data.try_reserve(len).ok()?;
-        data.resize(len, 0);
-        fill_bytes(&mut self.rng, &mut data[initial_len..], self.mode)?;
-
-        Some(&data[..len])
+        self.buffer.fill(len, &mut self.rng, self.mode)?;
+        Some(self.buffer.slice_mut(len))
     }
 }
 
+impl<R: RngCore> AsRef<R> for Rng<R> {
+    #[inline]
+    fn as_ref(&self) -> &R {
+        &self.rng
+    }
+}
+
+#[inline]
 fn fill_bytes<R: RngCore>(rng: &mut R, bytes: &mut [u8], mode: DriverMode) -> Option<()> {
     match mode {
         DriverMode::Direct => RngCore::try_fill_bytes(rng, bytes).ok(),
@@ -75,7 +98,19 @@ fn fill_bytes<R: RngCore>(rng: &mut R, bytes: &mut [u8], mode: DriverMode) -> Op
     }
 }
 
+macro_rules! impl_sample {
+    ($sample:ident, $ty:ty, $inner:ident) => {
+        #[inline(always)]
+        fn $sample(&mut self) -> Option<$ty> {
+            Some(self.rng.$inner() as $ty)
+        }
+    };
+}
+
 impl<R: RngCore> FillBytes for Rng<R> {
+    // prefer sampling the larger values since it's faster to pull from the RNG
+    const SHOULD_SHRINK: bool = false;
+
     #[inline]
     fn mode(&self) -> DriverMode {
         self.mode
@@ -86,8 +121,25 @@ impl<R: RngCore> FillBytes for Rng<R> {
         self.fill_bytes(bytes)
     }
 
-    #[inline]
+    #[inline(always)]
     fn consume_bytes(&mut self, _consumed: usize) {}
+
+    #[inline(always)]
+    fn sample_bool(&mut self) -> Option<bool> {
+        let value = self.rng.next_u32();
+        Some(value < (u32::MAX / 2))
+    }
+
+    impl_sample!(sample_u8, u8, next_u32);
+    impl_sample!(sample_i8, i8, next_u32);
+    impl_sample!(sample_u16, u16, next_u32);
+    impl_sample!(sample_i16, i16, next_u32);
+    impl_sample!(sample_u32, u32, next_u32);
+    impl_sample!(sample_i32, i32, next_u32);
+    impl_sample!(sample_u64, u64, next_u64);
+    impl_sample!(sample_i64, i64, next_u64);
+    impl_sample!(sample_usize, usize, next_u64);
+    impl_sample!(sample_isize, isize, next_u64);
 }
 
 impl<R: RngCore> Driver for Rng<R> {

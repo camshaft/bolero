@@ -29,7 +29,7 @@ pub mod lib {
     #[allow(unused_imports)]
     use super::*;
 
-    use bolero_engine::{driver, Driver, Engine, TargetLocation, Test, TestInput, TypeGenerator};
+    use bolero_engine::{driver, input, Driver, Engine, TargetLocation, Test, TypeGenerator};
     use core::ops::{Bound, RangeBounds};
 
     #[derive(Debug, Default)]
@@ -71,7 +71,7 @@ pub mod lib {
         options: driver::Options,
     }
 
-    impl<Output> TestInput<Output> for KaniInput {
+    impl<Output> input::Input<Output> for KaniInput {
         type Driver = KaniDriver;
 
         fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
@@ -166,16 +166,12 @@ pub mod lib {
         }
 
         #[inline]
-        fn gen_variant<T: TypeGenerator + PartialOrd>(
-            &mut self,
-            variants: T,
-            base_case: T,
-        ) -> Option<T> {
+        fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
             if self.depth == self.max_depth {
                 return Some(base_case);
             }
 
-            let selected = self.gen::<T>()?;
+            let selected: usize = kani::any();
             kani::assume(selected < variants);
             Some(selected)
         }

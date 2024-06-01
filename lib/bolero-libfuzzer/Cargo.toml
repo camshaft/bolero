@@ -16,7 +16,7 @@ bin = []
 lib = ["bolero-engine"]
 
 [dependencies]
-bolero-engine = { version = "0.10", path = "../bolero-engine", optional = true }
+bolero-engine = { version = "0.10", path = "../bolero-engine", features = ["cache"], optional = true }
 
 [build-dependencies]
 cc = "1.0"

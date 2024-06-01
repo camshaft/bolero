@@ -12,6 +12,7 @@ readme = "../../README.md"
 rust-version = "1.66.0"
 
 [features]
+cache = ["bolero-generator/alloc"]
 rng = ["rand", "rand_xoshiro", "bolero-generator/alloc"]
 
 [dependencies]

@@ -20,6 +20,11 @@ impl<'a> ByteSliceDriver<'a> {
             max_depth,
         }
     }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[u8] {
+        self.input
+    }
 }
 
 impl<'a> FillBytes for ByteSliceDriver<'a> {

@@ -32,14 +32,14 @@ bolero-libfuzzer = { version = "0.10", path = "../bolero-libfuzzer" }
 bolero-honggfuzz = { version = "0.10", path = "../bolero-honggfuzz" }
 
 [target.'cfg(fuzzing_random)'.dependencies]
-bolero-engine = { version = "0.10", path = "../bolero-engine", features = ["rng"] }
+bolero-engine = { version = "0.10", path = "../bolero-engine", features = ["cache", "rng"] }
 rand = { version = "^0.8" }
 
 [target.'cfg(kani)'.dependencies]
 bolero-kani = { version = "0.10", path = "../bolero-kani" }
 
 [target.'cfg(not(any(fuzzing, kani)))'.dependencies]
-bolero-engine = { version = "0.10", path = "../bolero-engine", features = ["rng"] }
+bolero-engine = { version = "0.10", path = "../bolero-engine", features = ["cache", "rng"] }
 rand = { version = "^0.8" }
 
 [dev-dependencies]

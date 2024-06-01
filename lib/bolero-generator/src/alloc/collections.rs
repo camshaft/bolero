@@ -42,7 +42,7 @@ macro_rules! impl_values_collection_generator {
                 }
             }
 
-            pub fn len<Gen: $crate::ValueGenerator<Output = Len>, Len: Into<usize>>(
+            pub fn len<Gen: $crate::ValueGenerator<Output = usize>>(
                 self,
                 len: Gen,
             ) -> $generator<V, Gen> {
@@ -53,9 +53,8 @@ macro_rules! impl_values_collection_generator {
             }
 
             pub fn map_len<
-                Gen: $crate::ValueGenerator<Output = Len>,
+                Gen: $crate::ValueGenerator<Output = usize>,
                 F: Fn(L) -> Gen,
-                Len: Into<usize>,
             >(
                 self,
                 map: F,
@@ -69,19 +68,26 @@ macro_rules! impl_values_collection_generator {
 
         impl<
                 V: $crate::ValueGenerator,
-                L: $crate::ValueGenerator<Output = Len>,
-                Len: Into<usize>,
+                L: $crate::ValueGenerator<Output = usize>,
             > $crate::ValueGenerator for $generator<V, L>
-        $( where V::Output: Sized $(+ $params)*, )?
+        where $(V::Output: Sized $(+ $params)*, )?
+            $ty<V::Output>: 'static,
         {
             type Output = $ty<V::Output>;
 
+            #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                let mut value = Self::Output::new();
-                Self::mutate(self, driver, &mut value)?;
-                Some(value)
+                let mut value = driver.cache_get().unwrap_or_else(Self::Output::new);
+                match Self::mutate(self, driver, &mut value) {
+                    Some(()) => Some(value),
+                    None => {
+                        self.driver_cache(driver, value);
+                        None
+                    }
+                }
             }
 
+            #[inline]
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
                 driver.depth_guard(|driver| {
                     let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
@@ -96,15 +102,27 @@ macro_rules! impl_values_collection_generator {
                 })
 
             }
+
+            #[inline]
+            fn driver_cache<D: $crate::Driver>(&self, driver: &mut D, value: Self::Output) {
+                driver.cache_put(value);
+            }
         }
 
-        impl<V: $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGenerator for $ty<V> {
+        impl<V: 'static + $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGenerator for $ty<V> {
+            #[inline]
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
-                let mut value = Self::new();
-                Self::mutate(&mut value, driver)?;
-                Some(value)
+                let mut value = driver.cache_get().unwrap_or_else(Self::new);
+                match Self::mutate(&mut value, driver) {
+                    Some(()) => Some(value),
+                    None => {
+                        value.driver_cache(driver);
+                        None
+                    }
+                }
             }
 
+            #[inline]
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
                 driver.depth_guard(|driver| {
                     let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
@@ -118,9 +136,14 @@ macro_rules! impl_values_collection_generator {
                     }
                 })
             }
+
+            #[inline]
+            fn driver_cache<D: $crate::Driver>(self, driver: &mut D) {
+                driver.cache_put(self);
+            }
         }
 
-        impl<V: $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGeneratorWithParams for $ty<V> {
+        impl<V: 'static + $crate::TypeGenerator $($( + $params)*)?,> $crate::TypeGeneratorWithParams for $ty<V> {
             type Output =
                 $generator<$crate::TypeValueGenerator<V>, core::ops::RangeInclusive<usize>>;
 
@@ -137,6 +160,7 @@ macro_rules! impl_values_collection_generator {
         {
             type Output = $ty<V::Output>;
 
+            #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 assert!(!self.is_empty(), "cannot generate values from an empty collection");
                 let mut value = Self::Output::new();
@@ -144,6 +168,7 @@ macro_rules! impl_values_collection_generator {
                 Some(value)
             }
 
+            #[inline]
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
                 driver.depth_guard(|driver| {
                     let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
@@ -219,7 +244,7 @@ macro_rules! impl_key_values_collection_generator {
                 }
             }
 
-            pub fn len<Gen: $crate::ValueGenerator<Output = Len>, Len: Into<usize>>(
+            pub fn len<Gen: $crate::ValueGenerator<Output = usize>>(
                 self,
                 len: Gen,
             ) -> $generator<K, V, Gen> {
@@ -231,9 +256,8 @@ macro_rules! impl_key_values_collection_generator {
             }
 
             pub fn map_len<
-                Gen: $crate::ValueGenerator<Output = Len>,
+                Gen: $crate::ValueGenerator<Output = usize>,
                 F: Fn(L) -> Gen,
-                Len: Into<usize>,
             >(
                 self,
                 map: F,
@@ -249,13 +273,13 @@ macro_rules! impl_key_values_collection_generator {
         impl<
                 K: $crate::ValueGenerator,
                 V: $crate::ValueGenerator,
-                L: $crate::ValueGenerator<Output = Len>,
-                Len: Into<usize>,
+                L: $crate::ValueGenerator<Output = usize>,
             > $crate::ValueGenerator for $generator<K, V, L>
         $( where K::Output: Sized $(+ $params)*, )?
         {
             type Output = $ty<K::Output, V::Output>;
 
+            #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 driver.depth_guard(|driver| {
                     use $crate::ValueGenerator;
@@ -276,6 +300,7 @@ macro_rules! impl_key_values_collection_generator {
         impl<K: $crate::TypeGenerator $($( + $params)*)?, V: $crate::TypeGenerator> $crate::TypeGenerator
             for $ty<K, V>
         {
+            #[inline]
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
                 driver.depth_guard(|driver| {
                     use $crate::ValueGenerator;
@@ -313,6 +338,7 @@ macro_rules! impl_key_values_collection_generator {
         {
             type Output = $ty<K::Output, V::Output>;
 
+            #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 driver.depth_guard(|driver| {
                     use $crate::ValueGenerator;

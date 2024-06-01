@@ -9,6 +9,8 @@ use rand_core::RngCore;
 mod macros;
 
 mod bytes;
+#[cfg(feature = "alloc")]
+pub mod cache;
 mod rng;
 
 pub use bytes::ByteSliceDriver;
@@ -56,7 +58,7 @@ pub trait Driver: Sized {
 
     fn max_depth(&self) -> usize;
 
-    fn gen_variant<T: TypeGenerator + Uniform>(&mut self, variants: T, base_case: T) -> Option<T>;
+    fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize>;
 
     gen_method!(gen_u8, u8);
     gen_method!(gen_i8, i8);
@@ -94,6 +96,16 @@ pub trait Driver: Sized {
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>;
+
+    #[inline(always)]
+    fn cache_put<T: 'static>(&mut self, value: T) {
+        let _ = value;
+    }
+
+    #[inline(always)]
+    fn cache_get<T: 'static>(&mut self) -> Option<T> {
+        None
+    }
 }
 
 /// Byte exhaustion strategy for the driver

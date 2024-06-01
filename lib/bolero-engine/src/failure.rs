@@ -1,15 +1,18 @@
-use crate::panic::{rust_backtrace, PanicError};
+use crate::{
+    panic::{rust_backtrace, PanicError},
+    Seed,
+};
 use core::fmt::{Debug, Display};
 
 /// Contains information about a test failure
 #[derive(Debug)]
-pub struct TestFailure<Input> {
+pub struct Failure<Input> {
     pub error: PanicError,
     pub input: Input,
-    pub seed: Option<u64>,
+    pub seed: Option<Seed>,
 }
 
-impl<Input: Debug> Display for TestFailure<Input> {
+impl<Input: Debug> Display for Failure<Input> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
             f,
@@ -37,4 +40,4 @@ impl<Input: Debug> Display for TestFailure<Input> {
     }
 }
 
-impl<Input: Debug> std::error::Error for TestFailure<Input> {}
+impl<Input: Debug> std::error::Error for Failure<Input> {}
