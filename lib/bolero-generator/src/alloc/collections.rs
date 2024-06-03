@@ -89,9 +89,7 @@ macro_rules! impl_values_collection_generator {
 
             #[inline]
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&self.len, driver)?.into();
-
+                driver.enter_list::<Self::Output, _, _, _>(&self.len, |driver, len| {
                     $crate::alloc_generators::CollectionGenerator::mutate_collection(value, driver, len, &self.values)?;
 
                     if value.len() != len {
@@ -124,9 +122,7 @@ macro_rules! impl_values_collection_generator {
 
             #[inline]
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?.into();
-
+                driver.enter_list::<Self, _, _, _>(&$default_len_range, |driver, len| {
                     $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
 
                     if self.len() != len {
@@ -170,8 +166,8 @@ macro_rules! impl_values_collection_generator {
 
             #[inline]
             fn mutate<D: $crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-                driver.depth_guard(|driver| {
-                    let len = $crate::ValueGenerator::generate(&$default_len_range, driver)?;
+                driver.enter_list::<Self::Output, _, _, _>(&$default_len_range, |driver, len| {
+                    // TODO remove the allocation here
                     let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                     let gen_item = $crate::one_of(&generators[..]);
 
@@ -281,9 +277,8 @@ macro_rules! impl_key_values_collection_generator {
 
             #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                driver.depth_guard(|driver| {
+                driver.enter_list::<Self::Output, _, _, _>(&self.len, |driver, len| {
                     use $crate::ValueGenerator;
-                    let len = ValueGenerator::generate(&self.len, driver)?.into();
                     Iterator::map(0..len, |_| {
                         Some((
                             ValueGenerator::generate(&self.keys, driver)?,
@@ -302,9 +297,7 @@ macro_rules! impl_key_values_collection_generator {
         {
             #[inline]
             fn generate<D: $crate::Driver>(driver: &mut D) -> Option<Self> {
-                driver.depth_guard(|driver| {
-                    use $crate::ValueGenerator;
-                    let len = ValueGenerator::generate(&$default_len_range, driver)?;
+                driver.enter_list::<Self, _, _, _>(&$default_len_range, |driver, len| {
                     Iterator::map(0..len, |_|
                         Some((K::generate(driver)?, V::generate(driver)?))
                     ).collect()
@@ -340,12 +333,11 @@ macro_rules! impl_key_values_collection_generator {
 
             #[inline]
             fn generate<D: $crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                driver.depth_guard(|driver| {
+                driver.enter_list::<Self::Output, _, _, _>(&$default_len_range, |driver, len| {
                     use $crate::ValueGenerator;
 
                     assert!(!self.is_empty());
 
-                    let len = ValueGenerator::generate(&$default_len_range, driver)?;
                     let generators: $crate::alloc_generators::Vec<_> = self.iter().collect();
                     let generators_len = 0..generators.len();
 

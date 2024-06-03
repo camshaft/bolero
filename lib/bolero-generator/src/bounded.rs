@@ -27,7 +27,7 @@ impl<T> BoundExt<T> for Bound<T> {
     }
 }
 
-pub trait BoundedValue<B = Self>: Sized {
+pub trait BoundedValue<B = Self>: 'static + Sized {
     fn gen_bounded<D: Driver>(driver: &mut D, min: Bound<&B>, max: Bound<&B>) -> Option<Self>;
 
     fn mutate_bounded<D: Driver>(

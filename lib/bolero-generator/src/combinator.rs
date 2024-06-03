@@ -6,12 +6,14 @@ pub struct MapGenerator<Generator, Map> {
     pub(crate) map: Map,
 }
 
-impl<G: ValueGenerator, M: Fn(G::Output) -> T, T> ValueGenerator for MapGenerator<G, M> {
+impl<G: ValueGenerator, M: Fn(G::Output) -> T, T: 'static> ValueGenerator for MapGenerator<G, M> {
     type Output = T;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let value = self.generator.generate(driver)?;
-        Some((self.map)(value))
+        driver.enter_combinator::<Self::Output, _, _>(|driver| {
+            let value = self.generator.generate(driver)?;
+            Some((self.map)(value))
+        })
     }
 }
 
@@ -32,8 +34,12 @@ impl<G: ValueGenerator, H: ValueGenerator, F: Fn(G::Output) -> H> ValueGenerator
     type Output = H::Output;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let value = self.generator.generate(driver)?;
-        (self.and_then)(value).generate(driver)
+        driver.enter_combinator::<Self::Output, _, _>(|driver| {
+            driver.enter_product::<Self::Output, _, _>(|driver| {
+                let value = self.generator.generate(driver)?;
+                (self.and_then)(value).generate(driver)
+            })
+        })
     }
 }
 
@@ -52,12 +58,14 @@ impl<G: ValueGenerator, F: Fn(&G::Output) -> bool> ValueGenerator for FilterGene
     type Output = G::Output;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let value = self.generator.generate(driver)?;
-        if (self.filter)(&value) {
-            Some(value)
-        } else {
-            None
-        }
+        driver.enter_combinator::<Self::Output, _, _>(|driver| {
+            let value = self.generator.generate(driver)?;
+            if (self.filter)(&value) {
+                Some(value)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -72,14 +80,16 @@ pub struct FilterMapGenerator<Generator, FilterMap> {
     pub(crate) filter_map: FilterMap,
 }
 
-impl<G: ValueGenerator, F: Fn(G::Output) -> Option<T>, T> ValueGenerator
+impl<G: ValueGenerator, F: Fn(G::Output) -> Option<T>, T: 'static> ValueGenerator
     for FilterMapGenerator<G, F>
 {
     type Output = T;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let value = self.generator.generate(driver)?;
-        (self.filter_map)(value)
+        driver.enter_combinator::<Self::Output, _, _>(|driver| {
+            let value = self.generator.generate(driver)?;
+            (self.filter_map)(value)
+        })
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{
 use core::ops::{Bound, RangeFrom, RangeFull};
 
 macro_rules! impl_integer {
-    ($ty:ident, $call:ident) => {
+    ($ty:ident, $call:ident, $constant:ident) => {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 driver.$call(Bound::Unbounded, Bound::Unbounded)
@@ -15,8 +15,8 @@ macro_rules! impl_integer {
         impl ValueGenerator for $ty {
             type Output = $ty;
 
-            fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-                Some(*self)
+            fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self> {
+                driver.$constant(*self)
             }
         }
 
@@ -40,21 +40,37 @@ macro_rules! impl_integer {
     };
 }
 
-impl_integer!(u8, gen_u8);
-impl_integer!(i8, gen_i8);
-impl_integer!(u16, gen_u16);
-impl_integer!(i16, gen_i16);
-impl_integer!(u32, gen_u32);
-impl_integer!(i32, gen_i32);
-impl_integer!(u64, gen_u64);
-impl_integer!(i64, gen_i64);
-impl_integer!(u128, gen_u128);
-impl_integer!(i128, gen_i128);
-impl_integer!(usize, gen_usize);
-impl_integer!(isize, gen_isize);
+impl_integer!(u8, gen_u8, gen_u8_constant);
+impl_integer!(i8, gen_i8, gen_i8_constant);
+impl_integer!(u16, gen_u16, gen_u16_constant);
+impl_integer!(i16, gen_i16, gen_i16_constant);
+impl_integer!(u32, gen_u32, gen_u32_constant);
+impl_integer!(i32, gen_i32, gen_i32_constant);
+impl_integer!(u64, gen_u64, gen_u64_constant);
+impl_integer!(i64, gen_i64, gen_i64_constant);
+impl_integer!(u128, gen_u128, gen_u128_constant);
+impl_integer!(i128, gen_i128, gen_i128_constant);
+impl_integer!(usize, gen_usize, gen_usize_constant);
+impl_integer!(isize, gen_isize, gen_isize_constant);
+
+#[test]
+fn integer_test() {
+    let _ = generator_test!(gen::<u8>());
+    let _ = generator_test!(gen::<i8>());
+    let _ = generator_test!(gen::<u16>());
+    let _ = generator_test!(gen::<i16>());
+    let _ = generator_test!(gen::<u32>());
+    let _ = generator_test!(gen::<i32>());
+    let _ = generator_test!(gen::<u64>());
+    let _ = generator_test!(gen::<i64>());
+    let _ = generator_test!(gen::<u128>());
+    let _ = generator_test!(gen::<i128>());
+    let _ = generator_test!(gen::<usize>());
+    let _ = generator_test!(gen::<isize>());
+}
 
 macro_rules! impl_float {
-    ($ty:ident, $call:ident) => {
+    ($ty:ident, $call:ident, $constant:ident) => {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 driver.$call(Bound::Unbounded, Bound::Unbounded)
@@ -64,8 +80,8 @@ macro_rules! impl_float {
         impl ValueGenerator for $ty {
             type Output = $ty;
 
-            fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self> {
-                Some(*self)
+            fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self> {
+                driver.$constant(*self)
             }
         }
 
@@ -89,8 +105,15 @@ macro_rules! impl_float {
     };
 }
 
-impl_float!(f32, gen_f32);
-impl_float!(f64, gen_f64);
+impl_float!(f32, gen_f32, gen_f32_constant);
+impl_float!(f64, gen_f64, gen_f64_constant);
+
+#[test]
+fn float_test() {
+    // TODO filter NaN for mutation comparison
+    //let _ = generator_test!(gen::<f32>());
+    //let _ = generator_test!(gen::<f64>());
+}
 
 macro_rules! impl_non_zero_integer {
     ($ty:ident, $inner:ty) => {

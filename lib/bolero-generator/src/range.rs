@@ -57,21 +57,26 @@ macro_rules! range_generator {
         where
             Start: ValueGenerator<Output = T>,
             End: ValueGenerator<Output = T>,
+            T: 'static,
         {
             type Output = core::ops::$ty<T>;
 
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-                let $start = self.start.generate(driver)?;
-                let $end = self.end.generate(driver)?;
-                Some($new)
+                driver.enter_product::<Self::Output, _, _>(|driver| {
+                    let $start = self.start.generate(driver)?;
+                    let $end = self.end.generate(driver)?;
+                    Some($new)
+                })
             }
         }
 
         impl<T: TypeGenerator> TypeGenerator for core::ops::$ty<T> {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                let $start = driver.gen()?;
-                let $end = driver.gen()?;
-                Some($new)
+                driver.enter_product::<Self, _, _>(|driver| {
+                    let $start = driver.gen()?;
+                    let $end = driver.gen()?;
+                    Some($new)
+                })
             }
         }
 

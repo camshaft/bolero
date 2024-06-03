@@ -51,7 +51,7 @@ pub use crate::arbitrary::gen_arbitrary;
 pub use crate::driver::Driver;
 
 /// Generate a value for a given type
-pub trait TypeGenerator: Sized {
+pub trait TypeGenerator: 'static + Sized {
     /// Generates a value with the given driver
     fn generate<D: Driver>(driver: &mut D) -> Option<Self>;
 
@@ -82,7 +82,7 @@ pub trait TypeGenerator: Sized {
 
 /// Generate a value with a parameterized generator
 pub trait ValueGenerator: Sized {
-    type Output;
+    type Output: 'static;
 
     /// Generates a value with the given driver
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output>;
@@ -229,7 +229,7 @@ pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
 
 pub use one_of::{one_of, one_value_of};
 
-impl<T> ValueGenerator for PhantomData<T> {
+impl<T: 'static> ValueGenerator for PhantomData<T> {
     type Output = Self;
 
     fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {
@@ -237,7 +237,7 @@ impl<T> ValueGenerator for PhantomData<T> {
     }
 }
 
-impl<T> TypeGenerator for PhantomData<T> {
+impl<T: 'static> TypeGenerator for PhantomData<T> {
     fn generate<D: Driver>(_driver: &mut D) -> Option<Self> {
         Some(PhantomData)
     }
@@ -247,7 +247,7 @@ pub struct Constant<T> {
     value: T,
 }
 
-impl<T: Clone> ValueGenerator for Constant<T> {
+impl<T: 'static + Clone> ValueGenerator for Constant<T> {
     type Output = T;
 
     fn generate<D: Driver>(&self, _driver: &mut D) -> Option<Self::Output> {

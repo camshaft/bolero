@@ -27,17 +27,21 @@ macro_rules! impl_tuple {
     ($head:ident($h_value:tt), $($tail:ident($t_value:tt), )* [$($acc:ident($a_value:tt),)*]) => {
         impl<$head: TypeGenerator $(, $acc: TypeGenerator)*> TypeGenerator for ($($acc, )* $head ,) {
             fn generate<D_: Driver>(driver: &mut D_) -> Option<Self> {
-                Some(($(
-                    $acc::generate(driver)?,
-                )* $head::generate(driver)?, ))
+                driver.enter_product::<Self, _, _>(|driver| {
+                    Some(($(
+                        $acc::generate(driver)?,
+                    )* $head::generate(driver)?, ))
+                })
             }
 
             fn mutate<D_: Driver>(&mut self, driver: &mut D_) -> Option<()> {
-                $(
-                    self.$a_value.mutate(driver)?;
-                )*
-                self.$h_value.mutate(driver)?;
-                Some(())
+                driver.enter_product::<Self, _, _>(|driver| {
+                    $(
+                        self.$a_value.mutate(driver)?;
+                    )*
+                    self.$h_value.mutate(driver)?;
+                    Some(())
+                })
             }
         }
 
@@ -45,17 +49,21 @@ macro_rules! impl_tuple {
             type Output = ($( $acc::Output, )* $head::Output, );
 
             fn generate<D_: Driver>(&self, driver: &mut D_) -> Option<Self::Output> {
-                Some(($(
-                    self.$a_value.generate(driver)?,
-                )* self.$h_value.generate(driver)?,))
+                driver.enter_product::<Self::Output, _, _>(|driver| {
+                    Some(($(
+                        self.$a_value.generate(driver)?,
+                    )* self.$h_value.generate(driver)?,))
+                })
             }
 
             fn mutate<D_: Driver>(&self, driver: &mut D_, value: &mut Self::Output) -> Option<()> {
-                $(
-                    self.$a_value.mutate(driver, &mut value.$a_value)?;
-                )*
-                self.$h_value.mutate(driver, &mut value.$h_value)?;
-                Some(())
+                driver.enter_product::<Self::Output, _, _>(|driver| {
+                    $(
+                        self.$a_value.mutate(driver, &mut value.$a_value)?;
+                    )*
+                    self.$h_value.mutate(driver, &mut value.$h_value)?;
+                    Some(())
+                })
             }
         }
 

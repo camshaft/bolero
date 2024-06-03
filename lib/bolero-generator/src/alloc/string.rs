@@ -28,17 +28,14 @@ impl<C, L> StringGenerator<C, L> {
         }
     }
 
-    pub fn len<Gen: ValueGenerator<Output = Len>, Len: Into<usize>>(
-        self,
-        len: Gen,
-    ) -> StringGenerator<C, Gen> {
+    pub fn len<Gen: ValueGenerator<Output = usize>>(self, len: Gen) -> StringGenerator<C, Gen> {
         StringGenerator {
             chars: self.chars,
             len,
         }
     }
 
-    pub fn map_len<Gen: ValueGenerator<Output = Len>, F: Fn(L) -> Gen, Len: Into<usize>>(
+    pub fn map_len<Gen: ValueGenerator<Output = usize>, F: Fn(L) -> Gen>(
         self,
         map: F,
     ) -> StringGenerator<C, Gen> {
@@ -49,20 +46,21 @@ impl<C, L> StringGenerator<C, L> {
     }
 }
 
-impl<G: ValueGenerator<Output = char>, L: ValueGenerator<Output = Len>, Len: Into<usize>>
-    ValueGenerator for StringGenerator<G, L>
+impl<G: ValueGenerator<Output = char>, L: ValueGenerator<Output = usize>> ValueGenerator
+    for StringGenerator<G, L>
 {
     type Output = String;
 
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
-        let len = ValueGenerator::generate(&self.len, driver)?.into();
-
-        Iterator::map(0..len, |_| ValueGenerator::generate(&self.chars, driver)).collect()
+        let mut value = String::default();
+        self.mutate(driver, &mut value)?;
+        Some(value)
     }
 
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
-        let len = ValueGenerator::generate(&self.len, driver)?.into();
-        CollectionGenerator::mutate_collection(value, driver, len, &self.chars)
+        driver.enter_list::<Self::Output, _, _, _>(&self.len, |driver, len| {
+            CollectionGenerator::mutate_collection(value, driver, len, &self.chars)
+        })
     }
 }
 
