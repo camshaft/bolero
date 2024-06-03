@@ -52,6 +52,27 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Animal {
+    Dog { color: Color, tail: Tail },
+    Bear { color: Color },
+    Cat { color: Color, tail: Tail },
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Color {
+    Brown,
+    Black,
+    White,
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
+pub enum Tail {
+    Short,
+    Medium,
+    Long,
+}
+
+#[derive(Debug, Clone, TypeGenerator, PartialEq)]
 pub enum GenericTypes<T1, T2> {
     T1Value(T1),
     T2Value(T2),
@@ -95,11 +116,16 @@ fn derive_enum_test() {
 }
 
 #[test]
+fn derive_animal_test() {
+    let _ = generator_test!(Animal::gen());
+}
+
+#[test]
 fn derive_union_test() {
     let _ = generator_no_clone_test!(Union::gen());
 }
 
 #[test]
-fn derive_recursive_test() {
+fn derive_expr_test() {
     let _ = generator_test!(Expr::gen());
 }

@@ -92,15 +92,21 @@ fn generate_struct_type_gen(
     let generate_method = quote!(
         #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            Some(#value)
+            __bolero_driver.enter_product::<Self, _, _>(
+                |__bolero_driver| Some(#value)
+            )
         }
     );
     let mutate_method = quote!(
         #[inline]
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-            let #destructure = self;
-            #mutate_body
-            Some(())
+            __bolero_driver.enter_product::<Self, _, _>(
+                |__bolero_driver| {
+                    let #destructure = self;
+                    #mutate_body
+                    Some(())
+                }
+            )
         }
 
         #[inline]
@@ -119,7 +125,18 @@ fn generate_enum_type_gen(
     data_enum: DataEnum,
 ) -> (TokenStream2, TokenStream2) {
     let variant_max = data_enum.variants.len();
-    let variant_upper = lower_type_index(variant_max, variant_max, name.span());
+    let base_case: usize = 0;
+
+    let variant_names: Vec<_> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let span = variant.span();
+            let name = variant.ident.to_string();
+            quote_spanned!(span=> #name,)
+        })
+        .collect();
+    let variant_names = quote_spanned!(name.span()=> &[#(#variant_names)*]);
 
     let gen_variants: Vec<_> = data_enum
         .variants
@@ -186,37 +203,48 @@ fn generate_enum_type_gen(
     let generate_method = quote!(
         #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            let __bolero_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
-            Some(match __bolero_selection {
-                #(#gen_variants)*
-                _ => unreachable!("Value outside of range"),
-            })
+            __bolero_driver.enter_sum::<Self, _, _>(
+                Some(#variant_names),
+                #variant_max,
+                #base_case,
+                |__bolero_driver, __bolero_selection| {
+                    Some(match __bolero_selection {
+                        #(#gen_variants)*
+                        _ => unreachable!("Value outside of range"),
+                    })
+                }
+            )
         }
     );
 
     let mutate_method = quote!(
         #[inline]
         fn mutate<__BOLERO_DRIVER: #krate::driver::Driver>(&mut self, __bolero_driver: &mut __BOLERO_DRIVER) -> Option<()> {
-            let __bolero_new_selection = __bolero_driver.gen_variant(#variant_upper, 0)?;
+            __bolero_driver.enter_sum::<Self, _, _>(
+                Some(#variant_names),
+                #variant_max,
+                #base_case,
+                |__bolero_driver, __bolero_new_selection| {
+                    let __bolero_prev_selection = match self {
+                        #(#gen_lookup)*
+                    };
 
-            let __bolero_prev_selection = match self {
-                #(#gen_lookup)*
-            };
-
-            if __bolero_prev_selection == __bolero_new_selection {
-                match self {
-                    #(#gen_mutate)*
+                    if __bolero_prev_selection == __bolero_new_selection {
+                        match self {
+                            #(#gen_mutate)*
+                        }
+                    } else {
+                        let next = match __bolero_new_selection {
+                            #(#gen_variants)*
+                            _ => unreachable!("Value outside of range"),
+                        };
+                        match ::core::mem::replace(self, next) {
+                            #(#gen_driver_cache)*
+                        }
+                        Some(())
+                    }
                 }
-            } else {
-                let next = match __bolero_new_selection {
-                    #(#gen_variants)*
-                    _ => unreachable!("Value outside of range"),
-                };
-                match ::core::mem::replace(self, next) {
-                    #(#gen_driver_cache)*
-                }
-                Some(())
-            }
+            )
         }
 
         #[inline]
@@ -239,6 +267,25 @@ fn generate_union_type_gen(
     let field_max = data_union.fields.named.len();
     let field_upper = lower_type_index(field_max, field_max, name.span());
 
+    let base_case: usize = 0;
+
+    let variant_names: Vec<_> = data_union
+        .fields
+        .named
+        .iter()
+        .enumerate()
+        .map(|(idx, variant)| {
+            let span = variant.span();
+            let name = if let Some(name) = variant.ident.as_ref() {
+                name.to_string()
+            } else {
+                format!("<UnnamedUnionVariant{idx}>")
+            };
+            quote_spanned!(span=> #name,)
+        })
+        .collect();
+    let variant_names = quote_spanned!(name.span()=> &[#(#variant_names)*]);
+
     let fields: Vec<_> = data_union
         .fields
         .named
@@ -256,7 +303,7 @@ fn generate_union_type_gen(
             let span = generator.span();
             let value = generator.value_generate();
             quote_spanned!(span=>
-                #idx => Some(#name { #field_name: #value })
+                #idx => Some(#name { #field_name: #value }),
             )
         })
         .collect();
@@ -264,10 +311,17 @@ fn generate_union_type_gen(
     let generate_method = quote!(
         #[inline]
         fn generate<__BOLERO_DRIVER: #krate::driver::Driver>(__bolero_driver: &mut __BOLERO_DRIVER) -> Option<Self> {
-            match __bolero_driver.gen_variant(#field_upper, 0)? {
-                #(#fields,)*
-                _ => unreachable!("Value outside of range"),
-            }
+            __bolero_driver.enter_sum::<Self, _, _>(
+                Some(#variant_names),
+                #field_upper,
+                #base_case,
+                |__bolero_driver, __bolero_selection| {
+                    match __bolero_selection {
+                        #(#fields)*
+                        _ => unreachable!("Value outside of range"),
+                    }
+                }
+            )
         }
     );
 
