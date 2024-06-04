@@ -30,30 +30,39 @@ impl PanicError {
     }
 }
 
-pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, PanicError> {
-    Ok(fun())
+#[inline(always)]
+pub fn catch<F: RefUnwindSafe + FnOnce() -> Result<Output, PanicError>, Output>(
+    fun: F,
+) -> Result<Output, PanicError> {
+    fun()
 }
 
+#[inline(always)]
 pub fn take_panic() -> Option<PanicError> {
     None
 }
 
+#[inline(always)]
 pub fn capture_backtrace(_value: bool) -> bool {
     false
 }
 
+#[inline(always)]
 pub fn forward_panic(_value: bool) -> bool {
     false
 }
 
+#[inline(always)]
 pub fn set_hook() {
     // no-op
 }
 
+#[inline(always)]
 pub fn rust_backtrace() -> bool {
     false
 }
 
+#[inline(always)]
 pub fn thread_name() -> String {
     String::from("main")
 }

@@ -1,6 +1,6 @@
 macro_rules! gen_int {
     ($name:ident, $ty:ident) => {
-        #[inline]
+        #[inline(always)]
         fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
             Uniform::sample(self, min, max)
         }
@@ -74,12 +74,12 @@ macro_rules! gen_from_bytes {
 
         gen_float!(gen_f64, f64);
 
-        #[inline]
+        #[inline(always)]
         fn gen_char(&mut self, min: Bound<&char>, max: Bound<&char>) -> Option<char> {
             char::sample(self, min, max)
         }
 
-        #[inline]
+        #[inline(always)]
         fn gen_bool(&mut self, probability: Option<f32>) -> Option<bool> {
             if let Some(probability) = probability {
                 let value = self.sample_u32()? as f32 / core::u32::MAX as f32;
@@ -89,20 +89,13 @@ macro_rules! gen_from_bytes {
             }
         }
 
-        #[inline]
+        #[inline(always)]
         fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
-            match FillBytes::mode(self) {
-                DriverMode::Direct => {
-                    Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))
-                }
-                DriverMode::Forced => {
-                    if self.depth == self.max_depth {
-                        return Some(base_case);
-                    }
-
-                    Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))
-                }
+            if self.depth == self.max_depth {
+                return Some(base_case);
             }
+
+            Uniform::sample(self, Bound::Unbounded, Bound::Excluded(&variants))
         }
     };
 }

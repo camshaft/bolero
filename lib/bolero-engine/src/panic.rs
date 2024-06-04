@@ -82,32 +82,44 @@ impl PanicError {
     }
 }
 
-pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, PanicError> {
-    catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun))).map_err(|err| {
-        if let Some(err) = take_panic() {
-            return err;
+#[inline]
+pub fn catch<F: RefUnwindSafe + FnOnce() -> Result<Output, PanicError>, Output>(
+    fun: F,
+) -> Result<Output, PanicError> {
+    let res = catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun)));
+    match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(err)) => Err(err),
+        Err(err) => {
+            if let Some(err) = take_panic() {
+                return Err(err);
+            }
+            macro_rules! try_downcast {
+                ($ty:ty, $fmt:expr) => {
+                    if let Some(err) = err.downcast_ref::<$ty>() {
+                        return Err(PanicError::new(format!($fmt, err)));
+                    }
+                };
+            }
+            try_downcast!(PanicInfo, "{}");
+            try_downcast!(anyhow::Error, "{}");
+            try_downcast!(String, "{}");
+            try_downcast!(&'static str, "{}");
+            try_downcast!(Box<dyn Display>, "{}");
+            try_downcast!(Box<dyn Debug>, "{:?}");
+            Err(PanicError::new(
+                "thread panicked with an unknown error".to_string(),
+            ))
         }
-        macro_rules! try_downcast {
-            ($ty:ty, $fmt:expr) => {
-                if let Some(err) = err.downcast_ref::<$ty>() {
-                    return PanicError::new(format!($fmt, err));
-                }
-            };
-        }
-        try_downcast!(PanicInfo, "{}");
-        try_downcast!(anyhow::Error, "{}");
-        try_downcast!(String, "{}");
-        try_downcast!(&'static str, "{}");
-        try_downcast!(Box<dyn Display>, "{}");
-        try_downcast!(Box<dyn Debug>, "{:?}");
-        PanicError::new("thread panicked with an unknown error".to_string())
-    })
+    }
 }
 
+#[inline]
 pub fn take_panic() -> Option<PanicError> {
     ERROR.with(|error| error.borrow_mut().take())
 }
 
+#[inline]
 pub fn capture_backtrace(value: bool) -> bool {
     CAPTURE_BACKTRACE.with(|cell| {
         let prev = *cell.borrow();
@@ -116,6 +128,7 @@ pub fn capture_backtrace(value: bool) -> bool {
     })
 }
 
+#[inline]
 pub fn forward_panic(value: bool) -> bool {
     FORWARD_PANIC.with(|cell| {
         let prev = *cell.borrow();
@@ -124,14 +137,17 @@ pub fn forward_panic(value: bool) -> bool {
     })
 }
 
+#[inline]
 pub fn set_hook() {
     *PANIC_HOOK
 }
 
+#[inline]
 pub fn rust_backtrace() -> bool {
     *RUST_BACKTRACE
 }
 
+#[inline]
 pub fn thread_name() -> String {
     THREAD_NAME.with(|cell| cell.clone())
 }
