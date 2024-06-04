@@ -37,6 +37,7 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
+    #[inline]
     fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
@@ -48,10 +49,11 @@ where
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
-            })?
+            })
         })
     }
 
+    #[inline]
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
@@ -73,6 +75,7 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
+    #[inline]
     fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
@@ -84,10 +87,11 @@ where
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
-            })?
+            })
         })
     }
 
+    #[inline]
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
@@ -109,6 +113,7 @@ where
 {
     type Value = SliceDebug<Vec<u8>>;
 
+    #[inline]
     fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
@@ -121,10 +126,11 @@ where
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
-            })?
+            })
         })
     }
 
+    #[inline]
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_slice(&mut |slice| SliceDebug(slice.to_vec()))
     }
@@ -186,6 +192,7 @@ where
 {
     type Value = G::Output;
 
+    #[inline]
     fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
@@ -202,10 +209,11 @@ where
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
-            })?
+            })
         })
     }
 
+    #[inline]
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
@@ -240,6 +248,7 @@ where
 {
     type Value = G::Output;
 
+    #[inline]
     fn test<T: Input<Result<bool, PanicError>>>(
         &mut self,
         input: &mut T,
@@ -268,10 +277,11 @@ where
                     Ok(()) => Ok(true),
                     Err(err) => Err(err),
                 }
-            })?
+            })
         })
     }
 
+    #[inline]
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
