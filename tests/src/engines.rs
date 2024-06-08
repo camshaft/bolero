@@ -33,8 +33,8 @@ pub fn test() -> Result {
             .run()?;
         }
 
-        // libfuzzer supports multiple jobs
-        if ["libfuzzer"].contains(&engine) {
+        // engines that support multiple jobs
+        if ["libfuzzer", "random"].contains(&engine) {
             Test {
                 sanitizer: "address".to_string(),
                 rustc_bootstrap: !is_nightly,
