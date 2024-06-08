@@ -1,6 +1,6 @@
 [package]
 name = "bolero-engine"
-version = "0.10.2"
+version = "0.11.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "fuzz and property testing framework"
 homepage = "https://github.com/camshaft/bolero"
@@ -17,9 +17,9 @@ rng = ["rand", "rand_xoshiro", "bolero-generator/alloc"]
 
 [dependencies]
 anyhow = "1"
-bolero-generator = { version = "0.10", path = "../bolero-generator", default-features = false }
+bolero-generator = { version = "0.11", path = "../bolero-generator", default-features = false }
 lazy_static = "1"
-pretty-hex = "0.3"
+pretty-hex = { version = "0.4", default-features = false }
 rand = { version = "0.8", optional = true }
 rand_xoshiro = { version = "0.6", optional = true }
 
@@ -28,5 +28,5 @@ backtrace = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 bolero-generator = { path = "../bolero-generator", features = ["std"] }
-rand = "^0.8"
+rand = "0.8"
 rand_xoshiro = "0.6"
