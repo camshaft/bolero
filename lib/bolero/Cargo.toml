@@ -44,3 +44,14 @@ rand = { version = "0.8" }
 
 [dev-dependencies]
 rand = "0.8"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+  'cfg(kani)',
+  'cfg(fuzzing)',
+  'cfg(fuzzing_afl)',
+  'cfg(fuzzing_libfuzzer)',
+  'cfg(fuzzing_honggfuzz)',
+  'cfg(fuzzing_random)'
+]

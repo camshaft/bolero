@@ -20,3 +20,14 @@ bolero-engine = { version = "0.11", path = "../bolero-engine", optional = true }
 
 [build-dependencies]
 cc = "1.0"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+  'cfg(kani)',
+  'cfg(fuzzing)',
+  'cfg(fuzzing_afl)',
+  'cfg(fuzzing_libfuzzer)',
+  'cfg(fuzzing_honggfuzz)',
+  'cfg(fuzzing_random)'
+]

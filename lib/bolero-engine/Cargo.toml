@@ -30,3 +30,14 @@ backtrace = { version = "0.3", default-features = false, features = ["std"] }
 bolero-generator = { path = "../bolero-generator", features = ["std"] }
 rand = "0.8"
 rand_xoshiro = "0.6"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+  'cfg(kani)',
+  'cfg(fuzzing)',
+  'cfg(fuzzing_afl)',
+  'cfg(fuzzing_libfuzzer)',
+  'cfg(fuzzing_honggfuzz)',
+  'cfg(fuzzing_random)'
+]
