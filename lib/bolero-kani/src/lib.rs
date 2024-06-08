@@ -76,16 +76,13 @@ pub mod lib {
 
         fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
             // TODO make this configurable
-            const MAX_LEN: usize = driver::Options::DEFAULT_MAX_LEN;
+            const MAX_LEN: usize = 256;
 
             let bytes = kani::vec::any_vec::<u8, MAX_LEN>();
             let len = self.options.max_len_or_default().min(MAX_LEN);
             kani::assume(bytes.len() <= len);
 
-            let array: [u8; MAX_LEN] = kani::any();
-            let len = kani::any();
-            kani::assume(len <= MAX_LEN);
-            f(&array[..len])
+            f(&bytes)
         }
 
         fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
