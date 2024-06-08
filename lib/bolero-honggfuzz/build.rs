@@ -3,7 +3,6 @@ use std::{env, process::Command};
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "dragonfly",
-    target_os = "bitrig",
     target_os = "openbsd",
     target_os = "netbsd"
 )))]
@@ -11,7 +10,6 @@ const MAKE_COMMAND: &str = "make";
 #[cfg(any(
     target_os = "freebsd",
     target_os = "dragonfly",
-    target_os = "bitrig",
     target_os = "openbsd",
     target_os = "netbsd"
 ))]
