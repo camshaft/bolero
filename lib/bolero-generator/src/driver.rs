@@ -178,10 +178,12 @@ pub struct Options {
     driver_mode: Option<DriverMode>,
     shrink_time: Option<core::time::Duration>,
     max_depth: Option<usize>,
+    max_len: Option<usize>,
 }
 
 impl Options {
-    pub const DEFAULT_MAX_DEPTH: usize = 32;
+    pub const DEFAULT_MAX_DEPTH: usize = 5;
+    pub const DEFAULT_MAX_LEN: usize = 4096;
     pub const DEFAULT_SHRINK_TIME: core::time::Duration = core::time::Duration::from_secs(1);
 
     pub fn with_driver_mode(mut self, driver_mode: DriverMode) -> Self {
@@ -196,6 +198,11 @@ impl Options {
 
     pub fn with_max_depth(mut self, max_depth: usize) -> Self {
         self.max_depth = Some(max_depth);
+        self
+    }
+
+    pub fn with_max_len(mut self, max_len: usize) -> Self {
+        self.max_len = Some(max_len);
         self
     }
 
@@ -214,9 +221,19 @@ impl Options {
         self
     }
 
+    pub fn set_max_len(&mut self, max_len: usize) -> &mut Self {
+        self.max_len = Some(max_len);
+        self
+    }
+
     #[inline]
     pub fn max_depth(&self) -> Option<usize> {
         self.max_depth
+    }
+
+    #[inline]
+    pub fn max_len(&self) -> Option<usize> {
+        self.max_len
     }
 
     #[inline]
@@ -232,6 +249,11 @@ impl Options {
     #[inline]
     pub fn max_depth_or_default(&self) -> usize {
         self.max_depth.unwrap_or(Self::DEFAULT_MAX_DEPTH)
+    }
+
+    #[inline]
+    pub fn max_len_or_default(&self) -> usize {
+        self.max_len.unwrap_or(Self::DEFAULT_MAX_LEN)
     }
 
     #[inline]
@@ -251,6 +273,7 @@ impl Options {
 
         merge!(driver_mode);
         merge!(max_depth);
+        merge!(max_len);
         merge!(shrink_time);
     }
 }

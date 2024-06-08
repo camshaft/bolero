@@ -12,6 +12,8 @@ impl<'a> ByteSliceDriver<'a> {
     pub fn new(input: &'a [u8], options: &Options) -> Self {
         let mode = options.driver_mode.unwrap_or(DriverMode::Direct);
         let max_depth = options.max_depth_or_default();
+        let len = options.max_len_or_default().min(input.len());
+        let input = &input[..len];
 
         Self {
             input,
