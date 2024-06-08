@@ -1,6 +1,6 @@
 [package]
 name = "cargo-bolero"
-version = "0.11.0"
+version = "0.11.1"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
