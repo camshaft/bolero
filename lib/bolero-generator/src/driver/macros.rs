@@ -19,15 +19,7 @@ macro_rules! gen_float {
                 return Some(<$ty>::from_le_bytes(bytes));
             }
 
-            // if we're in direct mode, just sample a value and check if it's within the provided range
-            if FillBytes::mode(self) == DriverMode::Direct {
-                return self
-                    .$name(Bound::Unbounded, Bound::Unbounded)
-                    .filter(|value| (min, max).contains(value));
-            }
-
             // TODO make this all less biased
-
             if let Some(value) = self
                 .$name(Bound::Unbounded, Bound::Unbounded)
                 .filter(|value| (min, max).contains(value))

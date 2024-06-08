@@ -6,7 +6,7 @@ macro_rules! shrink_test {
         #[test]
         fn $name() {
             #[allow(unused_imports)]
-            use bolero_generator::{driver::DriverMode, gen, ValueGenerator};
+            use bolero_generator::{gen, ValueGenerator};
 
             panic::forward_panic(true);
             panic::capture_backtrace(true);
@@ -14,9 +14,7 @@ macro_rules! shrink_test {
             let mut test = crate::ClonedGeneratorTest::new($check, $gen);
             let input = ($input).to_vec();
 
-            let options = driver::Options::default()
-                .with_driver_mode(DriverMode::Forced)
-                .with_shrink_time(Duration::from_secs(1));
+            let options = driver::Options::default().with_shrink_time(Duration::from_secs(1));
 
             let failure = Shrinker::new(&mut test, input, None, &options)
                 .shrink()

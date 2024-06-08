@@ -2,12 +2,12 @@
 macro_rules! generator_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ByteSliceDriver, DriverMode, Options, Rng},
+            driver::{ByteSliceDriver, Options, Rng},
             *,
         };
         let gen = $gen;
 
-        let options = Options::default().with_driver_mode(DriverMode::Forced);
+        let options = Options::default();
 
         let mut rng_driver = Rng::new(rand::thread_rng(), &options);
 
@@ -19,7 +19,6 @@ macro_rules! generator_test {
             .unwrap();
 
         {
-            let options = options.clone().with_driver_mode(DriverMode::Direct);
             for input in inputs.iter() {
                 if let Some(value) =
                     ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
@@ -39,8 +38,8 @@ macro_rules! generator_test {
             }
         }
 
-        // keep track of failed forced inputs and make sure they didn't all fail
-        let mut failed_forced = 0;
+        // keep track of failed inputs and make sure they didn't all fail
+        let mut failed = 0;
 
         for input in inputs.iter() {
             if let Some(value) =
@@ -58,11 +57,11 @@ macro_rules! generator_test {
                     "a mutation with the same input should produce the original"
                 );
             } else {
-                failed_forced += 1;
+                failed += 1;
             }
         }
 
-        assert_ne!(failed_forced, inputs.len(), "all the forced inputs failed");
+        assert_ne!(failed, inputs.len(), "all the inputs failed");
 
         ValueGenerator::generate(&gen, &mut rng_driver)
     }};
@@ -72,12 +71,12 @@ macro_rules! generator_test {
 macro_rules! generator_no_clone_test {
     ($gen:expr) => {{
         use $crate::{
-            driver::{ByteSliceDriver, DriverMode, Options, Rng},
+            driver::{ByteSliceDriver, Options, Rng},
             *,
         };
         let gen = $gen;
 
-        let options = Options::default().with_driver_mode(DriverMode::Forced);
+        let options = Options::default();
 
         let mut rng_driver = Rng::new(rand::thread_rng(), &options);
 
@@ -89,7 +88,6 @@ macro_rules! generator_no_clone_test {
             .unwrap();
 
         {
-            let options = options.clone().with_driver_mode(DriverMode::Direct);
             for input in inputs.iter() {
                 if let Some(mut value) =
                     ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
@@ -105,7 +103,7 @@ macro_rules! generator_no_clone_test {
         }
 
         // keep track of failed forced inputs and make sure they didn't all fail
-        let mut failed_forced = 0;
+        let mut failed = 0;
 
         for input in inputs.iter() {
             if let Some(mut value) =
@@ -118,11 +116,11 @@ macro_rules! generator_no_clone_test {
                 )
                 .expect("mutation with same driver should produce a value");
             } else {
-                failed_forced += 1;
+                failed += 1;
             }
         }
 
-        assert_ne!(failed_forced, inputs.len(), "all the forced inputs failed");
+        assert_ne!(failed, inputs.len(), "all the inputs failed");
 
         ValueGenerator::generate(&gen, &mut rng_driver)
     }};

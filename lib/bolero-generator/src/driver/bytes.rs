@@ -2,7 +2,6 @@ use super::*;
 
 #[derive(Debug)]
 pub struct ByteSliceDriver<'a> {
-    mode: DriverMode,
     input: &'a [u8],
     depth: usize,
     max_depth: usize,
@@ -10,14 +9,12 @@ pub struct ByteSliceDriver<'a> {
 
 impl<'a> ByteSliceDriver<'a> {
     pub fn new(input: &'a [u8], options: &Options) -> Self {
-        let mode = options.driver_mode.unwrap_or(DriverMode::Direct);
         let max_depth = options.max_depth_or_default();
         let len = options.max_len_or_default().min(input.len());
         let input = &input[..len];
 
         Self {
             input,
-            mode,
             depth: 0,
             max_depth,
         }
@@ -30,11 +27,6 @@ impl<'a> ByteSliceDriver<'a> {
 }
 
 impl<'a> FillBytes for ByteSliceDriver<'a> {
-    #[inline]
-    fn mode(&self) -> DriverMode {
-        self.mode
-    }
-
     #[inline]
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
         match self.input.len().checked_sub(offset) {
