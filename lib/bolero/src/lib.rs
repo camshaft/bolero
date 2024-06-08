@@ -35,7 +35,7 @@ pub use bolero_generator::prelude::*;
 #[doc(hidden)]
 pub use bolero_engine::{self, TargetLocation, __item_path__};
 
-pub use bolero_engine::{Driver, DriverMode, Engine, Test};
+pub use bolero_engine::{Driver, Engine, Test};
 
 #[cfg(test)]
 mod tests;
@@ -341,8 +341,10 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
     }
 
     /// Set the driver mode for the test target
-    pub fn with_driver_mode(mut self, mode: DriverMode) -> Self {
-        self.driver_options.set_driver_mode(mode);
+    #[deprecated = "Driver mode is no longer being used by generator implementations"]
+    #[allow(deprecated)]
+    pub fn with_driver_mode(self, mode: DriverMode) -> Self {
+        let _ = mode;
         self
     }
 

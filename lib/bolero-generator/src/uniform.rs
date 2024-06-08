@@ -1,4 +1,4 @@
-use crate::{bounded::BoundExt, driver::DriverMode};
+use crate::bounded::BoundExt;
 use core::ops::{Bound, RangeBounds};
 
 pub trait Uniform: Sized + PartialEq + Eq + PartialOrd + Ord {
@@ -19,8 +19,6 @@ macro_rules! fill_bytes_sample {
 
 pub trait FillBytes {
     const SHOULD_SHRINK: bool = true;
-
-    fn mode(&self) -> DriverMode;
 
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()>;
     fn consume_bytes(&mut self, consumed: usize);
@@ -275,14 +273,9 @@ mod tests {
     #[derive(Clone, Copy, Debug)]
     struct Byte {
         value: Option<u8>,
-        driver_mode: DriverMode,
     }
 
     impl FillBytes for Byte {
-        fn mode(&self) -> DriverMode {
-            self.driver_mode
-        }
-
         fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
             if offset > 0 {
                 return None;
@@ -374,10 +367,7 @@ mod tests {
         }
     }
 
-    fn range_test<T: SeenValue>(
-        driver_mode: DriverMode,
-        map: impl Fn(u8, u8) -> (Bound<T>, Bound<T>),
-    ) {
+    fn range_test<T: SeenValue>(map: impl Fn(u8, u8) -> (Bound<T>, Bound<T>)) {
         for min in 0..=T::ENTRIES {
             for max in 0..=T::ENTRIES {
                 let (min_b, max_b) = map(min as _, max as _);
@@ -391,17 +381,15 @@ mod tests {
                 for seed in 0..=T::ENTRIES {
                     let mut driver = Byte {
                         value: Some(seed as _),
-                        driver_mode,
                     };
                     let result = T::sample(&mut driver, min_b, max_b);
                     if let Some(value) = result {
                         assert!(
                             (min_b, max_b).contains(&value),
-                            "generated value ({:?}) outside of bounds ({:?}, {:?}) in {:?}",
+                            "generated value ({:?}) outside of bounds ({:?}, {:?})",
                             value,
                             min_b,
                             max_b,
-                            driver_mode,
                         );
                         actual.insert(value);
                     }
@@ -417,78 +405,60 @@ mod tests {
             mod $name {
                 use super::*;
 
-                range_tests!(Direct, direct, $ty, $map);
-                range_tests!(Forced, forced, $ty, $map);
-            }
-        };
-        ($mode:ident, $name:ident, $ty:ident, $map:expr) => {
-            mod $name {
-                use super::*;
-
                 // Inclusive
                 #[test]
                 fn inclusive_inclusive() {
-                    range_test(DriverMode::$mode, |min, max| {
+                    range_test(|min, max| {
                         (Bound::Included(($map)(min)), Bound::Included(($map)(max)))
                     });
                 }
 
                 #[test]
                 fn inclusive_exclusive() {
-                    range_test(DriverMode::$mode, |min, max| {
+                    range_test(|min, max| {
                         (Bound::Included(($map)(min)), Bound::Excluded(($map)(max)))
                     });
                 }
 
                 #[test]
                 fn inclusive_unbounded() {
-                    range_test(DriverMode::$mode, |min, _max| {
-                        (Bound::Included(($map)(min)), Bound::Unbounded)
-                    });
+                    range_test(|min, _max| (Bound::Included(($map)(min)), Bound::Unbounded));
                 }
 
                 // Exclusive
                 #[test]
                 fn exclusive_inclusive() {
-                    range_test(DriverMode::$mode, |min, max| {
+                    range_test(|min, max| {
                         (Bound::Excluded(($map)(min)), Bound::Included(($map)(max)))
                     });
                 }
 
                 #[test]
                 fn exclusive_exclusive() {
-                    range_test(DriverMode::$mode, |min, max| {
+                    range_test(|min, max| {
                         (Bound::Excluded(($map)(min)), Bound::Excluded(($map)(max)))
                     });
                 }
 
                 #[test]
                 fn exclusive_unbounded() {
-                    range_test(DriverMode::$mode, |min, _max| {
-                        (Bound::Excluded(($map)(min)), Bound::Unbounded)
-                    });
+                    range_test(|min, _max| (Bound::Excluded(($map)(min)), Bound::Unbounded));
                 }
 
                 // Unbounded
                 #[test]
                 fn unbounded_inclusive() {
-                    range_test(DriverMode::$mode, |_min, max| {
-                        (Bound::Unbounded, Bound::Included(($map)(max)))
-                    });
+                    range_test(|_min, max| (Bound::Unbounded, Bound::Included(($map)(max))));
                 }
 
                 #[test]
                 fn unbounded_exclusive() {
-                    range_test(DriverMode::$mode, |_min, max| {
-                        (Bound::Unbounded, Bound::Excluded(($map)(max)))
-                    });
+                    range_test(|_min, max| (Bound::Unbounded, Bound::Excluded(($map)(max))));
                 }
 
                 #[test]
                 fn unbounded_unbounded() {
-                    range_test(DriverMode::$mode, |_min, _max| {
-                        (<Bound<$ty>>::Unbounded, Bound::Unbounded)
-                    });
+                    range_test(|_min, _max| (<Bound<$ty>>::Unbounded, Bound::Unbounded));
                 }
             }
         };

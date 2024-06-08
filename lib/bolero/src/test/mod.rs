@@ -204,19 +204,8 @@ impl TestEngine {
         T: Test,
         T::Value: core::fmt::Debug,
     {
-        let mut file_options = options.clone();
-        let mut rng_options = options;
-
-        // set the driver mode to direct for file replays since they were likely generated with
-        // fuzzers
-        if file_options.driver_mode().is_none() {
-            file_options.set_driver_mode(crate::DriverMode::Direct);
-        }
-
-        // set the driver mode to forced so we increase the likelihood of valid generators
-        if rng_options.driver_mode().is_none() {
-            rng_options.set_driver_mode(crate::DriverMode::Forced);
-        }
+        let file_options = options.clone();
+        let rng_options = options;
 
         let file_options = &file_options;
         let rng_options = &rng_options;

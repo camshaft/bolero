@@ -82,20 +82,20 @@ mod tests {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
-    struct UnlikelyToBeValid(u128);
+    struct RandomlyValid(bool);
 
-    impl<'a> arbitrary::Arbitrary<'a> for UnlikelyToBeValid {
-        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<UnlikelyToBeValid> {
-            let v = u.arbitrary::<u128>()?;
-            if v >= 1024 {
+    impl<'a> arbitrary::Arbitrary<'a> for RandomlyValid {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let v: bool = u.arbitrary()?;
+            if !v {
                 return Err(arbitrary::Error::IncorrectFormat);
             }
-            Ok(UnlikelyToBeValid(v))
+            Ok(Self(v))
         }
     }
 
     #[test]
-    fn unlikely_to_be_valid() {
-        let _ = generator_test!(gen_arbitrary::<UnlikelyToBeValid>());
+    fn randomly_valid() {
+        let _ = generator_test!(gen_arbitrary::<RandomlyValid>());
     }
 }

@@ -12,7 +12,6 @@ pub struct Rng<R: RngCore> {
     max_depth: usize,
     consumed_len: usize,
     max_len: usize,
-    mode: DriverMode,
     #[allow(dead_code)] // this isn't used in no_std mode
     buffer: Buffer,
 }
@@ -25,7 +24,6 @@ impl<R: RngCore> Rng<R> {
             max_depth: options.max_depth_or_default(),
             consumed_len: 0,
             max_len: options.max_len_or_default(),
-            mode: options.driver_mode.unwrap_or(DriverMode::Forced),
             buffer: Default::default(),
         }
     }
@@ -34,7 +32,7 @@ impl<R: RngCore> Rng<R> {
     fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
         let len = bytes.len().min(self.remaining_len());
         let (to_rng, to_fill) = bytes.split_at_mut(len);
-        fill_bytes(&mut self.rng, to_rng, self.mode)?;
+        fill_bytes(&mut self.rng, to_rng)?;
         to_fill.fill(0);
         Some(())
     }
@@ -51,7 +49,7 @@ impl<R: RngCore> Rng<R> {
 
     #[inline]
     fn fill_buffer(&mut self, len: usize) -> Option<&[u8]> {
-        self.buffer.fill(len, &mut self.rng, self.mode)?;
+        self.buffer.fill(len, &mut self.rng)?;
         Some(self.buffer.slice_mut(len))
     }
 }
@@ -64,20 +62,15 @@ impl<R: RngCore> AsRef<R> for Rng<R> {
 }
 
 #[inline]
-fn fill_bytes<R: RngCore>(rng: &mut R, bytes: &mut [u8], mode: DriverMode) -> Option<()> {
-    match mode {
-        DriverMode::Direct => RngCore::try_fill_bytes(rng, bytes).ok(),
-        DriverMode::Forced => {
-            if RngCore::try_fill_bytes(rng, bytes).is_err() {
-                // if the rng fails to fill the remaining bytes, then we just start returning 0s
-                for byte in bytes.iter_mut() {
-                    *byte = 0;
-                }
-            }
-
-            Some(())
+fn fill_bytes<R: RngCore>(rng: &mut R, bytes: &mut [u8]) -> Option<()> {
+    if RngCore::try_fill_bytes(rng, bytes).is_err() {
+        // if the rng fails to fill the remaining bytes, then we just start returning 0s
+        for byte in bytes.iter_mut() {
+            *byte = 0;
         }
     }
+
+    Some(())
 }
 
 macro_rules! impl_sample {
@@ -97,11 +90,6 @@ macro_rules! impl_sample {
 impl<R: RngCore> FillBytes for Rng<R> {
     // prefer sampling the larger values since it's faster to pull from the RNG
     const SHOULD_SHRINK: bool = false;
-
-    #[inline]
-    fn mode(&self) -> DriverMode {
-        self.mode
-    }
 
     #[inline]
     fn peek_bytes(&mut self, _offset: usize, bytes: &mut [u8]) -> Option<()> {
@@ -195,12 +183,7 @@ mod buffer_alloc {
         pub const MAX_CAPACITY: usize = isize::MAX as _;
 
         #[inline]
-        pub fn fill<R: RngCore>(
-            &mut self,
-            len: usize,
-            rng: &mut R,
-            mode: DriverMode,
-        ) -> Option<()> {
+        pub fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             let data = &mut self.bytes;
 
             let initial_len = data.len();
@@ -213,7 +196,7 @@ mod buffer_alloc {
             // extend the random bytes
             data.try_reserve(len).ok()?;
             data.resize(len, 0);
-            fill_bytes(rng, &mut data[initial_len..], mode)?;
+            fill_bytes(rng, &mut data[initial_len..])?;
 
             Some(())
         }
@@ -253,12 +236,7 @@ mod buffer_no_alloc {
         pub const MAX_CAPACITY: usize = 256;
 
         #[inline]
-        pub fn fill<R: RngCore>(
-            &mut self,
-            len: usize,
-            rng: &mut R,
-            mode: DriverMode,
-        ) -> Option<()> {
+        pub fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             if cfg!(test) {
                 assert!(len <= Self::MAX_CAPACITY);
             }
@@ -271,7 +249,7 @@ mod buffer_no_alloc {
             }
 
             // extend the random bytes
-            fill_bytes(rng, &mut self.bytes[initial_len..], mode)?;
+            fill_bytes(rng, &mut self.bytes[initial_len..])?;
             self.len = len;
 
             Some(())

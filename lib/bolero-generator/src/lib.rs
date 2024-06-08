@@ -268,6 +268,9 @@ pub mod prelude {
         TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
     };
 
+    #[allow(deprecated)]
+    pub use crate::driver::DriverMode;
+
     #[cfg(feature = "arbitrary")]
     pub use crate::gen_arbitrary;
 }

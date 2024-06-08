@@ -163,6 +163,7 @@ pub trait Driver: Sized {
 
 /// Byte exhaustion strategy for the driver
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[deprecated = "Driver mode should no longer used by generator implementations"]
 pub enum DriverMode {
     /// When the driver bytes are exhausted, the driver will fail fill input bytes.
     /// This is useful for fuzz engines that want accurate mapping of inputs to coverage.
@@ -175,7 +176,6 @@ pub enum DriverMode {
 
 #[derive(Clone, Debug, Default)]
 pub struct Options {
-    driver_mode: Option<DriverMode>,
     shrink_time: Option<core::time::Duration>,
     max_depth: Option<usize>,
     max_len: Option<usize>,
@@ -185,11 +185,6 @@ impl Options {
     pub const DEFAULT_MAX_DEPTH: usize = 5;
     pub const DEFAULT_MAX_LEN: usize = 4096;
     pub const DEFAULT_SHRINK_TIME: core::time::Duration = core::time::Duration::from_secs(1);
-
-    pub fn with_driver_mode(mut self, driver_mode: DriverMode) -> Self {
-        self.driver_mode = Some(driver_mode);
-        self
-    }
 
     pub fn with_shrink_time(mut self, shrink_time: core::time::Duration) -> Self {
         self.shrink_time = Some(shrink_time);
@@ -203,11 +198,6 @@ impl Options {
 
     pub fn with_max_len(mut self, max_len: usize) -> Self {
         self.max_len = Some(max_len);
-        self
-    }
-
-    pub fn set_driver_mode(&mut self, driver_mode: DriverMode) -> &mut Self {
-        self.driver_mode = Some(driver_mode);
         self
     }
 
@@ -242,11 +232,6 @@ impl Options {
     }
 
     #[inline]
-    pub fn driver_mode(&self) -> Option<DriverMode> {
-        self.driver_mode
-    }
-
-    #[inline]
     pub fn max_depth_or_default(&self) -> usize {
         self.max_depth.unwrap_or(Self::DEFAULT_MAX_DEPTH)
     }
@@ -271,7 +256,6 @@ impl Options {
             };
         }
 
-        merge!(driver_mode);
         merge!(max_depth);
         merge!(max_len);
         merge!(shrink_time);
