@@ -1,50 +1,17 @@
 use super::*;
 
-#[derive(Debug, Default)]
-struct Buffer {
-    #[cfg(feature = "alloc")]
-    bytes: alloc::vec::Vec<u8>,
-}
-
 #[cfg(feature = "alloc")]
-impl Buffer {
-    #[inline]
-    fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R, mode: DriverMode) -> Option<()> {
-        let data = &mut self.bytes;
-
-        let initial_len = data.len();
-
-        // we don't need any more bytes, just return what we have
-        if initial_len >= len {
-            return Some(());
-        }
-
-        // extend the random bytes
-        data.try_reserve(len).ok()?;
-        data.resize(len, 0);
-        fill_bytes(rng, &mut data[initial_len..], mode)?;
-
-        Some(())
-    }
-
-    #[inline]
-    fn slice_mut(&mut self, len: usize) -> &mut [u8] {
-        &mut self.bytes[..len]
-    }
-
-    #[inline]
-    fn consume(&mut self, len: usize) {
-        // just ignore the consumed len since we don't actually pull from it
-        let _ = len;
-        self.bytes.clear();
-    }
-}
+use buffer_alloc::Buffer;
+#[cfg(not(feature = "alloc"))]
+use buffer_no_alloc::Buffer;
 
 #[derive(Debug)]
 pub struct Rng<R: RngCore> {
     rng: R,
     depth: usize,
     max_depth: usize,
+    consumed_len: usize,
+    max_len: usize,
     mode: DriverMode,
     #[allow(dead_code)] // this isn't used in no_std mode
     buffer: Buffer,
@@ -56,6 +23,8 @@ impl<R: RngCore> Rng<R> {
             rng,
             depth: 0,
             max_depth: options.max_depth_or_default(),
+            consumed_len: 0,
+            max_len: options.max_len_or_default(),
             mode: options.driver_mode.unwrap_or(DriverMode::Forced),
             buffer: Default::default(),
         }
@@ -63,10 +32,23 @@ impl<R: RngCore> Rng<R> {
 
     #[inline]
     fn fill_bytes(&mut self, bytes: &mut [u8]) -> Option<()> {
-        fill_bytes(&mut self.rng, bytes, self.mode)
+        let len = bytes.len().min(self.remaining_len());
+        let (to_rng, to_fill) = bytes.split_at_mut(len);
+        fill_bytes(&mut self.rng, to_rng, self.mode)?;
+        to_fill.fill(0);
+        Some(())
     }
 
-    #[cfg(feature = "alloc")]
+    #[inline]
+    fn has_remaining(&self) -> bool {
+        self.consumed_len < self.max_len
+    }
+
+    #[inline]
+    fn remaining_len(&self) -> usize {
+        self.max_len.saturating_sub(self.consumed_len)
+    }
+
     #[inline]
     fn fill_buffer(&mut self, len: usize) -> Option<&[u8]> {
         self.buffer.fill(len, &mut self.rng, self.mode)?;
@@ -102,7 +84,12 @@ macro_rules! impl_sample {
     ($sample:ident, $ty:ty, $inner:ident) => {
         #[inline(always)]
         fn $sample(&mut self) -> Option<$ty> {
-            Some(self.rng.$inner() as $ty)
+            if self.has_remaining() {
+                self.consumed_len += core::mem::size_of::<$ty>();
+                Some(self.rng.$inner() as $ty)
+            } else {
+                Some(0)
+            }
         }
     };
 }
@@ -122,12 +109,19 @@ impl<R: RngCore> FillBytes for Rng<R> {
     }
 
     #[inline(always)]
-    fn consume_bytes(&mut self, _consumed: usize) {}
+    fn consume_bytes(&mut self, consumed: usize) {
+        self.consumed_len += consumed;
+    }
 
     #[inline(always)]
     fn sample_bool(&mut self) -> Option<bool> {
-        let value = self.rng.next_u32();
-        Some(value < (u32::MAX / 2))
+        if self.has_remaining() {
+            self.consumed_len += 1;
+            let value = self.rng.next_u32();
+            Some(value < (u32::MAX / 2))
+        } else {
+            Some(false)
+        }
     }
 
     impl_sample!(sample_u8, u8, next_u32);
@@ -160,100 +154,137 @@ impl<R: RngCore> Driver for Rng<R> {
         self.max_depth
     }
 
-    #[cfg(feature = "alloc")]
+    #[inline]
     fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
-        // Even attempting an alloc of more than 0x10000000000 bytes makes asan crash.
-        // LibFuzzer limits memory to 2G (by default) and try_reserve() does not fail in oom situations then.
-        // With all the above, limit memory allocations to 1M total here.
-        const NONSENSICAL_SIZE: usize = 1024 * 1024;
-        const ABUSIVE_SIZE: usize = 1024;
-        const MIN_INCREASE: usize = 32;
+        let (min, max) = hint();
 
-        let hint = match hint() {
-            (min, None) => min..=usize::MAX,
-            (min, Some(max)) => min..=max,
-        };
+        // the lower bound is bigger than what we have remaining
+        if min > self.remaining_len() {
+            return None;
+        }
 
-        match self.mode {
-            DriverMode::Direct => {
-                let len = match (hint.start(), hint.end()) {
-                    (s, e) if s == e => *s,
-                    (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
-                };
-                if len >= NONSENSICAL_SIZE {
-                    return None;
-                }
-                let bytes = self.fill_buffer(len)?;
-                let (consumed, value) = gen(bytes)?;
-                self.buffer.consume(consumed);
-                Some(value)
+        let max = max
+            .unwrap_or(usize::MAX)
+            .min(min)
+            .min(self.remaining_len())
+            .min(Buffer::MAX_CAPACITY);
+
+        let len = self.gen_usize(Bound::Included(&min), Bound::Included(&max))?;
+        let bytes = self.fill_buffer(len)?;
+        let (consumed, value) = gen(bytes)?;
+        self.consume_bytes(consumed);
+        self.buffer.clear();
+        Some(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+mod buffer_alloc {
+    use super::*;
+
+    #[derive(Debug, Default)]
+    pub struct Buffer {
+        bytes: alloc::vec::Vec<u8>,
+    }
+
+    impl Buffer {
+        pub const MAX_CAPACITY: usize = isize::MAX as _;
+
+        #[inline]
+        pub fn fill<R: RngCore>(
+            &mut self,
+            len: usize,
+            rng: &mut R,
+            mode: DriverMode,
+        ) -> Option<()> {
+            let data = &mut self.bytes;
+
+            let initial_len = data.len();
+
+            // we don't need any more bytes, just return what we have
+            if initial_len >= len {
+                return Some(());
             }
-            DriverMode::Forced => {
-                let mut len = hint.start()
-                    + self.gen_usize(
-                        Bound::Included(&0),
-                        Bound::Included(&core::cmp::min(ABUSIVE_SIZE, hint.end() - hint.start())),
-                    )?;
-                loop {
-                    let data = self.fill_buffer(len)?;
-                    match gen(data) {
-                        Some((consumed, res)) => {
-                            self.buffer.consume(consumed);
-                            return Some(res);
-                        }
-                        None => {
-                            let max_additional_size =
-                                core::cmp::min(ABUSIVE_SIZE, hint.end().saturating_sub(data.len()));
-                            if max_additional_size == 0 {
-                                self.buffer.bytes.clear();
-                                return None; // we actually tried feeding the max amount of data already
-                            }
 
-                            let additional_size = self.gen_usize(
-                                Bound::Included(&core::cmp::min(MIN_INCREASE, max_additional_size)),
-                                Bound::Included(&max_additional_size),
-                            )?;
-                            len += additional_size;
-                            if len >= NONSENSICAL_SIZE {
-                                return None;
-                            }
-                        }
-                    }
-                }
+            // extend the random bytes
+            data.try_reserve(len).ok()?;
+            data.resize(len, 0);
+            fill_bytes(rng, &mut data[initial_len..], mode)?;
+
+            Some(())
+        }
+
+        #[inline]
+        pub fn slice_mut(&mut self, len: usize) -> &mut [u8] {
+            &mut self.bytes[..len]
+        }
+
+        #[inline]
+        pub fn clear(&mut self) {
+            self.bytes.clear();
+        }
+    }
+}
+
+#[cfg_attr(feature = "alloc", allow(dead_code))]
+mod buffer_no_alloc {
+    use super::*;
+
+    #[derive(Debug)]
+    pub struct Buffer {
+        bytes: [u8; Self::MAX_CAPACITY],
+        len: usize,
+    }
+
+    impl Default for Buffer {
+        fn default() -> Self {
+            Self {
+                bytes: [0; Self::MAX_CAPACITY],
+                len: Default::default(),
             }
         }
     }
 
-    #[cfg(not(feature = "alloc"))]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
-    where
-        Hint: FnOnce() -> (usize, Option<usize>),
-        Gen: FnMut(&[u8]) -> Option<(usize, T)>,
-    {
-        // In alloc-free mode, we can't support FORCED driver mode so just do our best to fill
-        // the data
-        const DATA_LEN: usize = 256;
+    impl Buffer {
+        pub const MAX_CAPACITY: usize = 256;
 
-        let mut data = [0; DATA_LEN];
+        #[inline]
+        pub fn fill<R: RngCore>(
+            &mut self,
+            len: usize,
+            rng: &mut R,
+            mode: DriverMode,
+        ) -> Option<()> {
+            if cfg!(test) {
+                assert!(len <= Self::MAX_CAPACITY);
+            }
 
-        let hint = match hint() {
-            (min, None) => min..=DATA_LEN,
-            (min, Some(max)) => min..=max.min(DATA_LEN),
-        };
+            let initial_len = self.len;
 
-        let len = match (hint.start(), hint.end()) {
-            (s, e) if s == e => *s,
-            (s, e) => self.gen_usize(Bound::Included(s), Bound::Included(e))?,
-        };
+            // we don't need any more bytes, just return what we have
+            if initial_len >= len {
+                return Some(());
+            }
 
-        let data = &mut data[..len];
+            // extend the random bytes
+            fill_bytes(rng, &mut self.bytes[initial_len..], mode)?;
+            self.len = len;
 
-        self.peek_bytes(0, data)?;
-        let (_consumed, value) = gen(data)?;
-        Some(value)
+            Some(())
+        }
+
+        #[inline]
+        pub fn slice_mut(&mut self, len: usize) -> &mut [u8] {
+            &mut self.bytes[..len]
+        }
+
+        #[inline]
+        pub fn clear(&mut self) {
+            self.len = 0;
+        }
     }
 }
