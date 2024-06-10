@@ -15,12 +15,6 @@ mod kani {
         // no-op
         let _ = cond;
     }
-
-    pub mod vec {
-        pub fn any_vec<T, const N: usize>() -> Vec<T> {
-            todo!()
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -78,11 +72,12 @@ pub mod lib {
             // TODO make this configurable
             const MAX_LEN: usize = 256;
 
-            let bytes = kani::vec::any_vec::<u8, MAX_LEN>();
-            let len = self.options.max_len_or_default().min(MAX_LEN);
-            kani::assume(bytes.len() <= len);
+            let bytes = kani::any::<[u8; MAX_LEN]>();
+            let len = kani::any::<usize>();
+            let max_len = self.options.max_len_or_default().min(MAX_LEN);
+            kani::assume(len <= max_len);
 
-            f(&bytes)
+            f(&bytes[..len])
         }
 
         fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
@@ -160,8 +155,14 @@ pub mod lib {
             Hint: FnOnce() -> (usize, Option<usize>),
             Gen: FnMut(&[u8]) -> Option<(usize, T)>,
         {
-            let bytes = kani::vec::any_vec::<u8, 256>();
-            let value = gen(&bytes).map(|v| v.1);
+            // TODO make this configurable
+            const MAX_LEN: usize = 256;
+
+            let bytes = kani::any::<[u8; MAX_LEN]>();
+            let len = kani::any::<usize>();
+            kani::assume(len <= MAX_LEN);
+
+            let value = gen(&bytes[..len]).map(|v| v.1);
             kani::assume(value.is_some());
             value
         }
