@@ -1,6 +1,6 @@
 [package]
 name = "cargo-bolero"
-version = "0.11.1"
+version = "0.11.2"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
@@ -34,7 +34,7 @@ tar = "0.4"
 tempfile = "3"
 
 [dev-dependencies]
-bolero = { path = "../../lib/bolero" }
+bolero = { version = "0.11", path = "../../lib/bolero" }
 
 [[test]]
 name = "fuzz_bytes"
