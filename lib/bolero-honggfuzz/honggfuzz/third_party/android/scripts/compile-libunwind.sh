@@ -15,9 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-set -x # debug
-
-readonly JOBS=$(getconf _NPROCESSORS_ONLN)
+set -xeu
 
 abort() {
   cd - &>/dev/null
@@ -36,47 +34,26 @@ fi
 readonly LIBUNWIND_DIR="$1"
 
 if [ ! -d "$LIBUNWIND_DIR/.git" ]; then
-  git submodule update --init third_party/android/libunwind || {
-    echo "[-] git submodules init failed"
-    exit 1
-  }
-fi
-
-# register client hooks
-hooksDir="$(git -C "$LIBUNWIND_DIR" rev-parse --git-dir)/hooks"
-mkdir -p "$hooksDir"
-
-if [ ! -f "$hooksDir/post-checkout" ]; then
-  cat > "$hooksDir/post-checkout" <<'endmsg'
-#!/usr/bin/env bash
-
-endmsg
-  chmod +x "$hooksDir/post-checkout"
+  git submodule update --init third_party/android/libunwind
 fi
 
 # Change workspace
 cd "$LIBUNWIND_DIR" &>/dev/null
 
-if [ -z "$NDK" ]; then
-  # Search in $PATH
-  if [[ $(which ndk-build) != "" ]]; then
-    NDK=$(dirname $(which ndk-build))
-  else
-    echo "[-] Could not detect Android NDK dir"
-    abort 1
-  fi
+if [[ $(which ndk-build) != "" ]]; then
+  NDK=$(dirname $(which ndk-build))
+else
+  echo "[-] Could not detect Android NDK dir"
+  abort 1
 fi
 
-if [ -z "$ANDROID_API" ]; then
-  ANDROID_API="android-26"
-fi
 if ! echo "$ANDROID_API" | grep -qoE 'android-[0-9]{1,2}'; then
   echo "[-] Invalid ANDROID_API '$ANDROID_API'"
   abort 1
 fi
 ANDROID_API_V=$(echo "$ANDROID_API" | grep -oE '[0-9]{1,2}$')
 
-LC_LDFLAGS="-static -Wl,-z,muldefs"
+LC_LDFLAGS="-static"
 
 ARCH="$2"
 
@@ -96,28 +73,9 @@ case "$ARCH" in
     ;;
 esac
 
-# Apply patches required for Android
-# TODO: Automate global patching when all archs have been tested
-
-# Ptrace patches due to Android incompatibilities
-git reset --hard
-
-git apply --check ../patches/libunwind.patch
-if [ $? -eq 0 ]; then
-  git apply ../patches/libunwind.patch
-  if [ $? -ne 0 ]; then
-    echo "[-] Failed to apply libunwind patches"
-    abort 1
-  fi
-else
-  echo "[-] Cannot apply libunwind patches"
-  abort 1
-fi
-
 # Support both Linux & Darwin
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH=$(uname -m)
-
 
 export CC="$NDK"/toolchains/llvm/prebuilt/"$HOST_OS"-x86_64/bin/"$ANDROID_NDK_COMPILER_PREFIX""$ANDROID_API_V"-clang
 export CXX="$NDK"/toolchains/llvm/prebuilt/"$HOST_OS"-x86_64/bin/"$ANDROID_NDK_COMPILER_PREFIX""$ANDROID_API_V"-clang++
@@ -131,37 +89,13 @@ elif [ ! -x "$CXX" ]; then
 fi
 
 if [ ! -f configure ]; then
-  NOCONFIGURE=true ./autogen.sh
-  if [ $? -ne 0 ]; then
-    echo "[-] autogen failed"
-    abort 1
-  fi
-  # Patch configure
-  sed -i -e 's/-lgcc_s//g' configure
-  sed -i -e 's/-lgcc//g' configure
+  autoreconf -i
 else
   make clean
 fi
 
-./configure --host=$TOOLCHAIN --disable-coredump
-if [ $? -ne 0 ]; then
-  echo "[-] configure failed"
-  abort 1
-fi
-
-# Fix stuff that configure failed to detect
-# TODO: Investigate for more elegant patches
-if [ "$ARCH" == "arm64" ]; then
-  sed -i -e 's/#define HAVE_DECL_PTRACE_POKEUSER 1/#define HAVE_DECL_PTRACE_POKEUSER 0/g' include/config.h
-  echo "#define HAVE_DECL_PT_GETREGSET 1" >> include/config.h
-fi
-
-make -j"$JOBS" CFLAGS="$LC_CFLAGS" LDFLAGS="$LC_LDFLAGS"
-if [ $? -ne 0 ]; then
-    echo "[-] Compilation failed"
-    cd - &>/dev/null
-    abort 1
-fi
+./configure "--host=$TOOLCHAIN" --disable-coredump --enable-static --disable-shared --disable-tests --enable-ptrace
+make -j LDFLAGS="$LC_LDFLAGS"
 
 # Naming conventions for arm64
 if [[ "$ARCH" == "arm64" ]]; then

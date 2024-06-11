@@ -400,6 +400,9 @@ void arch_reapChild(run_t* run) {
     }
 }
 
+void arch_reapKill(void) {
+}
+
 void* wait_for_exception() {
     while (1) {
         mach_msg_server_once(mach_exc_server, 4096, g_exception_port, MACH_MSG_OPTION_NONE);
@@ -696,13 +699,21 @@ kern_return_t catch_mach_exception_raise_state_identity(
      * Get program counter.
      * Cast to void* in order to silence the alignment warnings
      */
+#if defined(__x86_64__)
     x86_thread_state_t* platform_in_state = ((x86_thread_state_t*)(void*)in_state);
+#elif defined(__aarch64__)
+    arm_thread_state_t* platform_in_state = ((arm_thread_state_t*)(void*)in_state);
+#endif /* defined(__x86_64__) */
 
+#if defined(__x86_64__)
     if (x86_THREAD_STATE32 == platform_in_state->tsh.flavor) {
         run->pc = platform_in_state->uts.ts32.__eip;
     } else {
         run->pc = platform_in_state->uts.ts64.__rip;
     }
+#elif defined(__aarch64__)
+    run->pc = platform_in_state->__pc;
+#endif /* defined(__x86_64__) */
 
     /*
      * Get the exception type

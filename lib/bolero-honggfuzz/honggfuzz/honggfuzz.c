@@ -23,15 +23,21 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
+#if defined(__FreeBSD__)
+#include <sys/procctl.h>
+#endif
 
 #include "cmdline.h"
 #include "display.h"
@@ -260,6 +266,11 @@ static uint8_t mainThreadLoop(honggfuzz_t* hfuzz) {
     setupMainThreadTimer();
 
     for (;;) {
+        if (hfuzz->io.dynamicInputDir) {
+            LOG_D("Loading files from the dynamic input queue...");
+            input_enqueueDynamicInputs(hfuzz);
+        }
+
         if (hfuzz->display.useScreen) {
             if (ATOMIC_XCHG(clearWin, false)) {
                 display_clear();
@@ -276,6 +287,12 @@ static uint8_t mainThreadLoop(honggfuzz_t* hfuzz) {
         }
         if (hfuzz->timing.runEndTime > 0 && (time(NULL) > hfuzz->timing.runEndTime)) {
             LOG_I("Maximum run time reached, terminating");
+            break;
+        }
+        if (hfuzz->timing.exitOnTime > 0 &&
+            time(NULL) - ATOMIC_GET(hfuzz->timing.lastCovUpdate) > hfuzz->timing.exitOnTime) {
+            LOG_I("No new coverage was found for the last %ld seconds, terminating",
+                hfuzz->timing.exitOnTime);
             break;
         }
         pingThreads(hfuzz);
@@ -303,7 +320,7 @@ static const char* strYesNo(bool yes) {
 }
 
 static const char* getGitVersion() {
-    static char version[] = "$Id: 380cf14962c64e3fa902d9442b6c6513869116ed $";
+    static char version[] = "$Id: ebacfad1f3e0766351149de883b54a16a6017071 $";
     if (strlen(version) == 47) {
         version[45] = '\0';
         return &version[5];
@@ -399,6 +416,18 @@ int honggfuzz_main(int argc, char** argv) {
                 sizeof(cmpfeedback_t), hfuzz.io.workDir);
         }
     }
+    /* Stats file. */
+    if (hfuzz.io.statsFileName) {
+        hfuzz.io.statsFileFd =
+            TEMP_FAILURE_RETRY(open(hfuzz.io.statsFileName, O_CREAT | O_RDWR | O_TRUNC, 0640));
+
+        if (hfuzz.io.statsFileFd == -1) {
+            PLOG_F("Couldn't open statsfile open('%s')", hfuzz.io.statsFileName);
+        } else {
+            dprintf(hfuzz.io.statsFileFd, "# unix_time, last_cov_update, total_exec, exec_per_sec, "
+                                          "crashes, unique_crashes, hangs, edge_cov, block_cov\n");
+        }
+    }
 
     setupRLimits();
     setupSignalsPreThreads();
@@ -432,6 +461,10 @@ int honggfuzz_main(int argc, char** argv) {
 #endif
     if (hfuzz.socketFuzzer.enabled) {
         cleanupSocketFuzzer();
+    }
+    /* Stats file. */
+    if (hfuzz.io.statsFileName) {
+        close(hfuzz.io.statsFileFd);
     }
 
     printSummary(&hfuzz);

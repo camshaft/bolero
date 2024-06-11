@@ -52,7 +52,7 @@ cmpfeedback_t* globalCmpFeedback = NULL;
 
 uint32_t my_thread_no = 0;
 
-static int _memcmp(const void* m1, const void* m2, size_t n) {
+__attribute__((hot)) static int _memcmp(const void* m1, const void* m2, size_t n) {
     const unsigned char* s1 = (const unsigned char*)m1;
     const unsigned char* s2 = (const unsigned char*)m2;
 
@@ -65,9 +65,17 @@ static int _memcmp(const void* m1, const void* m2, size_t n) {
     return 0;
 }
 
-int (*libc_memcmp)(const void* s1, const void* s2, size_t n) = _memcmp;
+int (*hf_memcmp)(const void* s1, const void* s2, size_t n) = _memcmp;
 
-static void* getsym(const char* sym) {
+static void* getsym(const char* fname, const char* sym) {
+    if (fname) {
+        void* dlh = dlopen(fname, RTLD_LAZY);
+        if (!dlh) {
+            return NULL;
+        }
+        return dlsym(dlh, sym);
+    }
+
 #if defined(RTLD_NEXT)
     return dlsym(RTLD_NEXT, sym);
 #else  /* defined(RTLD_NEXT) */
@@ -79,16 +87,48 @@ static void* getsym(const char* sym) {
 #endif /* defined(RTLD_NEXT) */
 }
 
+extern int __wrap_memcmp(const void* s1, const void* s2, size_t n) __attribute__((weak));
+extern int __sanitizer_weak_hook_memcmp(const void* s1, const void* s2, size_t n)
+    __attribute__((weak));
 static void initializeLibcFunctions(void) {
-    libc_memcmp = (int (*)(const void* s1, const void* s2, size_t n))getsym("memcmp");
-    if (!libc_memcmp) {
-        LOG_W("dlsym(memcmp) failed: %s", dlerror());
-        libc_memcmp = _memcmp;
+    /*
+     * Look for the original "memcmp" function.
+     *
+     * First, in standard C libraries, because if an instrumented shared library is loaded, it can
+     * overshadow the libc's symbol. Next, among the already loaded symbols.
+     */
+    int (*libcso6_memcmp)(const void* s1, const void* s2, size_t n) =
+        (int (*)(const void* s1, const void* s2, size_t n))getsym("libc.so.6", "memcmp");
+    int (*libcso_memcmp)(const void* s1, const void* s2, size_t n) =
+        (int (*)(const void* s1, const void* s2, size_t n))getsym("libc.so", "memcmp");
+    int (*libc_memcmp)(const void* s1, const void* s2, size_t n) =
+        (int (*)(const void* s1, const void* s2, size_t n))getsym(NULL, "memcmp");
+
+    if (libcso6_memcmp) {
+        hf_memcmp = libcso6_memcmp;
+    } else if (libcso_memcmp) {
+        hf_memcmp = libcso_memcmp;
+    } else if (libc_memcmp) {
+        hf_memcmp = libc_memcmp;
     }
-    LOG_D("libc_memcmp=%p, (_memcmp=%p, memcmp=%p)", libc_memcmp, _memcmp, memcmp);
+
+    if (hf_memcmp == __wrap_memcmp) {
+        LOG_W("hf_memcmp==__wrap_memcmp: %p==%p", hf_memcmp, __wrap_memcmp);
+        hf_memcmp = _memcmp;
+    }
+    if (hf_memcmp == __sanitizer_weak_hook_memcmp) {
+        LOG_W("hf_memcmp==__sanitizer_weak_hook_memcmp: %p==%p", hf_memcmp,
+            __sanitizer_weak_hook_memcmp);
+        hf_memcmp = _memcmp;
+    }
+
+    LOG_D("hf_memcmp=%p, (_memcmp=%p, memcmp=%p, __wrap_memcmp=%p, "
+          "__sanitizer_weak_hook_memcmp=%p, libcso6_memcmp=%p, libcso_memcmp=%p, libc_memcmp=%p)",
+        hf_memcmp, _memcmp, memcmp, __wrap_memcmp, __sanitizer_weak_hook_memcmp, libcso6_memcmp,
+        libcso_memcmp, libc_memcmp);
 }
 
-static void* initialzeTryMapHugeTLB(int fd, size_t sz) {
+static void* initializeTryMapHugeTLB(int fd, size_t sz) {
     int initflags = MAP_SHARED;
 #if defined(MAP_ALIGNED_SUPER)
     initflags |= MAP_ALIGNED_SUPER;
@@ -117,7 +157,7 @@ static void initializeCmpFeedback(void) {
             (size_t)st.st_size, sizeof(cmpfeedback_t));
         return;
     }
-    void* ret = initialzeTryMapHugeTLB(_HF_CMP_BITMAP_FD, sizeof(cmpfeedback_t));
+    void* ret = initializeTryMapHugeTLB(_HF_CMP_BITMAP_FD, sizeof(cmpfeedback_t));
     if (ret == MAP_FAILED) {
         PLOG_W("mmap(_HF_CMP_BITMAP_FD=%d, size=%zu) of the feedback structure failed",
             _HF_CMP_BITMAP_FD, sizeof(cmpfeedback_t));
@@ -138,7 +178,7 @@ static bool initializeLocalCovFeedback(void) {
         return false;
     }
 
-    localCovFeedback = initialzeTryMapHugeTLB(_HF_PERTHREAD_BITMAP_FD, sizeof(feedback_t));
+    localCovFeedback = initializeTryMapHugeTLB(_HF_PERTHREAD_BITMAP_FD, sizeof(feedback_t));
     if (localCovFeedback == MAP_FAILED) {
         PLOG_W("mmap(_HF_PERTHREAD_BITMAP_FD=%d, size=%zu) of the local feedback structure failed",
             _HF_PERTHREAD_BITMAP_FD, sizeof(feedback_t));
@@ -159,7 +199,7 @@ static bool initializeGlobalCovFeedback(void) {
         return false;
     }
 
-    globalCovFeedback = initialzeTryMapHugeTLB(_HF_COV_BITMAP_FD, sizeof(feedback_t));
+    globalCovFeedback = initializeTryMapHugeTLB(_HF_COV_BITMAP_FD, sizeof(feedback_t));
     if (globalCovFeedback == MAP_FAILED) {
         PLOG_W("mmap(_HF_COV_BITMAP_FD=%d, size=%zu) of the feedback structure failed",
             _HF_COV_BITMAP_FD, sizeof(feedback_t));
@@ -255,7 +295,7 @@ static inline void instrumentAddConstMemInternal(const void* mem, size_t len) {
 
     for (uint32_t i = 0; i < curroff; i++) {
         if ((len == ATOMIC_GET(globalCmpFeedback->valArr[i].len)) &&
-            libc_memcmp(globalCmpFeedback->valArr[i].val, mem, len) == 0) {
+            hf_memcmp(globalCmpFeedback->valArr[i].val, mem, len) == 0) {
             return;
         }
     }

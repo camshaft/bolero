@@ -137,7 +137,7 @@ COMMON_CFLAGS := -std=c11 \
   -Wall -Wextra -Wno-initializer-overrides -Wno-override-init \
   -Wno-atomic-alignment -Wno-unknown-warning-option \
   -Werror -funroll-loops -O2 \
-  -Wframe-larger-than=1048576 -Wno-format-truncation \
+  -Wno-format-truncation \
 
 ifneq (,$(findstring clang,$(NDK_TOOLCHAIN)))
   COMMON_CFLAGS += -fblocks -fno-sanitize=address,undefined,memory,thread -fsanitize-coverage=0
@@ -146,7 +146,7 @@ endif
 
 # libhfcommon module
 include $(CLEAR_VARS)
-LOCAL_MODULE := common
+LOCAL_MODULE := hfcommon
 LOCAL_SRC_FILES := $(wildcard libhfcommon/*.c)
 LOCAL_CFLAGS := -D_HF_ARCH_${ARCH} $(COMMON_CFLAGS)
 LOCAL_STATIC_LIBRARIES := $(COMMON_STATIC_LIBS)
@@ -175,8 +175,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := honggfuzz
 LOCAL_SRC_FILES := $(wildcard *.c)
 LOCAL_CFLAGS := $(COMMON_CFLAGS)
-LOCAL_LDFLAGS := -lm -latomic
-LOCAL_STATIC_LIBRARIES := $(COMMON_STATIC_LIBS) common
+LOCAL_LDFLAGS := -lm -latomic -lz
+LOCAL_STATIC_LIBRARIES := $(COMMON_STATIC_LIBS) hfcommon
 
 ifeq ($(ANDROID_WITH_PTRACE),true)
   LOCAL_STATIC_LIBRARIES += libunwind-arch \
