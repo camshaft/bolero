@@ -27,7 +27,7 @@ BIN := honggfuzz
 HFUZZ_CC_BIN := hfuzz_cc/hfuzz-cc
 HFUZZ_CC_SRCS := hfuzz_cc/hfuzz-cc.c
 COMMON_CFLAGS := -std=c11 -I/usr/local/include -D_GNU_SOURCE -Wall -Wextra -Werror -Wno-format-truncation -Wno-override-init -I.
-COMMON_LDFLAGS := -pthread -lm
+COMMON_LDFLAGS := -pthread -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib -lm
 COMMON_SRCS := $(sort $(wildcard *.c))
 CFLAGS ?= -O3 -mtune=native -funroll-loops
 LDFLAGS ?=
@@ -36,6 +36,7 @@ GREP_COLOR ?=
 BUILD_OSSFUZZ_STATIC ?= false # for https://github.com/google/oss-fuzz
 BUILD_LINUX_NO_BFD ?= false # for users who don't want to use libbfd/binutils
 
+REALOS = $(shell uname -s)
 OS ?= $(shell uname -s)
 MARCH ?= $(shell uname -m)
 KERNEL ?= $(shell uname -r)
@@ -82,24 +83,37 @@ else ifeq ($(OS),Darwin)
     # Figure out which crash reporter to use.
     CRASHWRANGLER := third_party/mac
     OS_VERSION := $(shell sw_vers -productVersion)
-    ifneq (,$(findstring 10.15,$(OS_VERSION)))
+    OS_MAJOR_VERSION := $(shell echo $(OS_VERSION) | cut -f1 -d.)
+    OS_MINOR_VERSION := $(shell echo $(OS_VERSION) | cut -f2 -d.)
+
+    ifeq ($(OS_MAJOR_VERSION), 13)
         CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
-    else ifneq (,$(findstring 10.14,$(OS_VERSION)))
+    else ifeq ($(OS_MAJOR_VERSION), 12)
         CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
-    else ifneq (,$(findstring 10.13,$(OS_VERSION)))
+    else ifeq ($(OS_MAJOR_VERSION), 11)
         CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
-    else ifneq (,$(findstring 10.12,$(OS_VERSION)))
-        CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
-    else ifneq (,$(findstring 10.11,$(OS_VERSION)))
-        # El Capitan didn't break compatibility
-        CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Yosemite.o
-    else ifneq (,$(findstring 10.10,$(OS_VERSION)))
-        CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Yosemite.o
-    else ifneq (,$(findstring 10.9,$(OS_VERSION)))
-        CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Mavericks.o
-    else ifneq (,$(findstring 10.8,$(OS_VERSION)))
-        CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Mountain_Lion.o
-    else
+    else ifeq ($(OS_MAJOR_VERSION), 10)
+        ifeq ($(OS_MINOR_VERSION), 15)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
+        else ifeq ($(OS_MINOR_VERSION), 14)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
+        else ifeq ($(OS_MINOR_VERSION), 13)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
+        else ifeq ($(OS_MINOR_VERSION), 12)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Sierra.o
+        else ifeq ($(OS_MINOR_VERSION), 11)
+            # El Capitan didn't break compatibility
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Yosemite.o
+        else ifeq ($(OS_MINOR_VERSION), 10)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Yosemite.o
+        else ifeq ($(OS_MINOR_VERSION), 9)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Mavericks.o
+        else ifeq ($(OS_MINOR_VERSION), 8)
+            CRASH_REPORT := $(CRASHWRANGLER)/CrashReport_Mountain_Lion.o
+        endif
+    endif
+
+    ifeq ($(CRASH_REPORT), )
         $(error Unsupported MAC OS X version)
     endif
 
@@ -121,7 +135,7 @@ else ifeq ($(OS),Darwin)
                    -Wno-embedded-directive
     ARCH_LDFLAGS := -F/System/Library/PrivateFrameworks -framework CoreSymbolication -framework IOKit \
                     -F$(SDK_V)/System/Library/Frameworks -F$(SDK_V)/System/Library/PrivateFrameworks \
-                    -F$(SDK)/System/Library/Frameworks \
+                    -F$(SDK)/System/Library/Frameworks -F$(SDK)/System/Library/PrivateFrameworks \
                     -framework Foundation -framework ApplicationServices -framework Symbolication \
                     -framework CoreServices -framework CrashReporterSupport -framework CoreFoundation \
                     -framework CommerceKit $(CRASH_REPORT)
@@ -150,8 +164,10 @@ else
         ARCH_CFLAGS += -D_POSIX_C_SOURCE=200809L -D__EXTENSIONS__=1
 	ARCH_LDFLAGS += -lkstat -lsocket -lnsl
     endif
-    ifneq ($(OS),OpenBSD)
+    ifneq ($(REALOS),OpenBSD)
+    ifneq ($(REALOS),Darwin)
         ARCH_LDFLAGS += -lrt
+    endif
     endif
 # OS Posix
 endif
@@ -167,7 +183,7 @@ ifeq ($(COMPILER),clang)
   ARCH_CFLAGS += -mllvm -inline-threshold=2000
   CFLAGS_BLOCKS = -fblocks
 
-  ifneq ($(OS),Darwin)
+  ifneq ($(REALOS),Darwin)
     ARCH_LDFLAGS += -Wl,-Bstatic -lBlocksRuntime -Wl,-Bdynamic
   endif
 endif
@@ -202,9 +218,9 @@ ifdef DEBUG
 endif
 
 # Control Android builds
-ANDROID_API           ?= android-26 # Minimal working version is android-23
+ANDROID_API           ?= android-30 # Minimal working version is android-30 (ndk 22)
 ANDROID_DEBUG_ENABLED ?= false
-ANDROID_APP_ABI       ?= armeabi-v7a
+ANDROID_APP_ABI       ?= arm64-v8a
 ANDROID_SKIP_CLEAN    ?= false
 NDK_BUILD_ARGS :=
 
@@ -317,7 +333,7 @@ depend: all
 .PHONY: android
 android:
 	$(info ***************************************************************)
-	$(info *                 Use Android NDK 20 or newer                 *)
+	$(info *                 Use Android NDK 22 or newer                 *)
 	$(info ***************************************************************)
 	@ANDROID_API=$(ANDROID_API) ANDROID_NDK_COMPILER_PREFIX=$(ANDROID_NDK_COMPILER_PREFIX) third_party/android/scripts/compile-libunwind.sh \
 	third_party/android/libunwind $(ANDROID_ARCH_CPU)
@@ -415,7 +431,7 @@ libhfcommon/files.o: libhfcommon/common.h libhfcommon/log.h
 libhfcommon/files.o: libhfcommon/util.h
 libhfcommon/log.o: libhfcommon/log.h libhfcommon/common.h libhfcommon/util.h
 libhfcommon/ns.o: libhfcommon/ns.h libhfcommon/common.h libhfcommon/files.h
-libhfcommon/ns.o: libhfcommon/common.h libhfcommon/log.h
+libhfcommon/ns.o: libhfcommon/common.h libhfcommon/log.h libhfcommon/util.h
 libhfcommon/util.o: libhfcommon/util.h libhfcommon/common.h
 libhfcommon/util.o: libhfcommon/files.h libhfcommon/common.h
 libhfcommon/util.o: libhfcommon/log.h

@@ -55,13 +55,14 @@ typedef struct {
     asymbol** dsyms;
 } bfd_t;
 
+/* INFO: binutils (libbfd, libopcode) has an unstable public interface. */
 /*
- * This is probably the only define which was added with binutils 2.29, so we us
- * it, do decide which disassembler() prototype from dis-asm.h to use
+ * This is probably the only define which was added with binutils 2.29, so we use
+ * it, do decide which disassembler() prototype from dis-asm.h to use.
  */
 #if defined(FOR_EACH_DISASSEMBLER_OPTION)
 #define _HF_BFD_GE_2_29
-#endif
+#endif /* defined(FOR_EACH_DISASSEMBLER_OPTION) */
 
 static pthread_mutex_t arch_bfd_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -197,6 +198,16 @@ static int arch_bfdFPrintF(void* buf, const char* fmt, ...) {
     return ret;
 }
 
+static int arch_bfdFPrintFStyled(
+    void* buf, enum disassembler_style style HF_ATTR_UNUSED, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int ret = util_vssnprintf(buf, _HF_INSTR_SZ, fmt, args);
+    va_end(args);
+
+    return ret;
+}
+
 void arch_bfdDisasm(pid_t pid, uint8_t* mem, size_t size, char* instr) {
     MX_SCOPED_LOCK(&arch_bfd_mutex);
 
@@ -227,8 +238,16 @@ void arch_bfdDisasm(pid_t pid, uint8_t* mem, size_t size, char* instr) {
         return;
     }
 
-    struct disassemble_info info;
-    init_disassemble_info(&info, instr, arch_bfdFPrintF);
+    struct disassemble_info info = {};
+
+    /*
+     * At some point in time the function init_disassemble_info() started taking 4 arguments instead
+     * of 3. Add the 4th argument in all cases. Hopefully it'll work will all ABIs, and the 4th
+     * argument will be discarded if needed.
+     */
+    void (*idi_4_args)(void*, void*, void*, void*) =
+        (void (*)(void*, void*, void*, void*))init_disassemble_info;
+    idi_4_args(&info, instr, arch_bfdFPrintF, arch_bfdFPrintFStyled);
     info.arch          = bfd_get_arch(bfdh);
     info.mach          = bfd_get_mach(bfdh);
     info.buffer        = mem;
@@ -242,6 +261,11 @@ void arch_bfdDisasm(pid_t pid, uint8_t* mem, size_t size, char* instr) {
         snprintf(instr, _HF_INSTR_SZ, "[DIS-ASM_FAILURE]");
     }
 
+    /* disassemble_free_target is available only since bfd/dis-asm 2019 */
+    __attribute__((weak)) void disassemble_free_target(struct disassemble_info*);
+    if (disassemble_free_target) {
+        disassemble_free_target(&info);
+    }
     bfd_close(bfdh);
 }
 

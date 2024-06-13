@@ -29,14 +29,16 @@ impl Test {
             vec![]
         };
 
-        cmd!(sh, "cargo {toolchain...} test").run()?;
-        cmd!(sh, "cargo {toolchain...} build").run()?;
+        let features = &vec!["--features", "honggfuzz"];
+
+        cmd!(sh, "cargo {toolchain...} test {features...}").run()?;
+        cmd!(sh, "cargo {toolchain...} build {features...}").run()?;
 
         // Validate failing tests don’t prevent fuzzers from being found
         sh.change_dir("cargo-bolero/test_crates/failing_tests");
         let listed_fuzzers = cmd!(
             sh,
-            "cargo {toolchain...} run --manifest-path ../../Cargo.toml list"
+            "cargo {toolchain...} run {features...} --manifest-path ../../Cargo.toml list"
         )
         .read()?;
         sh.change_dir("../../..");
@@ -47,7 +49,7 @@ impl Test {
         // This runs it in $repo/bin, which is fine as cargo-bolero does have fuzz-tests
         cmd!(
             sh,
-            "cargo {toolchain...} run build-clusterfuzz --rustc-bootstrap"
+            "cargo {toolchain...} run {features...} build-clusterfuzz --rustc-bootstrap"
         )
         .run()?;
 

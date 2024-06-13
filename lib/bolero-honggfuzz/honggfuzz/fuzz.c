@@ -178,29 +178,38 @@ static void fuzz_perfFeedback(run_t* run) {
     if (run->global->feedback.skipFeedbackOnTimeout && run->tmOutSignaled) {
         return;
     }
+    if (run->global->feedback.dynFileMethod == _HF_DYNFILE_NONE) {
+        return;
+    }
 
     MX_SCOPED_LOCK(&run->global->mutex.feedback);
     defer {
         wmb();
     };
 
-    uint64_t softNewPC = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewPC[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewPC[run->fuzzNo]);
-    uint64_t softCurPC = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalPC[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalPC[run->fuzzNo]);
+    uint64_t softNewPC   = 0;
+    uint64_t softCurPC   = 0;
+    uint64_t softNewEdge = 0;
+    uint64_t softCurEdge = 0;
+    uint64_t softNewCmp  = 0;
+    uint64_t softCurCmp  = 0;
 
-    uint64_t softNewEdge =
-        ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewEdge[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewEdge[run->fuzzNo]);
-    uint64_t softCurEdge =
-        ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalEdge[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalEdge[run->fuzzNo]);
+    if (run->global->feedback.dynFileMethod & _HF_DYNFILE_SOFT) {
+        softNewPC = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewPC[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewPC[run->fuzzNo]);
+        softCurPC = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalPC[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalPC[run->fuzzNo]);
 
-    uint64_t softNewCmp = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewCmp[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewCmp[run->fuzzNo]);
-    uint64_t softCurCmp =
-        ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalCmp[run->fuzzNo]);
-    ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalCmp[run->fuzzNo]);
+        softNewEdge = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewEdge[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewEdge[run->fuzzNo]);
+        softCurEdge = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalEdge[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalEdge[run->fuzzNo]);
+
+        softNewCmp = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidNewCmp[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidNewCmp[run->fuzzNo]);
+        softCurCmp = ATOMIC_GET(run->global->feedback.covFeedbackMap->pidTotalCmp[run->fuzzNo]);
+        ATOMIC_CLEAR(run->global->feedback.covFeedbackMap->pidTotalCmp[run->fuzzNo]);
+    }
 
     rmb();
 
@@ -228,6 +237,37 @@ static void fuzz_perfFeedback(run_t* run) {
             run->hwCnts.cpuInstrCnt, run->hwCnts.cpuBranchCnt, run->hwCnts.newBBCnt, softNewEdge,
             softNewPC, softNewCmp, run->hwCnts.cpuInstrCnt, run->hwCnts.cpuBranchCnt,
             run->hwCnts.bbCnt, softCurEdge, softCurPC, softCurCmp);
+
+        if (run->global->io.statsFileName) {
+            const time_t curr_sec      = time(NULL);
+            const time_t elapsed_sec   = curr_sec - run->global->timing.timeStart;
+            size_t       curr_exec_cnt = ATOMIC_GET(run->global->cnts.mutationsCnt);
+            /*
+             * We increase the mutation counter unconditionally in threads, but if it's
+             * above hfuzz->mutationsMax we don't really execute the fuzzing loop.
+             * Therefore at the end of fuzzing, the mutation counter might be higher
+             * than hfuzz->mutationsMax
+             */
+            if (run->global->mutate.mutationsMax > 0 &&
+                curr_exec_cnt > run->global->mutate.mutationsMax) {
+                curr_exec_cnt = run->global->mutate.mutationsMax;
+            }
+            size_t tot_exec_per_sec = elapsed_sec ? (curr_exec_cnt / elapsed_sec) : 0;
+
+            dprintf(run->global->io.statsFileFd,
+                "%lu, %lu, %lu, %lu, "
+                "%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "\n",
+                curr_sec,                                 /* unix_time */
+                run->global->timing.lastCovUpdate,        /* last_cov_update */
+                curr_exec_cnt,                            /* total_exec */
+                tot_exec_per_sec,                         /* exec_per_sec */
+                run->global->cnts.crashesCnt,             /* crashes */
+                run->global->cnts.uniqueCrashesCnt,       /* unique_crashes */
+                run->global->cnts.timeoutedCnt,           /* hangs */
+                run->global->feedback.hwCnts.softCntEdge, /* edge_cov */
+                run->global->feedback.hwCnts.softCntPc    /* block_cov */
+            );
+        }
 
         /* Update per-input coverage metrics */
         run->dynfile->cov[0] = softCurEdge + softCurPC + run->hwCnts.bbCnt;
@@ -488,6 +528,9 @@ static void* fuzz_threadNew(void* arg) {
         .persistentSock = -1,
         .tmOutSignaled  = false,
     };
+    defer {
+        free(run.dynfile);
+    };
 
     /* Do not try to handle input files with socketfuzzer */
     char mapname[32];
@@ -552,6 +595,8 @@ static void* fuzz_threadNew(void* arg) {
             break;
         }
     }
+
+    arch_reapKill();
 
     if (run.pid) {
         kill(run.pid, SIGKILL);
