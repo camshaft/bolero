@@ -78,7 +78,14 @@ mod tests {
 
     #[test]
     fn vec() {
-        let _ = generator_test!(gen_arbitrary::<Vec<usize>>());
+        let results = generator_test!(gen_arbitrary::<Vec<usize>>());
+        assert!(results.into_iter().any(|v| !v.is_empty()));
+    }
+
+    #[test]
+    fn string() {
+        let results = generator_test!(gen_arbitrary::<String>());
+        assert!(results.into_iter().any(|v| !v.is_empty()));
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -96,6 +103,7 @@ mod tests {
 
     #[test]
     fn randomly_valid() {
-        let _ = generator_test!(gen_arbitrary::<RandomlyValid>());
+        let results = generator_test!(gen_arbitrary::<RandomlyValid>());
+        assert!(!results.is_empty());
     }
 }

@@ -210,8 +210,8 @@ fn vec_type_test() {
 
 #[test]
 fn vec_with_len_test() {
-    let vec: Vec<u8> = generator_test!(gen::<Vec<u8>>().with().len(8usize)).unwrap();
-    assert_eq!(vec.len(), 8);
+    let results = generator_test!(gen::<Vec<u8>>().with().len(8usize));
+    assert!(results.into_iter().all(|v| v.len() == 8));
 }
 
 #[test]

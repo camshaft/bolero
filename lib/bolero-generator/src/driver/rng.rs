@@ -150,14 +150,10 @@ impl<R: RngCore> Driver for Rng<R> {
     {
         let (min, max) = hint();
 
-        // the lower bound is bigger than what we have remaining
-        if min > self.remaining_len() {
-            return None;
-        }
-
         let max = max
             .unwrap_or(usize::MAX)
-            .min(min)
+            // make sure max is at least min
+            .max(min)
             .min(self.remaining_len())
             .min(Buffer::MAX_CAPACITY);
 
