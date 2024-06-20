@@ -74,7 +74,7 @@ macro_rules! gen_from_bytes {
         #[inline(always)]
         fn gen_bool(&mut self, probability: Option<f32>) -> Option<bool> {
             if let Some(probability) = probability {
-                let value = self.sample_u32()? as f32 / core::u32::MAX as f32;
+                let value = self.sample_u32()? as f32 / u32::MAX as f32;
                 Some(value < probability)
             } else {
                 self.sample_bool()
