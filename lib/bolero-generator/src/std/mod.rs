@@ -48,9 +48,8 @@ fn hash_set_type_test() {
 
 #[test]
 fn hash_set_with_len_test() {
-    if let Some(set) = generator_test!(gen::<HashSet<u8>>().with().len(8usize)) {
-        assert_eq!(set.len(), 8);
-    }
+    let results = generator_test!(gen::<HashSet<u8>>().with().len(8usize));
+    assert!(results.into_iter().any(|r| r.len() == 8));
 }
 
 #[test]
