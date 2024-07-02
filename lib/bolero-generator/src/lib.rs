@@ -43,6 +43,7 @@ pub mod one_of;
 pub mod range;
 pub mod result;
 pub mod time;
+pub mod trace;
 pub mod tuple;
 
 #[cfg(feature = "arbitrary")]
@@ -142,6 +143,11 @@ pub trait ValueGenerator: Sized {
             generator: self,
             filter_map,
         }
+    }
+
+    #[inline]
+    fn trace(self) -> trace::Trace<Self> {
+        trace::Trace::new(self)
     }
 }
 
