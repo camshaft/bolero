@@ -10,6 +10,7 @@ impl<G: ValueGenerator> Trace<G> {
     }
 }
 
+#[cfg(not(kani))]
 impl<G: ValueGenerator> ValueGenerator for Trace<G> {
     type Output = G::Output;
 
@@ -38,6 +39,26 @@ impl<G: ValueGenerator> ValueGenerator for Trace<G> {
             formatter: Default::default(),
         };
         self.0.driver_cache(&mut driver, value)
+    }
+}
+
+#[cfg(kani)]
+impl<G: ValueGenerator> ValueGenerator for Trace<G> {
+    type Output = G::Output;
+
+    #[inline]
+    fn generate<D: crate::Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        self.0.generate(driver)
+    }
+
+    #[inline]
+    fn mutate<D: crate::Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        self.0.mutate(driver, value)
+    }
+
+    #[inline]
+    fn driver_cache<D: crate::Driver>(&self, driver: &mut D, value: Self::Output) {
+        self.0.driver_cache(driver, value)
     }
 }
 
@@ -317,8 +338,11 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Debug, PartialEq, Eq, TypeGenerator)]
+    struct Empty {}
+
     #[derive(Clone, Debug, PartialEq, Eq)]
-    pub struct Even {
+    struct Even {
         pub value: u8,
     }
 
@@ -338,7 +362,7 @@ mod tests {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, TypeGenerator)]
-    pub enum EvenTree {
+    enum EvenTree {
         Leaf(Even),
         Pair(Box<EvenTree>, Box<EvenTree>),
     }
@@ -350,6 +374,17 @@ mod tests {
         let out = g.out.borrow();
         let out = core::str::from_utf8(&out).unwrap();
         assert_eq!(out, expected.trim_start())
+    }
+
+    #[test]
+    fn empty_test() {
+        run(
+            &[],
+            Empty::gen(),
+            r#"
+product bolero_generator::trace::tests::Empty {}
+"#,
+        )
     }
 
     #[test]
@@ -379,7 +414,7 @@ product bolero_generator::trace::tests::Even {
     }
 
     #[test]
-    fn even_tree_test() {
+    fn tree_even_test() {
         run(
             &[],
             EvenTree::gen(),
@@ -396,7 +431,7 @@ sum bolero_generator::trace::tests::EvenTree {
     }
 
     #[test]
-    fn even_nested_tree_test() {
+    fn nested_tree_test() {
         run(
             &[255],
             EvenTree::gen(),
