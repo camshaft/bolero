@@ -80,3 +80,52 @@ fn with_test_time() {
         });
     assert!(num_iters.load(Ordering::Relaxed) > 10);
 }
+
+#[test]
+fn on_failure_generator_test() {
+    let mut failures = 0usize;
+    check!()
+        .with_type()
+        .on_failure(|_failure| {
+            failures += 1;
+        })
+        .for_each(|_: &u32| {
+            panic!();
+        });
+
+    assert!(failures > 1);
+}
+
+#[test]
+fn on_failure_generator_cloned_test() {
+    let mut failures = 0usize;
+    check!()
+        .with_type()
+        .cloned()
+        .on_failure(|_failure| {
+            failures += 1;
+        })
+        .for_each(|_: u32| {
+            panic!();
+        });
+
+    assert!(failures > 1);
+}
+
+/*
+ * TODO
+#[test]
+fn on_failure_bytes_test() {
+    let mut failures = 0usize;
+    check!()
+        .on_failure(|_failure| {
+            failures += 1;
+        })
+        .for_each(|_: &[u8]| {
+            panic!();
+        });
+
+    assert!(failures > 1);
+    panic!();
+}
+*/

@@ -1,5 +1,3 @@
-#![cfg_attr(not(fuzzing_random), allow(dead_code))]
-
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},

@@ -35,7 +35,7 @@ pub use bolero_generator::prelude::*;
 #[doc(hidden)]
 pub use bolero_engine::{self, TargetLocation, __item_path__};
 
-pub use bolero_engine::{Driver, Engine, Test};
+pub use bolero_engine::{Driver, Engine, Failure, Test};
 
 #[cfg(test)]
 mod tests;
@@ -168,11 +168,12 @@ macro_rules! fuzz {
 }
 
 /// Configuration for a test target
-pub struct TestTarget<Generator, Engine, InputOwnership> {
+pub struct TestTarget<Generator, Engine, InputOwnership, OnFailure = ()> {
     generator: Generator,
     driver_options: bolero_generator::driver::Options,
     engine: Engine,
     input_ownership: PhantomData<InputOwnership>,
+    on_failure: OnFailure,
 }
 
 #[doc(hidden)]
@@ -202,6 +203,7 @@ impl<Engine> TestTarget<ByteSliceGenerator, Engine, BorrowedInput> {
             engine,
             driver_options: Default::default(),
             input_ownership: PhantomData,
+            on_failure: (),
         }
     }
 }
@@ -227,6 +229,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -246,6 +249,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -270,6 +274,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -295,6 +300,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -311,6 +317,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -324,6 +331,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -337,6 +345,7 @@ impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine,
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,
+            on_failure: (),
         }
     }
 
@@ -418,53 +427,107 @@ where
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: PhantomData,
+            on_failure: (),
         }
     }
 }
 
-impl<G, E> TestTarget<G, E, BorrowedInput>
+impl<E, InputOwnership> TestTarget<ByteSliceGenerator, E, InputOwnership> {
+    /// Iterate over all of the inputs and check the `TestTarget`
+    pub fn on_failure<F>(
+        self,
+        on_failure: F,
+    ) -> TestTarget<ByteSliceGenerator, E, InputOwnership, F>
+    where
+        F: FnMut(Failure<bolero_engine::input::SliceDebug<&[u8]>>),
+    {
+        TestTarget {
+            generator: self.generator,
+            engine: self.engine,
+            driver_options: self.driver_options,
+            input_ownership: PhantomData,
+            on_failure,
+        }
+    }
+}
+
+impl<G, E, InputOwnership> TestTarget<G, E, InputOwnership>
+where
+    G: generator::ValueGenerator,
+{
+    /// Iterate over all of the inputs and check the `TestTarget`
+    pub fn on_failure<F>(self, on_failure: F) -> TestTarget<G, E, InputOwnership, F>
+    where
+        F: FnMut(Failure<G::Output>),
+    {
+        TestTarget {
+            generator: self.generator,
+            engine: self.engine,
+            driver_options: self.driver_options,
+            input_ownership: PhantomData,
+            on_failure,
+        }
+    }
+}
+
+impl<G, E, OnFailure> TestTarget<G, E, BorrowedInput, OnFailure>
 where
     G: generator::ValueGenerator,
 {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<F>(self, test: F) -> E::Output
     where
-        E: Engine<bolero_engine::BorrowedGeneratorTest<F, G, G::Output>>,
-        bolero_engine::BorrowedGeneratorTest<F, G, G::Output>: Test,
+        E: Engine<
+            bolero_engine::OnFailure<
+                bolero_engine::BorrowedGeneratorTest<F, G, G::Output>,
+                OnFailure,
+            >,
+        >,
+        bolero_engine::OnFailure<bolero_engine::BorrowedGeneratorTest<F, G, G::Output>, OnFailure>:
+            Test,
     {
         let test = bolero_engine::BorrowedGeneratorTest::new(test, self.generator);
+        let test = bolero_engine::OnFailure::new(test, self.on_failure);
         self.engine.run(test, self.driver_options)
     }
 }
 
-impl<G, E> TestTarget<G, E, ClonedInput>
+impl<G, E, OnFailure> TestTarget<G, E, ClonedInput, OnFailure>
 where
     G: generator::ValueGenerator,
 {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<F>(self, test: F) -> E::Output
     where
-        E: Engine<bolero_engine::ClonedGeneratorTest<F, G, G::Output>>,
-        bolero_engine::ClonedGeneratorTest<F, G, G::Output>: Test,
+        E: Engine<
+            bolero_engine::OnFailure<
+                bolero_engine::ClonedGeneratorTest<F, G, G::Output>,
+                OnFailure,
+            >,
+        >,
+        bolero_engine::OnFailure<bolero_engine::ClonedGeneratorTest<F, G, G::Output>, OnFailure>:
+            Test,
     {
         let test = bolero_engine::ClonedGeneratorTest::new(test, self.generator);
+        let test = bolero_engine::OnFailure::new(test, self.on_failure);
         self.engine.run(test, self.driver_options)
     }
 }
 
-impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
+impl<E, OnFailure> TestTarget<ByteSliceGenerator, E, BorrowedInput, OnFailure> {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<T>(self, test: T) -> E::Output
     where
-        E: Engine<bolero_engine::BorrowedSliceTest<T>>,
-        bolero_engine::BorrowedSliceTest<T>: Test,
+        E: Engine<bolero_engine::OnFailure<bolero_engine::BorrowedSliceTest<T>, OnFailure>>,
+        bolero_engine::OnFailure<bolero_engine::BorrowedSliceTest<T>, OnFailure>: Test,
     {
         let test = bolero_engine::BorrowedSliceTest::new(test);
+        let test = bolero_engine::OnFailure::new(test, self.on_failure);
         self.engine.run(test, self.driver_options)
     }
 }
 
-impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {
+impl<E, OnFailure> TestTarget<ByteSliceGenerator, E, ClonedInput, OnFailure> {
     /// Iterate over all of the inputs and check the `TestTarget`
     pub fn for_each<T>(self, test: T) -> E::Output
     where

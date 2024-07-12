@@ -7,7 +7,7 @@ use std::panic::RefUnwindSafe;
 /// Trait for defining a test case
 pub trait Test: Sized {
     /// The input value for the test case
-    type Value;
+    type Value: core::fmt::Debug;
 
     /// Execute one test with the given input
     fn test<T: Input<Result<bool, PanicError>>>(
@@ -28,6 +28,11 @@ pub trait Test: Sized {
         options: &driver::Options,
     ) -> Option<Failure<Self::Value>> {
         crate::shrink::shrink(self, input, seed, options)
+    }
+
+    /// Called when the test fails
+    fn on_failure(&mut self, failure: Failure<Self::Value>) {
+        failure.exit();
     }
 }
 
@@ -244,7 +249,7 @@ impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for ClonedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoResult,
-    G::Output: core::fmt::Debug + Clone,
+    G::Output: core::fmt::Debug + Clone + core::panic::RefUnwindSafe,
 {
     type Value = G::Output;
 
@@ -289,5 +294,82 @@ where
             crate::panic::forward_panic(forward_panic);
             value
         })
+    }
+}
+
+pub struct OnFailure<T, F> {
+    test: T,
+    on_failure: F,
+}
+
+impl<T, F> OnFailure<T, F> {
+    pub fn new(test: T, on_failure: F) -> Self {
+        Self { test, on_failure }
+    }
+}
+
+impl<Tst, F> Test for OnFailure<Tst, F>
+where
+    Tst: Test,
+    F: FnMut(Failure<Tst::Value>),
+{
+    type Value = Tst::Value;
+
+    #[inline]
+    fn test<T: Input<Result<bool, panic::PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, panic::PanicError> {
+        self.test.test(input)
+    }
+
+    #[inline]
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
+        self.test.generate_value(input)
+    }
+
+    #[inline]
+    fn shrink<I: crate::shrink::Input>(
+        &mut self,
+        input: I,
+        seed: Option<Seed>,
+        options: &driver::Options,
+    ) -> Option<Failure<Self::Value>> {
+        self.test.shrink(input, seed, options)
+    }
+
+    #[inline]
+    fn on_failure(&mut self, failure: Failure<Self::Value>) {
+        (self.on_failure)(failure);
+    }
+}
+
+impl<Tst> Test for OnFailure<Tst, ()>
+where
+    Tst: Test,
+{
+    type Value = Tst::Value;
+
+    #[inline]
+    fn test<T: Input<Result<bool, panic::PanicError>>>(
+        &mut self,
+        input: &mut T,
+    ) -> Result<bool, panic::PanicError> {
+        self.test.test(input)
+    }
+
+    #[inline]
+    fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
+        self.test.generate_value(input)
+    }
+
+    #[inline]
+    fn shrink<I: crate::shrink::Input>(
+        &mut self,
+        input: I,
+        seed: Option<Seed>,
+        options: &driver::Options,
+    ) -> Option<Failure<Self::Value>> {
+        self.test.shrink(input, seed, options)
     }
 }

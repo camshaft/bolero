@@ -58,21 +58,20 @@ pub mod fuzzer {
 
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
-                        if let Some(shrunken) = shrunken {
-                            eprintln!("{:#}", shrunken);
+                        let mut error = if let Some(shrunken) = shrunken {
+                            shrunken
                         } else {
-                            let input = input::Bytes::new(slice, options);
-                            eprintln!(
-                                "{:#}",
-                                Failure {
-                                    seed: None,
-                                    error,
-                                    input
-                                }
-                            );
-                        }
+                            let mut input = input::Bytes::new(slice, options);
+                            let input = test.generate_value(&mut input);
+                            Failure::new(input, error)
+                        };
 
-                        std::process::abort();
+                        // libfuzzer prefers aborting over panic
+                        error.exit_strategy = bolero_engine::failure::ExitStrategy::Abort;
+
+                        panic::forward_panic(true);
+                        test.on_failure(error);
+                        panic::forward_panic(false);
                     }
                 }
             })

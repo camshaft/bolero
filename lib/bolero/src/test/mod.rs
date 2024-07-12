@@ -5,8 +5,6 @@ use core::{fmt, mem::size_of, time::Duration};
 use std::path::PathBuf;
 
 mod input;
-
-#[cfg(any(fuzzing_random, test))]
 mod report;
 
 /// Engine implementation which mimics Rust's default test
@@ -119,6 +117,14 @@ impl TestEngine {
         })
     }
 
+    #[cfg(fuzzing_random)]
+    fn tests(&self) -> impl Iterator<Item = NamedTest> {
+        self.seed_tests()
+            .map(|t| t.into())
+            .chain(self.rng_tests().map(|t| t.into()))
+    }
+
+    #[cfg(not(fuzzing_random))]
     fn tests(&self) -> impl Iterator<Item = NamedTest> {
         self.seed_tests()
             .map(|t| t.into())
@@ -130,89 +136,29 @@ impl TestEngine {
             .chain(self.rng_tests().map(|t| t.into()))
     }
 
-    #[cfg(any(fuzzing_random, test))]
-    #[cfg_attr(not(fuzzing_random), allow(dead_code))]
-    fn run_fuzzer<T>(mut self, mut test: T, options: driver::Options) -> bolero_engine::Never
+    fn run_tests<T>(mut self, mut test: T, options: driver::Options)
     where
         T: Test,
         T::Value: core::fmt::Debug,
     {
-        bolero_engine::panic::set_hook();
-        bolero_engine::panic::forward_panic(false);
-
-        let options = &options;
-
-        let mut report = report::Report::default();
-        report.spawn_timer();
-
-        if self.rng_cfg.iterations.is_none() {
+        if cfg!(fuzzing_random) && self.rng_cfg.iterations.is_none() {
             self.rng_cfg.iterations = Some(usize::MAX);
         }
 
-        let start_time = std::time::Instant::now();
-        let test_time = self.rng_cfg.test_time;
-
-        let mut buffer = vec![];
-        let mut cache = bolero_generator::driver::cache::Cache::default();
-        let mut testfn = |conf: &input::RngTest| {
-            let mut input = conf.input(&mut buffer, &mut cache, options);
-            test.test(&mut input).map_err(|error| {
-                let seed = Some(conf.seed);
-                // reseed the input and buffer the rng for shrinking
-                let mut input = conf.buffered_input(&mut buffer, options);
-                let _ = test.generate_value(&mut input);
-
-                let input = input::RngReplayInput {
-                    buffer: &mut buffer.clone(),
-                };
-                let shrunken = test.shrink(input, seed, options);
-
-                if let Some(shrunken) = shrunken {
-                    format!("{:#}", shrunken)
-                } else {
-                    buffer.clear();
-                    let mut input = conf.input(&mut buffer, &mut cache, options);
-                    let input = test.generate_value(&mut input);
-                    format!("{:#}", Failure { seed, error, input })
-                }
-            })
-        };
-
-        for input in self.rng_tests() {
-            if let Some(test_time) = test_time {
-                if start_time.elapsed() > test_time {
-                    break;
-                }
-            }
-
-            match testfn(&input) {
-                Ok(is_valid) => {
-                    report.on_result(is_valid);
-                }
-                Err(err) => {
-                    bolero_engine::panic::forward_panic(true);
-                    eprintln!("{}", err);
-                    panic!("test failed");
-                }
-            }
-        }
-    }
-
-    #[cfg(not(fuzzing_random))]
-    fn run_tests<T>(self, mut test: T, options: driver::Options)
-    where
-        T: Test,
-        T::Value: core::fmt::Debug,
-    {
         let file_options = options.clone();
         let rng_options = options;
 
         let file_options = &file_options;
         let rng_options = &rng_options;
 
+        let mut report = report::Report::default();
+        if cfg!(fuzzing_random) {
+            report.spawn_timer();
+        }
+
         let mut buffer = vec![];
         let mut cache = driver::cache::Cache::default();
-        let mut testfn = |data: &input::Test| {
+        let mut testfn = |test: &mut T, data: &input::Test| {
             buffer.clear();
             match data {
                 input::Test::File(file) => {
@@ -223,42 +169,39 @@ impl TestEngine {
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
                         if let Some(shrunken) = shrunken {
-                            format!("{:#}", shrunken)
+                            shrunken
                         } else {
-                            format!(
-                                "{:#}",
-                                Failure {
-                                    seed: data.seed(),
-                                    error,
-                                    input: buffer.clone()
-                                }
-                            )
+                            let input = test.generate_value(&mut input);
+                            Failure::new(input, error).with_seed(data.seed())
                         }
                     })
                 }
                 input::Test::Rng(conf) => {
                     let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                     test.test(&mut input).map_err(|error| {
+                        let seed = Some(conf.seed);
+
                         // reseed the input and buffer the rng for shrinking
                         let mut input = conf.buffered_input(&mut buffer, rng_options);
                         let _ = test.generate_value(&mut input);
 
-                        let shrunken = test.shrink(buffer.clone(), data.seed(), rng_options);
+                        // reseed the input and buffer the rng for shrinking
+                        let mut input = conf.buffered_input(&mut buffer, rng_options);
+                        let _ = test.generate_value(&mut input);
+
+                        let input = input::RngReplayInput {
+                            buffer: &mut buffer.clone(),
+                        };
+
+                        let shrunken = test.shrink(input, seed, rng_options);
 
                         if let Some(shrunken) = shrunken {
-                            format!("{:#}", shrunken)
+                            shrunken
                         } else {
                             buffer.clear();
                             let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                             let input = test.generate_value(&mut input);
-                            format!(
-                                "{:#}",
-                                Failure {
-                                    seed: data.seed(),
-                                    error,
-                                    input
-                                }
-                            )
+                            Failure::new(input, error).with_seed(data.seed())
                         }
                     })
                 }
@@ -267,24 +210,42 @@ impl TestEngine {
 
         let tests = self.tests();
 
+        let start_time = std::time::Instant::now();
+        let test_time = if cfg!(fuzzing_random) {
+            self.rng_cfg.test_time
+        } else {
+            Some(self.rng_cfg.test_time_or_default()).filter(|v| *v < Duration::MAX)
+        };
+
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
-
-        let start_time = std::time::Instant::now();
-        let test_time = self.rng_cfg.test_time_or_default();
-        for test in tests {
-            if start_time.elapsed() > test_time {
-                break;
+        for input in tests {
+            if let Some(test_time) = test_time {
+                if start_time.elapsed() > test_time {
+                    break;
+                }
             }
 
             progress();
 
-            if let Err(err) = testfn(&test.data) {
-                bolero_engine::panic::forward_panic(true);
-                eprintln!("{}", err);
-                panic!("test failed: {}", test);
+            match testfn(&mut test, &input.data) {
+                Ok(is_valid) => {
+                    report.on_result(is_valid);
+                }
+                Err(mut err) => {
+                    if cfg!(fuzzing_random) {
+                        err.exit_strategy = bolero_engine::failure::ExitStrategy::Abort;
+                    }
+
+                    bolero_engine::panic::forward_panic(true);
+                    test.on_failure(err);
+                    bolero_engine::panic::forward_panic(false);
+                }
             }
         }
+
+        // restore panics after exiting the test
+        bolero_engine::panic::forward_panic(true);
 
         fn progress() {
             if cfg!(miri) {
@@ -303,17 +264,8 @@ where
     T: Test,
     T::Value: core::fmt::Debug,
 {
-    #[cfg(fuzzing_random)]
-    type Output = bolero_engine::Never;
-    #[cfg(not(fuzzing_random))]
     type Output = ();
 
-    #[cfg(fuzzing_random)]
-    fn run(self, test: T, options: driver::Options) -> Self::Output {
-        self.run_fuzzer(test, options)
-    }
-
-    #[cfg(not(fuzzing_random))]
     fn run(self, test: T, options: driver::Options) -> Self::Output {
         self.run_tests(test, options)
     }

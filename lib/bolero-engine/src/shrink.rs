@@ -144,9 +144,10 @@ impl<'a, T: Test, I: Input> Shrinker<'a, T, I> {
         panic::capture_backtrace(capture_backtrace);
 
         Some(Failure {
-            seed: self.seed,
-            error,
             input,
+            error,
+            seed: self.seed,
+            exit_strategy: Default::default(),
         })
     }
 

@@ -4,12 +4,54 @@ use crate::{
 };
 use core::fmt::{Debug, Display};
 
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub enum ExitStrategy {
+    #[default]
+    Panic,
+    Abort,
+    Exit,
+}
+
+impl ExitStrategy {
+    fn exit(&self) {
+        match self {
+            ExitStrategy::Panic => panic!("test failed"),
+            ExitStrategy::Abort => std::process::abort(),
+            ExitStrategy::Exit => std::process::exit(1),
+        }
+    }
+}
+
 /// Contains information about a test failure
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Failure<Input> {
     pub error: PanicError,
     pub input: Input,
     pub seed: Option<Seed>,
+    pub exit_strategy: ExitStrategy,
+}
+
+impl<Input: Debug> Failure<Input> {
+    pub fn new(input: Input, error: PanicError) -> Self {
+        Self {
+            input,
+            error,
+            seed: None,
+            exit_strategy: Default::default(),
+        }
+    }
+
+    pub fn with_seed(mut self, seed: Option<Seed>) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    pub fn exit(self) {
+        eprintln!("{self:#}");
+        self.exit_strategy.exit()
+    }
 }
 
 impl<Input: Debug> Display for Failure<Input> {
