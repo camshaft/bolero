@@ -569,7 +569,7 @@ static inline void mangle_AddSubWithRange(
         }
         case 2: {
             int16_t val;
-            memcpy(&val, &run->dynfile->data[off], sizeof(val));
+            util_memcpyInline(&val, &run->dynfile->data[off], sizeof(val));
             if (util_rnd64() & 0x1) {
                 val += delta;
             } else {
@@ -583,7 +583,7 @@ static inline void mangle_AddSubWithRange(
         }
         case 4: {
             int32_t val;
-            memcpy(&val, &run->dynfile->data[off], sizeof(val));
+            util_memcpyInline(&val, &run->dynfile->data[off], sizeof(val));
             if (util_rnd64() & 0x1) {
                 val += delta;
             } else {
@@ -597,7 +597,7 @@ static inline void mangle_AddSubWithRange(
         }
         case 8: {
             int64_t val;
-            memcpy(&val, &run->dynfile->data[off], sizeof(val));
+            util_memcpyInline(&val, &run->dynfile->data[off], sizeof(val));
             if (util_rnd64() & 0x1) {
                 val += delta;
             } else {
@@ -705,6 +705,7 @@ static void mangle_Shrink(run_t* run, bool printable HF_ATTR_UNUSED) {
     mangle_Move(run, off_end, off_start, len_to_move);
     input_setSize(run, run->dynfile->size - len);
 }
+
 static void mangle_ASCIINum(run_t* run, bool printable) {
     size_t len = util_rndGet(2, 8);
 
@@ -842,7 +843,7 @@ static void mangle_Resize(run_t* run, bool printable) {
 }
 
 void mangle_mangleContent(run_t* run, int speed_factor) {
-    static void (*const mangleFuncs[])(run_t * run, bool printable) = {
+    static void (*const mangleFuncs[])(run_t* run, bool printable) = {
         mangle_Shrink,
         mangle_Expand,
         mangle_Bit,
@@ -890,17 +891,17 @@ void mangle_mangleContent(run_t* run, int speed_factor) {
         }
     }
 
+    /*
+     * mangle_ConstFeedbackDict() is quite powerful if the dynamic feedback dictionary
+     * exists. If so, give it a 50% chance of being used.
+     */
+    if (run->global->feedback.cmpFeedback && (util_rnd64() & 0x1)) {
+        mangle_ConstFeedbackDict(run, /* printable= */ run->global->cfg.only_printable);
+    }
+
     for (uint64_t x = 0; x < changesCnt; x++) {
-        if (run->global->feedback.cmpFeedback && (util_rnd64() & 0x1)) {
-            /*
-             * mangle_ConstFeedbackDict() is quite powerful if the dynamic feedback dictionary
-             * exists. If so, give it 50% chance of being used among all mangling functions.
-             */
-            mangle_ConstFeedbackDict(run, /* printable= */ run->global->cfg.only_printable);
-        } else {
-            uint64_t choice = util_rndGet(0, ARRAYSIZE(mangleFuncs) - 1);
-            mangleFuncs[choice](run, /* printable= */ run->global->cfg.only_printable);
-        }
+        uint64_t choice = util_rndGet(0, ARRAYSIZE(mangleFuncs) - 1);
+        mangleFuncs[choice](run, /* printable= */ run->global->cfg.only_printable);
     }
 
     wmb();

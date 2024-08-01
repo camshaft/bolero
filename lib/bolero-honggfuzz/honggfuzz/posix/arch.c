@@ -35,6 +35,9 @@
 #if !defined(__sun)
 #include <sys/cdefs.h>
 #endif
+#if defined(__FreeBSD__)
+#include <sys/procctl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -178,10 +181,28 @@ static void arch_analyzeSignal(run_t* run, pid_t pid, int status) {
 }
 
 pid_t arch_fork(run_t* fuzzer HF_ATTR_UNUSED) {
+#if defined(__FreeBSD__)
+    const int flags = RFPROC | RFCFDG;
+    return rfork(flags);
+#else
     return fork();
+#endif
 }
 
 bool arch_launchChild(run_t* run) {
+#if defined(__FreeBSD__)
+    int enableTrace          = PROC_TRACE_CTL_ENABLE;
+    int disableRandomization = PROC_ASLR_FORCE_DISABLE;
+    if (procctl(P_PID, 0, PROC_TRACE_CTL, &enableTrace) == -1) {
+        PLOG_E("procctl(PROC_TRACE_CTL, PROC_TRACE_CTL_ENABLE)");
+        return false;
+    }
+
+    if (run->global->arch_linux.disableRandomization &&
+        procctl(P_PID, 0, PROC_ASLR_CTL, &disableRandomization) == -1) {
+        PLOG_D("procctl(PROC_ASLR_CTL, PROC_ASLR_FORCE_DISABLE) failed");
+    }
+#endif
     /* alarm persists across forks, so disable it here */
     alarm(0);
     execvp(run->args[0], (char* const*)run->args);
@@ -263,6 +284,17 @@ void arch_reapChild(run_t* run) {
     }
 }
 
+void arch_reapKill(void) {
+#if defined(__FreeBSD__)
+    struct procctl_reaper_kill lst;
+    lst.rk_flags = 0;
+    lst.rk_sig   = SIGTERM;
+    if (procctl(P_PID, getpid(), PROC_REAP_KILL, &lst) == -1) {
+        PLOG_W("procctl(PROC_REAP_KILL)");
+    }
+#endif
+}
+
 bool arch_archInit(honggfuzz_t* hfuzz HF_ATTR_UNUSED) {
     /* Make %'d work */
     setlocale(LC_NUMERIC, "en_US.UTF-8");
@@ -271,5 +303,10 @@ bool arch_archInit(honggfuzz_t* hfuzz HF_ATTR_UNUSED) {
 }
 
 bool arch_archThreadInit(run_t* fuzzer HF_ATTR_UNUSED) {
+#if defined(__FreeBSD_)
+    if (procctl(P_PID, getpid(), PROC_REAP_ACQUIRE, NULL) == -1) {
+        PLOG_W("procctl(PROC_REAP_ACQUIRE)");
+    }
+#endif
     return true;
 }

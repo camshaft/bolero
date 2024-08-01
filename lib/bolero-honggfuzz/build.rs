@@ -20,6 +20,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
 
     let status = Command::new(MAKE_COMMAND)
         .args(["-C", "honggfuzz", target, "libhfcommon/libhfcommon.a"])
+        .env("CFLAGS", "-O3 -mtune=native -funroll-loops -fPIE")
         .status()
         .unwrap();
     assert!(status.success());

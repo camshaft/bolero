@@ -114,7 +114,7 @@ static unsigned getCpuUse(int numCpus) {
 
 #if defined(__linux__) || defined(__CYGWIN__)
     FILE* f = fopen("/proc/stat", "re");
-    if (f == NULL) {
+    if (UNLIKELY(f == NULL)) {
         return 0;
     }
     defer {
@@ -130,7 +130,7 @@ static unsigned getCpuUse(int numCpus) {
     long   off        = 0;
     size_t cpuDataLen = sizeof(long) * CPUSTATES * numCpus;
     long*  cpuData    = malloc(cpuDataLen);
-    if (cpuData == NULL) {
+    if (UNLIKELY(cpuData == NULL)) {
         return 0;
     }
 
@@ -233,7 +233,7 @@ static unsigned getCpuUse(int numCpus) {
     prevIdleT   = idleT;
 
     uint64_t allCycles = userCycles + niceCycles + systemCycles + idleCycles;
-    if (allCycles == 0) {
+    if (UNLIKELY(allCycles == 0)) {
         return 0;
     }
 
@@ -417,7 +417,7 @@ void display_display(honggfuzz_t* hfuzz) {
         uint64_t softCntCmp  = ATOMIC_GET(hfuzz->feedback.hwCnts.softCntCmp);
         uint64_t guardNb     = ATOMIC_GET(hfuzz->feedback.covFeedbackMap->guardNb);
         display_put(" edge: " ESC_BOLD "%" _HF_NONMON_SEP PRIu64 ESC_RESET "/"
-                    "%" _HF_NONMON_SEP                           PRIu64 " [%" PRId64 "%%]",
+                    "%" _HF_NONMON_SEP PRIu64 " [%" PRId64 "%%]",
             softCntEdge, guardNb, guardNb ? ((softCntEdge * 100) / guardNb) : 0);
         display_put(" pc: " ESC_BOLD "%" _HF_NONMON_SEP PRIu64 ESC_RESET, softCntPc);
         display_put(" cmp: " ESC_BOLD "%" _HF_NONMON_SEP PRIu64 ESC_RESET, softCntCmp);
