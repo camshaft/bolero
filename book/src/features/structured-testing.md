@@ -95,8 +95,9 @@ fn main() {
 #                     }
 #                 }
 #             }
-#         })
-# }
+            // assertions go here
+        })
+}
 ```
 
 ## Using Test Oracles
