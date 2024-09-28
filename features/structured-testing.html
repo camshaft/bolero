@@ -204,7 +204,45 @@ fn main() {
         })
 }
 </code></pre></pre>
-<p>This basic test will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
+<h2><a class="header" href="#controlling-the-number-of-operations-generated" id="controlling-the-number-of-operations-generated">Controlling The Number Of Operations Generated</a></h2>
+<p>Using <code>check!().with_type::&lt;Vec&lt;T&gt;&gt;()</code> will generate vectors with lengths in the range <code>0..=64</code>. If you need more control over the number of elements being generated you can instead use <code>.with_generator</code> and provide a customized generator:</p>
+<pre><pre class="playpen"><code class="language-rust"><span class="boring">use bolero::{check, generator::*};
+</span>use bolero::gen;
+<span class="boring">use my_set::MySet;
+</span>
+<span class="boring">#[derive(Debug, TypeGenerator)]
+</span><span class="boring">enum Operation {
+</span><span class="boring">    Insert(u64),
+</span><span class="boring">    Remove(u64),
+</span><span class="boring">    Clear,
+</span><span class="boring">}
+</span><span class="boring">
+</span>fn main() {
+    check!()
+        // Generate 0 to 200 operations
+        .with_generator(gen::&lt;Vec&lt;Operation&gt;&gt;().with().len(0..=200))
+        .for_each(|operations| {
+<span class="boring">            let mut set = MySet::new();
+</span><span class="boring">
+</span><span class="boring">            for operation in operations.iter() {
+</span><span class="boring">                match operation {
+</span><span class="boring">                    Operation::Insert(value) =&gt; {
+</span><span class="boring">                        set.insert(value);
+</span><span class="boring">                    }
+</span><span class="boring">                    Operation::Remove(value) =&gt; {
+</span><span class="boring">                        set.remove(value);
+</span><span class="boring">                    }
+</span><span class="boring">                    Operation::Clear =&gt; {
+</span><span class="boring">                        set.clear();
+</span><span class="boring">                    }
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span>            // assertions go here
+        })
+}
+</code></pre></pre>
+<h2><a class="header" href="#using-test-oracles" id="using-test-oracles">Using Test Oracles</a></h2>
+<p>The basic test we constructed above will make sure we don't panic on any of the list of operations. We can take it to the next step by using a test oracle to make sure the behavior of <code>MySet</code> is actually correct. Here we'll use <code>HashSet</code> from the <code>std</code> library:</p>
 <pre><pre class="playpen"><code class="language-rust">use bolero::{check, generator::*};
 use my_set::MySet;
 use std::collections::HashSet;
