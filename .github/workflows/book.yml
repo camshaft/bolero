@@ -22,6 +22,6 @@ jobs:
       - run: mdbook build book
 
       - name: Build and Deploy
-        uses: JamesIves/github-pages-deploy-action@v4.6.3
+        uses: JamesIves/github-pages-deploy-action@v4.6.8
         with:
           folder: target/book
