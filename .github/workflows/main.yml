@@ -25,7 +25,7 @@ jobs:
         override: true
         components: rustfmt, clippy
 
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v4.2.0
 
     - name: Override bin
       working-directory: bin
@@ -81,7 +81,7 @@ jobs:
         launchctl unload -w ${SL}/LaunchAgents/${PL}.plist
         sudo launchctl unload -w ${SL}/LaunchDaemons/${PL}.Root.plist
 
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v4.2.0
 
     # install stable for kani, cargo-bolero and test runner
     - uses: actions-rs/toolchain@v1.0.7
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v4.2.0
 
     - uses: actions-rs/toolchain@v1.0.7
       id: toolchain
@@ -136,9 +136,9 @@ jobs:
         repo: ["aws/s2n-quic"]
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v4.2.0
 
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v4.2.0
       with:
         repository: ${{ matrix.repo }}
         path: "target/integration/${{ matrix.repo }}"
