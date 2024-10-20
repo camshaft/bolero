@@ -37,16 +37,37 @@ macro_rules! shrink_test {
     };
 }
 
-shrink_test!(u16_shrink_test_zero_time, gen::<u16>(), [255u8; 2], Duration::ZERO, (None), |_| {});
+shrink_test!(
+    u16_shrink_test_zero_time,
+    gen::<u16>(),
+    [255u8; 2],
+    Duration::ZERO,
+    (None),
+    |_| {}
+);
 
-shrink_test!(u16_shrink_test, gen::<u16>(), [255u8; 2], Duration::from_secs(1), (1), |value| {
-    assert!(value < 20);
-    assert!(value % 7 == 0);
-});
+shrink_test!(
+    u16_shrink_test,
+    gen::<u16>(),
+    [255u8; 2],
+    Duration::from_secs(1),
+    (1),
+    |value| {
+        assert!(value < 20);
+        assert!(value % 7 == 0);
+    }
+);
 
-shrink_test!(u32_shrink_test, gen::<u32>(), [255u8; 4], Duration::from_secs(1), (20), |value| {
-    assert!(value < 20);
-});
+shrink_test!(
+    u32_shrink_test,
+    gen::<u32>(),
+    [255u8; 4],
+    Duration::from_secs(1),
+    (20),
+    |value| {
+        assert!(value < 20);
+    }
+);
 
 shrink_test!(
     vec_shrink_test,
