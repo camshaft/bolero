@@ -239,11 +239,15 @@ impl TestEngine {
                 input::Test::Rng(conf) => {
                     let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                     test.test(&mut input).map_err(|error| {
-                        // reseed the input and buffer the rng for shrinking
-                        let mut input = conf.buffered_input(&mut buffer, rng_options);
-                        let _ = test.generate_value(&mut input);
+                        let shrunken = if rng_options.shrink_time_or_default().is_zero() {
+                            None
+                        } else {
+                            // reseed the input and buffer the rng for shrinking
+                            let mut input = conf.buffered_input(&mut buffer, rng_options);
+                            let _ = test.generate_value(&mut input);
 
-                        let shrunken = test.shrink(buffer.clone(), data.seed(), rng_options);
+                            test.shrink(buffer.clone(), data.seed(), rng_options)
+                        };
 
                         if let Some(shrunken) = shrunken {
                             format!("{:#}", shrunken)

@@ -82,6 +82,10 @@ impl<'a, T: Test, I: Input> Shrinker<'a, T, I> {
     }
 
     fn shrink(mut self) -> Option<Failure<T::Value>> {
+        if self.options.shrink_time_or_default().is_zero() {
+            return None;
+        }
+
         panic::set_hook();
         let forward_panic = panic::forward_panic(false);
         let capture_backtrace = panic::capture_backtrace(false);
