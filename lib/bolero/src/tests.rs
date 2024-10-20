@@ -80,3 +80,54 @@ fn with_test_time() {
         });
     assert!(num_iters.load(Ordering::Relaxed) > 10);
 }
+
+#[test]
+fn with_shrinking() {
+    use std::sync::atomic::Ordering;
+    let last_seen_value = std::sync::atomic::AtomicU8::new(0);
+
+    std::panic::catch_unwind(|| {
+        check!()
+            .with_generator(gen::<u8>())
+            .with_shrink_time(Duration::from_secs(10))
+            .for_each(|value| {
+                last_seen_value.store(*value, Ordering::Relaxed);
+                assert!(*value == 0)
+            });
+    })
+    .unwrap_err();
+
+    assert_eq!(last_seen_value.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn without_shrinking() {
+    use std::sync::atomic::Ordering;
+
+    let max_seen_value = std::sync::atomic::AtomicU8::new(0);
+    let n = 20; // P(false negative) = 1/(256^n) assuming uniform gen::<u8>
+
+    for _ in 0..n {
+        let last_seen_value = std::sync::atomic::AtomicU8::new(0);
+
+        std::panic::catch_unwind(|| {
+            check!()
+                .with_generator(gen::<u8>())
+                .with_shrink_time(Duration::ZERO)
+                .for_each(|value| {
+                    last_seen_value.store(*value, Ordering::Relaxed);
+                    assert!(*value == 0)
+                });
+        })
+        .unwrap_err();
+
+        let last = last_seen_value.load(Ordering::Relaxed);
+        let max = max_seen_value.load(Ordering::Relaxed);
+
+        if last > max {
+            max_seen_value.store(last, Ordering::Relaxed);
+        }
+    }
+
+    assert!(max_seen_value.load(Ordering::Relaxed) > 1);
+}
