@@ -94,7 +94,8 @@ fn with_shrinking() {
                 last_seen_value.store(*value, Ordering::Relaxed);
                 assert!(*value == 0)
             });
-    }).unwrap_err();
+    })
+    .unwrap_err();
 
     assert_eq!(last_seen_value.load(Ordering::Relaxed), 1);
 }
@@ -117,7 +118,8 @@ fn without_shrinking() {
                     last_seen_value.store(*value, Ordering::Relaxed);
                     assert!(*value == 0)
                 });
-        }).unwrap_err();
+        })
+        .unwrap_err();
 
         let last = last_seen_value.load(Ordering::Relaxed);
         let max = max_seen_value.load(Ordering::Relaxed);
