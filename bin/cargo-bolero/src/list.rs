@@ -23,6 +23,7 @@ impl List {
         let output = self
             .cmd("test", &[], None)?
             .arg("--no-fail-fast")
+            .arg("_fuzzer")
             .arg("--")
             .arg("--nocapture")
             .env("CARGO_BOLERO_SELECT", "all")

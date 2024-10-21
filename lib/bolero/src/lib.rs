@@ -125,6 +125,8 @@ macro_rules! check {
             test_name: None,
         };
 
+        assert!(location.item_path.contains("_fuzzer"), "Bolero fuzzers must all end with `_fuzzer` since 0.11");
+        
         if !location.should_run() {
             return;
         }

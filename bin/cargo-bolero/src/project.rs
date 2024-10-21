@@ -140,7 +140,6 @@ impl Project {
         let flags = [
             "--cfg fuzzing",
             "-Cdebug-assertions",
-            "-Ctarget-cpu=native",
             "-Cdebuginfo=2",
             "-Coverflow_checks",
             "-Clink-dead-code",

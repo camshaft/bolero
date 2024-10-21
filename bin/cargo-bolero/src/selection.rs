@@ -29,6 +29,9 @@ impl Selection {
         let mut output_command = self.cmd("test", flags, Some(fuzzer))?;
         output_command
             .arg(&self.test)
+            .arg("--workspace")
+            .arg("--exclude")
+            .arg("neard")
             .arg("--")
             .arg("--nocapture")
             .arg("--exact")
