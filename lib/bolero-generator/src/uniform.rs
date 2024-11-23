@@ -1,7 +1,8 @@
 use crate::bounded::BoundExt;
-use core::ops::{Bound, RangeBounds};
+use core::ops::{Bound, RangeBounds, RangeInclusive};
 
-pub trait Uniform: Sized + PartialEq + Eq + PartialOrd + Ord {
+pub trait Uniform: Sized + PartialEq + PartialOrd {
+    fn bounds_to_range(min: Bound<&Self>, max: Bound<&Self>) -> Option<RangeInclusive<Self>>;
     fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self>;
     fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self>;
 }
@@ -53,12 +54,7 @@ macro_rules! uniform_int {
     ($sample:ident, $ty:ident, $unsigned:ident $(, $smaller:ident)*) => {
         impl Uniform for $ty {
             #[inline(always)]
-            fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<$ty> {
-                fill.$sample()
-            }
-
-            #[inline]
-            fn sample<F: FillBytes>(fill: &mut F, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
+            fn bounds_to_range(min: Bound<&$ty>, max: Bound<&$ty>) -> Option<RangeInclusive<$ty>> {
                 match (min, max) {
                     // filter invalid ranges
                     (Bound::Unbounded, Bound::Excluded(&$ty::MIN)) | (Bound::Excluded(&$ty::MAX), Bound::Unbounded)  => {
@@ -81,7 +77,7 @@ macro_rules! uniform_int {
                     | (Bound::Unbounded, Bound::Included(&$ty::MAX))
                     | (Bound::Included(&$ty::MIN), Bound::Unbounded)
                     | (Bound::Included(&$ty::MIN), Bound::Included(&$ty::MAX)) => {
-                        return Self::sample_unbound(fill);
+                        return Some($ty::MIN..=$ty::MAX);
                     }
                     _ => {}
                 }
@@ -97,6 +93,24 @@ macro_rules! uniform_int {
                     Bound::Excluded(v) => v.saturating_sub(1),
                     Bound::Unbounded => $ty::MAX,
                 };
+
+                Some(lower..=upper)
+            }
+
+            #[inline(always)]
+            fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<$ty> {
+                fill.$sample()
+            }
+
+            #[inline]
+            fn sample<F: FillBytes>(fill: &mut F, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
+                let range = Self::bounds_to_range(min, max)?;
+                let (lower, upper) = (*range.start(), *range.end());
+
+                // if the bounds includes everything then just sample the whole range
+                if lower == $ty::MIN && upper == $ty::MAX {
+                    return Self::sample_unbound(fill);
+                }
 
                 let range_inclusive = upper.wrapping_sub(lower) as $unsigned;
 
@@ -157,6 +171,48 @@ uniform_int!(sample_isize, isize, usize, u8, u16, u32);
 uniform_int!(sample_u128, u128, u128, u8, u16, u32, u64);
 uniform_int!(sample_i128, i128, u128, u8, u16, u32, u64);
 
+macro_rules! uniform_float {
+    ($ty:ident) => {
+        impl Uniform for $ty {
+            #[inline]
+            fn bounds_to_range(
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<RangeInclusive<Self>> {
+                let min = BoundExt::map(min, |&v| v.to_bits());
+                let max = BoundExt::map(max, |&v| v.to_bits());
+                let range = Uniform::bounds_to_range(min.as_ref(), max.as_ref())?;
+                let (lower, upper) = (*range.start(), *range.end());
+                let lower = Self::from_bits(lower);
+                let upper = Self::from_bits(upper);
+                Some(lower..=upper)
+            }
+
+            #[inline]
+            fn sample<F: FillBytes>(
+                fill: &mut F,
+                min: Bound<&Self>,
+                max: Bound<&Self>,
+            ) -> Option<Self> {
+                let range = Self::bounds_to_range(min, max)?;
+                let (lower, upper) = (*range.start(), *range.end());
+                let bound = upper.to_bits() - lower.to_bits();
+                let value = Uniform::sample(fill, Bound::Unbounded, Bound::Included(&bound))?;
+                let value = Self::from_bits(lower.to_bits() + value);
+                Some(value)
+            }
+
+            #[inline]
+            fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self> {
+                Some(Self::from_bits(Uniform::sample_unbound(fill)?))
+            }
+        }
+    };
+}
+
+uniform_float!(f32);
+uniform_float!(f64);
+
 trait Scaled: Sized {
     fn scale(self, range: Self) -> Self;
 }
@@ -211,21 +267,24 @@ impl Scaled for u128 {
     }
 }
 
-impl Uniform for char {
-    #[inline(always)]
-    fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self> {
-        Self::sample(fill, Bound::Unbounded, Bound::Unbounded)
+const CHAR_START: u32 = 0xD800;
+const CHAR_LEN: u32 = 0xE000 - CHAR_START;
+
+#[inline]
+pub(crate) fn char_from_u32(mut value: u32) -> Option<char> {
+    if value >= CHAR_START {
+        value += CHAR_LEN;
     }
 
-    #[inline]
-    fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self> {
-        const START: u32 = 0xD800;
-        const LEN: u32 = 0xE000 - START;
+    char::from_u32(value)
+}
 
+impl Uniform for char {
+    fn bounds_to_range(min: Bound<&Self>, max: Bound<&Self>) -> Option<RangeInclusive<Self>> {
         #[inline]
         fn map_to_u32(c: &char) -> u32 {
             match *c as u32 {
-                c if c >= START => c - LEN,
+                c if c >= CHAR_START => c - CHAR_LEN,
                 c => c,
             }
         }
@@ -237,21 +296,33 @@ impl Uniform for char {
             Bound::Unbounded => Bound::Included(map_to_u32(&char::MAX)),
         };
 
-        let mut value = u32::sample(fill, BoundExt::as_ref(&lower), BoundExt::as_ref(&upper))?;
+        let range = u32::bounds_to_range(BoundExt::as_ref(&lower), BoundExt::as_ref(&upper))?;
+        let (start, end) = (*range.start(), *range.end());
+        let start = char::from_u32(start)?;
+        let end = char::from_u32(end)?;
+        Some(start..=end)
+    }
 
-        if value >= START {
-            value += LEN;
-        }
+    #[inline(always)]
+    fn sample_unbound<F: FillBytes>(fill: &mut F) -> Option<Self> {
+        Self::sample(fill, Bound::Unbounded, Bound::Unbounded)
+    }
+
+    #[inline]
+    fn sample<F: FillBytes>(fill: &mut F, min: Bound<&Self>, max: Bound<&Self>) -> Option<Self> {
+        let range = Self::bounds_to_range(min, max)?;
+        let lower = Bound::Included(*range.start() as u32);
+        let upper = Bound::Included(*range.end() as u32);
+
+        let bytes = u32::sample(fill, BoundExt::as_ref(&lower), BoundExt::as_ref(&upper))?;
+
+        let value = char_from_u32(bytes);
 
         if cfg!(test) {
-            assert!(
-                char::from_u32(value).is_some(),
-                "invalid value generated: {}",
-                value
-            );
+            assert!(value.is_some(), "invalid value generated: {}", bytes);
         }
 
-        char::from_u32(value)
+        value
     }
 }
 

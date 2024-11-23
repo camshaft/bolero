@@ -82,6 +82,38 @@ fn with_test_time() {
 }
 
 #[test]
+fn with_exhaustive() {
+    use std::sync::atomic::Ordering;
+
+    let num_iters = std::sync::atomic::AtomicUsize::new(0);
+    let total_value = std::sync::atomic::AtomicUsize::new(0);
+
+    check!()
+        .with_type::<u8>()
+        .cloned()
+        .exhaustive()
+        .for_each(|value| {
+            num_iters.fetch_add(1, Ordering::Relaxed);
+            total_value.fetch_add(value as _, Ordering::Relaxed);
+        });
+
+    assert_eq!(num_iters.load(Ordering::Relaxed), 256);
+    assert_eq!(total_value.load(Ordering::Relaxed), (0..=255).sum());
+}
+
+#[test]
+#[should_panic]
+fn with_exhaustive_failure() {
+    check!()
+        .with_type::<(u8, u8)>()
+        .cloned()
+        .exhaustive()
+        .for_each(|(a, b)| {
+            let _ = a + b;
+        });
+}
+
+#[test]
 fn with_shrinking() {
     use std::sync::atomic::Ordering;
     let last_seen_value = std::sync::atomic::AtomicU8::new(0);

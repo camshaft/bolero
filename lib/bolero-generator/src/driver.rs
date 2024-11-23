@@ -11,6 +11,8 @@ mod macros;
 mod bytes;
 #[cfg(feature = "alloc")]
 pub mod cache;
+#[cfg(feature = "alloc")]
+pub mod exhaustive;
 mod rng;
 
 pub use bytes::ByteSliceDriver;
@@ -179,6 +181,7 @@ pub struct Options {
     shrink_time: Option<core::time::Duration>,
     max_depth: Option<usize>,
     max_len: Option<usize>,
+    exhaustive: bool,
 }
 
 impl Options {
@@ -201,6 +204,16 @@ impl Options {
         self
     }
 
+    pub fn with_exhaustive(mut self, exhaustive: bool) -> Self {
+        self.exhaustive = exhaustive;
+        self
+    }
+
+    pub fn set_exhaustive(&mut self, exhaustive: bool) -> &mut Self {
+        self.exhaustive = exhaustive;
+        self
+    }
+
     pub fn set_shrink_time(&mut self, shrink_time: core::time::Duration) -> &mut Self {
         self.shrink_time = Some(shrink_time);
         self
@@ -214,6 +227,11 @@ impl Options {
     pub fn set_max_len(&mut self, max_len: usize) -> &mut Self {
         self.max_len = Some(max_len);
         self
+    }
+
+    #[inline]
+    pub fn exhaustive(&self) -> bool {
+        self.exhaustive
     }
 
     #[inline]

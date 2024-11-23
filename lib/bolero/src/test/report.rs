@@ -1,5 +1,6 @@
 #![cfg_attr(not(fuzzing_random), allow(dead_code))]
 
+use core::fmt;
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -70,6 +71,10 @@ impl Report {
         self.stats.window_runs = 0;
         self.stats.window_valid = 0;
     }
+
+    pub fn on_estimate(&mut self, estimate: f64) {
+        self.stats.estimate = Some(estimate);
+    }
 }
 
 #[derive(Default)]
@@ -78,25 +83,48 @@ struct Stats {
     window_runs: u64,
     total_valid: u64,
     window_valid: u64,
+    estimate: Option<f64>,
 }
 
 impl Stats {
     fn print_worker(&self) {
         println!(
-            "[bolero-report]{{\"iterations\":{},\"valid\":{}}}",
-            self.window_runs, self.window_valid
+            "[bolero-report]{{\"iterations\":{},\"valid\":{},\"estimate\":{}}}",
+            self.window_runs,
+            self.window_valid,
+            self.estimate.unwrap_or(0.0),
         );
     }
 
     fn print(&self) {
         // only report valid percentage if we drop below 100%
+        struct Estimate(u64, Option<f64>);
+
+        impl fmt::Display for Estimate {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self.1 {
+                    Some(estimate) => write!(
+                        f,
+                        "\tstate space estimate: {estimate} ({}%)",
+                        (self.0 as f64 / estimate) * 100.0
+                    ),
+                    None => Ok(()),
+                }
+            }
+        }
+
+        let estimate = Estimate(self.total_runs, self.estimate);
+
         if self.total_runs == self.total_valid {
-            println!("#{}\titerations/s: {}", self.total_runs, self.window_runs);
+            println!(
+                "#{}\titerations/s: {}{estimate}",
+                self.total_runs, self.window_runs
+            );
         } else {
             let total_perc = self.total_valid as f32 / self.total_runs as f32 * 100.0;
             let window_perc = self.window_valid as f32 / self.window_runs as f32 * 100.0;
             println!(
-                "#{}\titerations/s: {} valid: {} ({:.2}%) valid/s: {} ({:.2}%)",
+                "#{}\titerations/s: {}{estimate} valid: {} ({:.2}%) valid/s: {} ({:.2}%)",
                 self.total_runs,
                 self.window_runs,
                 self.total_valid,

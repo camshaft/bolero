@@ -161,9 +161,10 @@ pub struct RngReplayInput<'a> {
 }
 
 impl<'a> bolero_engine::shrink::Input for RngReplayInput<'a> {
-    type Driver<'d> = driver::Rng<ReplayRng<'d>>
-        where
-            Self: 'd;
+    type Driver<'d>
+        = driver::Rng<ReplayRng<'d>>
+    where
+        Self: 'd;
 
     #[inline]
     fn driver(&self, len: usize, options: &driver::Options) -> Self::Driver<'_> {
@@ -181,6 +182,38 @@ impl<'a> AsRef<Vec<u8>> for RngReplayInput<'a> {
 }
 
 impl<'a> AsMut<Vec<u8>> for RngReplayInput<'a> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut Vec<u8> {
+        self.buffer
+    }
+}
+
+pub struct ExhastiveInput<'a> {
+    pub buffer: &'a mut Vec<u8>,
+    pub driver: &'a mut driver::exhaustive::Driver,
+}
+
+impl<'a, Output> Input<Output> for ExhastiveInput<'a> {
+    type Driver = driver::exhaustive::Driver;
+
+    fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
+        self.buffer.mutate(&mut self.driver);
+        f(self.buffer)
+    }
+
+    fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {
+        f(self.driver)
+    }
+}
+
+impl<'a> AsRef<Vec<u8>> for ExhastiveInput<'a> {
+    #[inline]
+    fn as_ref(&self) -> &Vec<u8> {
+        self.buffer
+    }
+}
+
+impl<'a> AsMut<Vec<u8>> for ExhastiveInput<'a> {
     #[inline]
     fn as_mut(&mut self) -> &mut Vec<u8> {
         self.buffer

@@ -1,9 +1,9 @@
 use super::*;
 
 #[cfg(feature = "alloc")]
-use buffer_alloc::Buffer;
+pub(crate) use buffer_alloc::Buffer;
 #[cfg(not(feature = "alloc"))]
-use buffer_no_alloc::Buffer;
+pub(crate) use buffer_no_alloc::Buffer;
 
 #[derive(Debug)]
 pub struct Rng<R: RngCore> {
@@ -170,7 +170,7 @@ impl<R: RngCore> Driver for Rng<R> {
 mod buffer_alloc {
     use super::*;
 
-    #[derive(Debug, Default)]
+    #[derive(Clone, Debug, Default)]
     pub struct Buffer {
         bytes: alloc::vec::Vec<u8>,
     }
@@ -213,7 +213,7 @@ mod buffer_alloc {
 mod buffer_no_alloc {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct Buffer {
         bytes: [u8; Self::MAX_CAPACITY],
         len: usize,
