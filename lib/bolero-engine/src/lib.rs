@@ -4,6 +4,9 @@ pub use bolero_generator::{
     TypeGenerator, ValueGenerator,
 };
 
+#[cfg(kani)]
+pub use bolero_generator::kani;
+
 pub type Seed = u128;
 
 #[cfg(not(kani))]

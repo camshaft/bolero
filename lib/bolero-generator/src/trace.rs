@@ -1,3 +1,5 @@
+#![cfg_attr(kani, allow(dead_code))]
+
 use super::ValueGenerator;
 use core::{any::type_name, ops::Bound};
 

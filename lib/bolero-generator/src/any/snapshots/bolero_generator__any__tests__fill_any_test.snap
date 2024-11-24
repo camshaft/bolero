@@ -1,0 +1,46 @@
+---
+source: bolero-generator/src/any/tests.rs
+expression: out
+---
+[
+    [
+        false,
+        false,
+        false,
+    ],
+    [
+        false,
+        false,
+        true,
+    ],
+    [
+        false,
+        true,
+        false,
+    ],
+    [
+        false,
+        true,
+        true,
+    ],
+    [
+        true,
+        false,
+        false,
+    ],
+    [
+        true,
+        false,
+        true,
+    ],
+    [
+        true,
+        true,
+        false,
+    ],
+    [
+        true,
+        true,
+        true,
+    ],
+]
