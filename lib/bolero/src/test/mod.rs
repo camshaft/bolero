@@ -137,6 +137,10 @@ impl TestEngine {
         T: Test,
         T::Value: core::fmt::Debug,
     {
+        if options.exhaustive() {
+            return self.run_exhaustive(test, options);
+        }
+
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
@@ -204,6 +208,10 @@ impl TestEngine {
         T: Test,
         T::Value: core::fmt::Debug,
     {
+        if options.exhaustive() {
+            return self.run_exhaustive(test, options);
+        }
+
         let file_options = options.clone();
         let rng_options = options;
 
@@ -300,6 +308,65 @@ impl TestEngine {
             }
         }
     }
+
+    fn run_exhaustive<T>(self, mut test: T, options: driver::Options)
+    where
+        T: Test,
+        T::Value: core::fmt::Debug,
+    {
+        bolero_engine::panic::set_hook();
+        bolero_engine::panic::forward_panic(false);
+
+        let mut driver = bolero_generator::driver::exhaustive::Driver::new(&options);
+        let test_time = self.rng_cfg.test_time;
+        let start_time = std::time::Instant::now();
+
+        let mut buffer = vec![];
+
+        #[cfg(any(fuzzing_random, test))]
+        let mut report = {
+            let report = report::Report::default();
+            report.spawn_timer();
+            report
+        };
+
+        while driver.step().is_continue() {
+            if let Some(test_time) = test_time {
+                if start_time.elapsed() > test_time {
+                    break;
+                }
+            }
+
+            let mut input = input::ExhastiveInput {
+                driver: &mut driver,
+                buffer: &mut buffer,
+            };
+
+            match test.test(&mut input) {
+                Ok(is_valid) => {
+                    #[cfg(any(fuzzing_random, test))]
+                    report.on_estimate(driver.estimate());
+
+                    #[cfg(any(fuzzing_random, test))]
+                    report.on_result(is_valid);
+                    let _ = is_valid;
+                }
+                Err(error) => {
+                    // restart the driver to replay what was selected
+                    input.driver.replay();
+                    let input = test.generate_value(&mut input);
+                    let error = Failure {
+                        seed: None,
+                        error,
+                        input,
+                    };
+                    bolero_engine::panic::forward_panic(true);
+                    eprintln!("{error}");
+                    panic!("test failed");
+                }
+            }
+        }
+    }
 }
 
 impl<T> Engine<T> for TestEngine
@@ -314,11 +381,14 @@ where
 
     #[cfg(fuzzing_random)]
     fn run(self, test: T, options: driver::Options) -> Self::Output {
-        self.run_fuzzer(test, options)
+        let out = self.run_fuzzer(test, options);
+        bolero_engine::panic::forward_panic(true);
+        out
     }
 
     #[cfg(not(fuzzing_random))]
     fn run(self, test: T, options: driver::Options) -> Self::Output {
-        self.run_tests(test, options)
+        self.run_tests(test, options);
+        bolero_engine::panic::forward_panic(true);
     }
 }

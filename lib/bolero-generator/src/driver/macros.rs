@@ -11,27 +11,7 @@ macro_rules! gen_float {
     ($name:ident, $ty:ident) => {
         #[inline]
         fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
-            use core::ops::RangeBounds;
-
-            if let (Bound::Unbounded, Bound::Unbounded) = (min, max) {
-                let mut bytes = [0u8; core::mem::size_of::<$ty>()];
-                self.fill_bytes(&mut bytes)?;
-                return Some(<$ty>::from_le_bytes(bytes));
-            }
-
-            // TODO make this all less biased
-            if let Some(value) = self
-                .$name(Bound::Unbounded, Bound::Unbounded)
-                .filter(|value| (min, max).contains(value))
-            {
-                return Some(value);
-            }
-
-            match min {
-                Bound::Included(&v) => Some(v),
-                Bound::Excluded(&v) => Some(v + $ty::EPSILON),
-                Bound::Unbounded => Some($ty::MIN),
-            }
+            Uniform::sample(self, min, max)
         }
     };
 }

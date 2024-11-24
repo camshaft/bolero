@@ -282,6 +282,14 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         self.driver_options.set_shrink_time(shrink_time);
         self
     }
+
+    /// Exhaustively iterates over all of the possible inputs
+    ///
+    /// Note that if the search space is large this can take a long time.
+    pub fn exhaustive(mut self) -> Self {
+        self.driver_options.set_exhaustive(true);
+        self
+    }
 }
 
 impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {

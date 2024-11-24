@@ -10,6 +10,7 @@ pub(crate) trait BoundExt<T> {
 }
 
 impl<T> BoundExt<T> for Bound<T> {
+    #[inline(always)]
     fn as_ref(&self) -> Bound<&T> {
         match self {
             Self::Excluded(v) => Bound::Excluded(v),
@@ -18,6 +19,7 @@ impl<T> BoundExt<T> for Bound<T> {
         }
     }
 
+    #[inline(always)]
     fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Bound<U> {
         match self {
             Self::Excluded(v) => Bound::Excluded(f(v)),
@@ -46,12 +48,14 @@ macro_rules! range_generator {
         impl<T: BoundedValue> ValueGenerator for core::ops::$ty<T> {
             type Output = T;
 
+            #[inline]
             fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
                 let min = self.start_bound();
                 let max = self.end_bound();
                 T::gen_bounded(driver, min, max)
             }
 
+            #[inline]
             fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
                 let min = self.start_bound();
                 let max = self.end_bound();
@@ -66,6 +70,24 @@ range_generator!(RangeFrom);
 range_generator!(RangeInclusive);
 range_generator!(RangeTo);
 range_generator!(RangeToInclusive);
+
+impl<T: BoundedValue> ValueGenerator for (core::ops::Bound<T>, core::ops::Bound<T>) {
+    type Output = T;
+
+    #[inline]
+    fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
+        let min = self.start_bound();
+        let max = self.end_bound();
+        T::gen_bounded(driver, min, max)
+    }
+
+    #[inline]
+    fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
+        let min = self.start_bound();
+        let max = self.end_bound();
+        value.mutate_bounded(driver, min, max)
+    }
+}
 
 #[derive(Debug)]
 pub struct BoundedGenerator<T, B> {
@@ -92,12 +114,14 @@ impl<T: BoundedValue, B: RangeBounds<T>> BoundedGenerator<T, B> {
 impl<T: BoundedValue, B: RangeBounds<T>> ValueGenerator for BoundedGenerator<T, B> {
     type Output = T;
 
+    #[inline]
     fn generate<D: Driver>(&self, driver: &mut D) -> Option<Self::Output> {
         let min = self.range_bounds.start_bound();
         let max = self.range_bounds.end_bound();
         T::gen_bounded(driver, min, max)
     }
 
+    #[inline]
     fn mutate<D: Driver>(&self, driver: &mut D, value: &mut Self::Output) -> Option<()> {
         let min = self.range_bounds.start_bound();
         let max = self.range_bounds.end_bound();
