@@ -52,6 +52,40 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(kani, kani::proof)]
+    fn exhaustive_test() {
+        let should_panic = should_panic();
+
+        check!()
+            .exhaustive()
+            .with_type()
+            .cloned()
+            .for_each(|(a, b)| assert!(add(a, b, should_panic) >= a));
+    }
+
+    #[test]
+    #[cfg_attr(kani, kani::proof)]
+    fn run_test() {
+        let should_panic = should_panic();
+
+        check!().run(|| {
+            let a = bolero::any();
+            let b = bolero::any();
+            assert!(add(a, b, should_panic) >= a)
+        });
+    }
+
+    #[test]
+    #[cfg_attr(kani, kani::proof)]
+    fn unit_test() {
+        let should_panic = should_panic();
+
+        let a = bolero::any();
+        let b = bolero::any();
+        assert!(add(a, b, should_panic) >= a);
+    }
+
+    #[test]
     fn panicking_generator_test() {
         #[derive(Debug)]
         struct T;

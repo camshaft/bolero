@@ -17,3 +17,10 @@ inherits = "dev"
 opt-level = 3
 incremental = false
 codegen-units = 1
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+  'cfg(kani)',
+  'cfg(bolero_should_panic)',
+]

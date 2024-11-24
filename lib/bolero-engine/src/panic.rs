@@ -83,9 +83,9 @@ impl PanicError {
 }
 
 #[inline]
-pub fn catch<F: RefUnwindSafe + FnOnce() -> Result<Output, PanicError>, Output>(
+pub fn catch<F: RefUnwindSafe + FnOnce() -> Result<bool, PanicError>>(
     fun: F,
-) -> Result<Output, PanicError> {
+) -> Result<bool, PanicError> {
     let res = catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun)));
     match res {
         Ok(Ok(v)) => Ok(v),
@@ -101,6 +101,13 @@ pub fn catch<F: RefUnwindSafe + FnOnce() -> Result<Output, PanicError>, Output>(
                     }
                 };
             }
+
+            // if an `any::Error` was returned, then the input wasn't valid
+            #[cfg(feature = "any")]
+            if err.downcast_ref::<bolero_generator::any::Error>().is_some() {
+                return Ok(false);
+            }
+
             try_downcast!(PanicInfo, "{}");
             try_downcast!(anyhow::Error, "{}");
             try_downcast!(String, "{}");

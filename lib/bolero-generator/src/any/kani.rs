@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 type Type = crate::kani::Driver;
 
 pub use core::convert::Infallible as Error;

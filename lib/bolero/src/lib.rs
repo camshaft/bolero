@@ -470,6 +470,17 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
         let test = bolero_engine::BorrowedSliceTest::new(test);
         self.engine.run(test, self.driver_options)
     }
+
+    /// Iterate over all of the inputs and check the `TestTarget`
+    #[cfg(feature = "std")]
+    pub fn run<T, R>(self, test: T) -> E::Output
+    where
+        T: FnMut() -> R,
+        R: bolero_engine::IntoResult,
+        E: bolero_engine::ScopedEngine,
+    {
+        self.engine.run(test, self.driver_options)
+    }
 }
 
 impl<E> TestTarget<ByteSliceGenerator, E, ClonedInput> {

@@ -70,6 +70,8 @@ impl Test {
                 &[
                     "tests::add_test",
                     "tests::other_test",
+                    "tests::exhaustive_test",
+                    "tests::run_test",
                     "fuzz_bytes",
                     "fuzz_generator",
                     "fuzz_operations",

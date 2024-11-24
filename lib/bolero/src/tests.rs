@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
 #[test]
 #[should_panic]
@@ -60,8 +61,7 @@ fn nested_test() {
 #[test]
 fn iteration_number() {
     // Atomic to avoid having to think about unwind safety
-    use std::sync::atomic::Ordering;
-    let num_iters = std::sync::atomic::AtomicUsize::new(0);
+    let num_iters = AtomicUsize::new(0);
     check!().with_iterations(5).for_each(|_| {
         num_iters.fetch_add(1, Ordering::Relaxed);
     });
@@ -71,8 +71,7 @@ fn iteration_number() {
 #[test]
 fn with_test_time() {
     // Atomic to avoid having to think about unwind safety
-    use std::sync::atomic::Ordering;
-    let num_iters = std::sync::atomic::AtomicUsize::new(0);
+    let num_iters = AtomicUsize::new(0);
     check!()
         .with_test_time(core::time::Duration::from_millis(5))
         .for_each(|_| {
@@ -83,10 +82,8 @@ fn with_test_time() {
 
 #[test]
 fn with_exhaustive() {
-    use std::sync::atomic::Ordering;
-
-    let num_iters = std::sync::atomic::AtomicUsize::new(0);
-    let total_value = std::sync::atomic::AtomicUsize::new(0);
+    let num_iters = AtomicUsize::new(0);
+    let total_value = AtomicUsize::new(0);
 
     check!()
         .with_type::<u8>()
@@ -109,14 +106,13 @@ fn with_exhaustive_failure() {
         .cloned()
         .exhaustive()
         .for_each(|(a, b)| {
-            let _ = a + b;
+            let _ = a.checked_add(b).unwrap();
         });
 }
 
 #[test]
 fn with_shrinking() {
-    use std::sync::atomic::Ordering;
-    let last_seen_value = std::sync::atomic::AtomicU8::new(0);
+    let last_seen_value = AtomicU8::new(0);
 
     std::panic::catch_unwind(|| {
         check!()
@@ -134,13 +130,11 @@ fn with_shrinking() {
 
 #[test]
 fn without_shrinking() {
-    use std::sync::atomic::Ordering;
-
-    let max_seen_value = std::sync::atomic::AtomicU8::new(0);
+    let max_seen_value = AtomicU8::new(0);
     let n = 20; // P(false negative) = 1/(256^n) assuming uniform gen::<u8>
 
     for _ in 0..n {
-        let last_seen_value = std::sync::atomic::AtomicU8::new(0);
+        let last_seen_value = AtomicU8::new(0);
 
         std::panic::catch_unwind(|| {
             check!()
@@ -162,4 +156,44 @@ fn without_shrinking() {
     }
 
     assert!(max_seen_value.load(Ordering::Relaxed) > 1);
+}
+
+#[test]
+fn scope_test() {
+    let runs = AtomicUsize::new(0);
+
+    check!().run(|| {
+        let _: u64 = any();
+        runs.fetch_add(1, Ordering::Relaxed);
+    });
+
+    assert_ne!(runs.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+#[should_panic]
+fn scope_panic_test() {
+    check!().run(|| {
+        assert!(any::<bool>(), "oops");
+    });
+}
+
+#[test]
+fn scope_exhaustive_test() {
+    let runs = AtomicUsize::new(0);
+
+    check!().exhaustive().run(|| {
+        let _: u8 = any();
+        runs.fetch_add(1, Ordering::Relaxed);
+    });
+
+    assert_eq!(runs.load(Ordering::Relaxed), 256);
+}
+
+#[test]
+#[should_panic]
+fn scope_exhaustive_panic_test() {
+    check!().exhaustive().run(|| {
+        assert!(any::<bool>(), "oops");
+    });
 }

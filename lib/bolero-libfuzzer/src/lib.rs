@@ -5,7 +5,9 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_libfuzzer)))]
 pub mod fuzzer {
-    use bolero_engine::{driver, input, panic, Engine, Failure, Never, TargetLocation, Test};
+    use bolero_engine::{
+        driver, input, panic, Engine, Failure, Never, ScopedEngine, TargetLocation, Test,
+    };
     use core::time::Duration;
     use std::{
         ffi::CString,
@@ -79,6 +81,58 @@ pub mod fuzzer {
         }
     }
 
+    impl ScopedEngine for LibFuzzerEngine {
+        type Output = Never;
+
+        fn run<F, R>(self, mut test: F, options: driver::Options) -> Self::Output
+        where
+            F: FnMut() -> R,
+            R: bolero_engine::IntoResult,
+        {
+            panic::set_hook();
+            panic::forward_panic(false);
+
+            let options = &options;
+            // TODO implement caching
+            // let mut cache = driver::cache::Cache::default();
+            let mut report = GeneratorReport::default();
+            report.spawn_timer();
+
+            // extend the lifetime of the bytes so it can be stored in local storage
+            let driver = bolero_engine::driver::bytes::Driver::new(&[][..], options);
+            let driver = bolero_engine::driver::object::Object(driver);
+            let driver = Box::new(driver);
+            let mut driver = Some(driver);
+
+            start(&mut |slice: &[u8]| {
+                // extend the lifetime of the slice so it can be stored in TLS
+                let input: &'static [u8] = unsafe { core::mem::transmute::<&[u8], &[u8]>(slice) };
+                let mut drv = driver.take().unwrap();
+                drv.reset(input, options);
+                let (drv, result) = bolero_engine::any::run(drv, &mut test);
+                driver = Some(drv);
+
+                match result {
+                    Ok(is_valid) => {
+                        report.on_result(is_valid);
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "{:#}",
+                            Failure {
+                                seed: None,
+                                error,
+                                input: (),
+                            }
+                        );
+
+                        std::process::abort();
+                    }
+                }
+            });
+        }
+    }
+
     #[derive(Default)]
     struct GeneratorReport {
         total_runs: u64,
@@ -130,7 +184,9 @@ pub mod fuzzer {
 
     fn start<F: FnMut(&[u8])>(run_one_test: &mut F) -> Never {
         unsafe {
-            TESTFN = Some(std::mem::transmute(run_one_test as &mut dyn FnMut(&[u8])));
+            TESTFN = Some(std::mem::transmute::<TestFn, TestFn>(
+                run_one_test as &mut dyn FnMut(&[u8]),
+            ));
         }
 
         // Libfuzzer can generate multiple jobs that can make the binary recurse.

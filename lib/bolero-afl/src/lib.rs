@@ -5,7 +5,7 @@
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_afl)))]
 pub mod fuzzer {
-    use bolero_engine::{driver, input, panic, Engine, Never, TargetLocation, Test};
+    use bolero_engine::{driver, input, panic, Engine, Never, ScopedEngine, TargetLocation, Test};
     use std::io::Read;
 
     extern "C" {
@@ -46,6 +46,44 @@ pub mod fuzzer {
 
             while unsafe { __afl_persistent_loop(1000) } != 0 {
                 if test.test(&mut input.test_input()).is_err() {
+                    std::process::abort();
+                }
+            }
+
+            std::process::exit(0);
+        }
+    }
+
+    impl ScopedEngine for AflEngine {
+        type Output = Never;
+
+        fn run<F, R>(self, mut test: F, options: driver::Options) -> Self::Output
+        where
+            F: FnMut() -> R,
+            R: bolero_engine::IntoResult,
+        {
+            panic::set_hook();
+
+            // extend the lifetime of the bytes so it can be stored in local storage
+            let driver = bolero_engine::driver::bytes::Driver::new(vec![], &options);
+            let driver = bolero_engine::driver::object::Object(driver);
+            let mut driver = Box::new(driver);
+
+            let mut input = AflInput::new(options);
+
+            unsafe {
+                __afl_manual_init();
+            }
+
+            while unsafe { __afl_persistent_loop(1000) } != 0 {
+                input.reset();
+                let bytes = core::mem::take(&mut input.input);
+                let tmp = driver.reset(bytes, &input.options);
+                let (drv, result) = bolero_engine::any::run(driver, &mut test);
+                driver = drv;
+                input.input = driver.reset(tmp, &input.options);
+
+                if result.is_err() {
                     std::process::abort();
                 }
             }

@@ -44,15 +44,11 @@ impl Report {
         });
     }
 
+    #[inline]
     pub fn on_result(&mut self, is_valid: bool) {
         self.stats.window_runs += 1;
         if is_valid {
             self.stats.window_valid += 1;
-        }
-
-        // check the should_print every 1024 runs
-        if self.stats.window_runs % 1024 != 0 {
-            return;
         }
 
         if !self.should_print.swap(false, Ordering::Relaxed) {
@@ -98,22 +94,35 @@ impl Stats {
 
     fn print(&self) {
         // only report valid percentage if we drop below 100%
-        struct Estimate(u64, Option<f64>);
+        struct Estimate<'a>(&'a Stats);
 
-        impl fmt::Display for Estimate {
+        impl<'a> fmt::Display for Estimate<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self.1 {
-                    Some(estimate) => write!(
-                        f,
-                        "\tstate space estimate: {estimate} ({}%)",
-                        (self.0 as f64 / estimate) * 100.0
-                    ),
+                match self.0.estimate {
+                    Some(estimate) => {
+                        let percent = self.0.total_runs as f64 / estimate * 100.0;
+
+                        let remaining = estimate - self.0.total_runs as f64;
+                        let rate = self.0.window_runs as f64;
+
+                        let time_remaining =
+                            PrintRemaining(core::time::Duration::from_secs_f64(remaining / rate));
+
+                        if (0.001..99.999).contains(&percent) {
+                            write!(f, "\tstate space estimate: {estimate} ({percent:.03}%, {time_remaining})",)
+                        } else {
+                            write!(
+                                f,
+                                "\tstate space estimate: {estimate} ({percent}%, {time_remaining})",
+                            )
+                        }
+                    }
                     None => Ok(()),
                 }
             }
         }
 
-        let estimate = Estimate(self.total_runs, self.estimate);
+        let estimate = Estimate(self);
 
         if self.total_runs == self.total_valid {
             println!(
@@ -132,6 +141,36 @@ impl Stats {
                 self.window_valid,
                 window_perc,
             );
+        }
+    }
+}
+
+struct PrintRemaining(core::time::Duration);
+
+impl fmt::Display for PrintRemaining {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let duration = self.0;
+
+        fn split(v: u64, by: u64) -> (u64, u64) {
+            (v / by, v % by)
+        }
+
+        let state = duration.as_secs();
+        let (state, secs) = split(state, 60);
+        let (state, mins) = split(state, 60);
+        let (state, hours) = split(state, 24);
+        let (years, days) = split(state, 360);
+
+        if years > 0 {
+            write!(f, "{years} years")
+        } else if days > 0 {
+            write!(f, "{days} days")
+        } else if hours > 0 {
+            write!(f, "{hours}h{mins:02}m{secs:02}s")
+        } else if mins > 0 {
+            write!(f, "{mins:02}m{secs:02}s")
+        } else {
+            write!(f, "{secs:02}s")
         }
     }
 }

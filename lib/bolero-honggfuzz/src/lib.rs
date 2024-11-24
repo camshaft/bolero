@@ -6,7 +6,7 @@
 #[cfg(any(test, all(feature = "lib", fuzzing_honggfuzz)))]
 pub mod fuzzer {
     use bolero_engine::{
-        driver, input, panic as bolero_panic, Engine, Never, TargetLocation, Test,
+        driver, input, panic as bolero_panic, Engine, Never, ScopedEngine, TargetLocation, Test,
     };
     use std::{mem::MaybeUninit, slice};
 
@@ -39,6 +39,35 @@ pub mod fuzzer {
         }
     }
 
+    impl ScopedEngine for HonggfuzzEngine {
+        type Output = Never;
+
+        fn run<F, R>(self, mut test: F, options: driver::Options) -> Self::Output
+        where
+            F: FnMut() -> R,
+            R: bolero_engine::IntoResult,
+        {
+            bolero_panic::set_hook();
+
+            // extend the lifetime of the bytes so it can be stored in local storage
+            let driver = bolero_engine::driver::bytes::Driver::new(&[][..], &options);
+            let driver = bolero_engine::driver::object::Object(driver);
+            let mut driver = Box::new(driver);
+
+            let mut input = HonggfuzzInput::new(options);
+
+            loop {
+                driver.reset(input.get_slice(), &input.options);
+                let (drv, result) = bolero_engine::any::run(driver, &mut test);
+                driver = drv;
+
+                if result.is_err() {
+                    std::process::abort();
+                }
+            }
+        }
+    }
+
     pub struct HonggfuzzInput {
         buf_ptr: MaybeUninit<*const u8>,
         len_ptr: MaybeUninit<usize>,
@@ -54,11 +83,15 @@ pub mod fuzzer {
             }
         }
 
-        fn test_input(&mut self) -> input::Bytes {
-            let input = unsafe {
+        fn get_slice(&mut self) -> &'static [u8] {
+            unsafe {
                 HF_ITER(self.buf_ptr.as_mut_ptr(), self.len_ptr.as_mut_ptr());
                 slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init())
-            };
+            }
+        }
+
+        fn test_input(&mut self) -> input::Bytes {
+            let input = self.get_slice();
             input::Bytes::new(input, &self.options)
         }
     }
