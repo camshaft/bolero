@@ -13,6 +13,7 @@ mod bytes;
 pub mod cache;
 #[cfg(feature = "alloc")]
 pub mod exhaustive;
+pub mod object;
 mod rng;
 
 pub use bytes::ByteSliceDriver;
