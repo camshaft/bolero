@@ -8,7 +8,7 @@ use rand_core::RngCore;
 #[macro_use]
 mod macros;
 
-mod bytes;
+pub mod bytes;
 #[cfg(feature = "alloc")]
 pub mod cache;
 #[cfg(feature = "alloc")]

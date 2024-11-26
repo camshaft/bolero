@@ -1,46 +1,74 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct ByteSliceDriver<'a> {
-    input: &'a [u8],
+pub struct Driver<I> {
+    input: I,
     depth: usize,
     max_depth: usize,
+    len: usize,
+    cursor: usize,
 }
 
-impl<'a> ByteSliceDriver<'a> {
-    pub fn new(input: &'a [u8], options: &Options) -> Self {
+impl<I> Driver<I>
+where
+    I: AsRef<[u8]>,
+{
+    pub fn new(input: I, options: &Options) -> Self {
         let max_depth = options.max_depth_or_default();
-        let len = options.max_len_or_default().min(input.len());
-        let input = &input[..len];
+        let len = options.max_len_or_default().min(input.as_ref().len());
 
         Self {
             input,
             depth: 0,
             max_depth,
+            len,
+            cursor: 0,
         }
+    }
+
+    pub fn reset(&mut self, input: I, options: &Options) -> I {
+        let max_depth = options.max_depth_or_default();
+        let len = options.max_len_or_default().min(input.as_ref().len());
+
+        let prev = core::mem::replace(&mut self.input, input);
+        self.depth = 0;
+        self.max_depth = max_depth;
+        self.cursor = 0;
+        self.len = len;
+
+        prev
     }
 
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
+        &self.input.as_ref()[self.cursor..self.len]
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> I {
         self.input
     }
 }
 
-impl<'a> FillBytes for ByteSliceDriver<'a> {
+impl<I> FillBytes for Driver<I>
+where
+    I: AsRef<[u8]>,
+{
     #[inline]
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
-        match self.input.len().checked_sub(offset) {
+        let slice = self.as_slice();
+        match slice.len().checked_sub(offset) {
             None | Some(0) => {
                 // no bytes left so fill in zeros
                 bytes.fill(0);
             }
             Some(remaining_len) if remaining_len >= bytes.len() => {
-                let input = &self.input[offset..];
+                let input = &slice[offset..];
                 let input = &input[..bytes.len()];
                 bytes.copy_from_slice(input);
             }
             Some(remaining_len) => {
-                let input = &self.input[offset..];
+                let input = &slice[offset..];
                 // we don't have enough bytes to fill the whole output
                 let (head, tail) = bytes.split_at_mut(remaining_len);
                 head.copy_from_slice(input);
@@ -53,12 +81,16 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
 
     #[inline]
     fn consume_bytes(&mut self, consumed: usize) {
-        let consumed = consumed.min(self.input.len());
-        self.input = &self.input[consumed..];
+        let remaining = self.len - self.cursor;
+        let consumed = consumed.min(remaining);
+        self.cursor += consumed;
     }
 }
 
-impl<'a> Driver for ByteSliceDriver<'a> {
+impl<I> super::Driver for Driver<I>
+where
+    I: AsRef<[u8]>,
+{
     gen_from_bytes!();
 
     #[inline]
@@ -67,7 +99,7 @@ impl<'a> Driver for ByteSliceDriver<'a> {
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
-        let slice = self.input;
+        let slice = self.as_slice();
         let (len, value) = gen(slice)?;
         self.consume_bytes(len);
         Some(value)
@@ -86,5 +118,59 @@ impl<'a> Driver for ByteSliceDriver<'a> {
     #[inline]
     fn max_depth(&self) -> usize {
         self.max_depth
+    }
+}
+
+#[derive(Debug)]
+pub struct ByteSliceDriver<'a>(Driver<&'a [u8]>);
+
+impl<'a> ByteSliceDriver<'a> {
+    pub fn new(input: &'a [u8], options: &Options) -> Self {
+        Self(Driver::new(input, options))
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl<'a> FillBytes for ByteSliceDriver<'a> {
+    #[inline]
+    fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
+        self.0.peek_bytes(offset, bytes)
+    }
+
+    #[inline]
+    fn consume_bytes(&mut self, consumed: usize) {
+        self.0.consume_bytes(consumed)
+    }
+}
+
+impl<'a> super::Driver for ByteSliceDriver<'a> {
+    gen_from_bytes!();
+
+    #[inline]
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, gen: Gen) -> Option<T>
+    where
+        Hint: FnOnce() -> (usize, Option<usize>),
+        Gen: FnMut(&[u8]) -> Option<(usize, T)>,
+    {
+        self.0.gen_from_bytes(hint, gen)
+    }
+
+    #[inline]
+    fn depth(&self) -> usize {
+        self.0.depth
+    }
+
+    #[inline]
+    fn set_depth(&mut self, depth: usize) {
+        self.0.depth = depth;
+    }
+
+    #[inline]
+    fn max_depth(&self) -> usize {
+        self.0.max_depth
     }
 }
