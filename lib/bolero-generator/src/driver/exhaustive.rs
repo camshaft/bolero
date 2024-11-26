@@ -47,7 +47,7 @@ impl Driver {
     }
 
     pub fn replay(&mut self) {
-        self.state.position = 0;
+        self.state.cursor = 0;
     }
 }
 
@@ -61,7 +61,7 @@ pub struct Frame {
 struct State {
     started: bool,
     stack: Vec<Frame>,
-    position: usize,
+    cursor: usize,
     estimate: f64,
 }
 
@@ -74,7 +74,7 @@ impl State {
         self.stack.clear();
         self.stack
             .extend(state.iter().map(|&v| Frame { value: v, bound: v }));
-        self.position = 0;
+        self.cursor = 0;
         self.started = !state.is_empty();
         self.estimate = 1.0;
     }
@@ -95,7 +95,7 @@ impl State {
             if self.stack[i].value < self.stack[i].bound {
                 self.stack[i].value += 1;
                 self.stack.truncate(i + 1);
-                self.position = 0;
+                self.cursor = 0;
                 return ControlFlow::Continue(());
             }
         }
@@ -111,17 +111,20 @@ impl State {
             return 0;
         }
 
-        if self.position == self.stack.len() {
+        while self.cursor >= self.stack.len() {
+            if self.cursor == self.stack.len() {
+                self.estimate += bound as f64;
+            }
+
             self.stack.push(Default::default());
-            self.estimate += bound as f64;
         }
 
-        let frame = &mut self.stack[self.position];
+        let frame = &mut self.stack[self.cursor];
 
-        self.position += 1;
+        self.cursor += 1;
 
-        frame.bound = bound;
-        frame.value
+        frame.bound = frame.bound.max(bound);
+        frame.value.min(bound)
     }
 
     #[inline]

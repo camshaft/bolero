@@ -130,11 +130,6 @@ fn string_type_test() {
 
 #[test]
 fn string_with_test() {
-    for _ in 0..100 {
-        let results = generator_test!(gen::<String>().with().len(32usize));
-        assert!(results.into_iter().any(|s| s.chars().count() == 32));
-        return;
-    }
-
-    panic!("failed to generate a valid string");
+    let results = generator_test!(gen::<String>().with().len(32usize));
+    assert!(results.into_iter().any(|s| s.chars().count() == 32));
 }

@@ -63,7 +63,7 @@ macro_rules! gen_from_bytes {
 
         #[inline(always)]
         fn gen_variant(&mut self, variants: usize, base_case: usize) -> Option<usize> {
-            if self.depth == self.max_depth {
+            if self.depth() == self.max_depth() {
                 return Some(base_case);
             }
 
