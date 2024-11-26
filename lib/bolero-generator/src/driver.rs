@@ -14,9 +14,11 @@ pub mod cache;
 #[cfg(feature = "alloc")]
 pub mod exhaustive;
 pub mod object;
+mod options;
 mod rng;
 
 pub use bytes::ByteSliceDriver;
+pub use options::Options;
 pub use rng::Rng;
 
 macro_rules! gen_method {
@@ -175,108 +177,4 @@ pub enum DriverMode {
     /// When the driver bytes are exhausted, the driver will continue to fill input bytes with 0.
     /// This is useful for engines that want to maximize the amount of time spent executing tests.
     Forced,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Options {
-    shrink_time: Option<core::time::Duration>,
-    max_depth: Option<usize>,
-    max_len: Option<usize>,
-    exhaustive: bool,
-}
-
-impl Options {
-    pub const DEFAULT_MAX_DEPTH: usize = 5;
-    pub const DEFAULT_MAX_LEN: usize = 4096;
-    pub const DEFAULT_SHRINK_TIME: core::time::Duration = core::time::Duration::from_secs(1);
-
-    pub fn with_shrink_time(mut self, shrink_time: core::time::Duration) -> Self {
-        self.shrink_time = Some(shrink_time);
-        self
-    }
-
-    pub fn with_max_depth(mut self, max_depth: usize) -> Self {
-        self.max_depth = Some(max_depth);
-        self
-    }
-
-    pub fn with_max_len(mut self, max_len: usize) -> Self {
-        self.max_len = Some(max_len);
-        self
-    }
-
-    pub fn with_exhaustive(mut self, exhaustive: bool) -> Self {
-        self.exhaustive = exhaustive;
-        self
-    }
-
-    pub fn set_exhaustive(&mut self, exhaustive: bool) -> &mut Self {
-        self.exhaustive = exhaustive;
-        self
-    }
-
-    pub fn set_shrink_time(&mut self, shrink_time: core::time::Duration) -> &mut Self {
-        self.shrink_time = Some(shrink_time);
-        self
-    }
-
-    pub fn set_max_depth(&mut self, max_depth: usize) -> &mut Self {
-        self.max_depth = Some(max_depth);
-        self
-    }
-
-    pub fn set_max_len(&mut self, max_len: usize) -> &mut Self {
-        self.max_len = Some(max_len);
-        self
-    }
-
-    #[inline]
-    pub fn exhaustive(&self) -> bool {
-        self.exhaustive
-    }
-
-    #[inline]
-    pub fn max_depth(&self) -> Option<usize> {
-        self.max_depth
-    }
-
-    #[inline]
-    pub fn max_len(&self) -> Option<usize> {
-        self.max_len
-    }
-
-    #[inline]
-    pub fn shrink_time(&self) -> Option<core::time::Duration> {
-        self.shrink_time
-    }
-
-    #[inline]
-    pub fn max_depth_or_default(&self) -> usize {
-        self.max_depth.unwrap_or(Self::DEFAULT_MAX_DEPTH)
-    }
-
-    #[inline]
-    pub fn max_len_or_default(&self) -> usize {
-        self.max_len.unwrap_or(Self::DEFAULT_MAX_LEN)
-    }
-
-    #[inline]
-    pub fn shrink_time_or_default(&self) -> core::time::Duration {
-        self.shrink_time.unwrap_or(Self::DEFAULT_SHRINK_TIME)
-    }
-
-    #[inline]
-    pub fn merge_from(&mut self, other: &Self) {
-        macro_rules! merge {
-            ($name:ident) => {
-                if let Some($name) = other.$name {
-                    self.$name = Some($name);
-                }
-            };
-        }
-
-        merge!(max_depth);
-        merge!(max_len);
-        merge!(shrink_time);
-    }
 }

@@ -12,7 +12,8 @@ readme = "README.md"
 rust-version = "1.66.0"
 
 [features]
-default = ["either", "std"]
+default = ["any", "either", "std"]
+any = ["getrandom", "rand_xoshiro", "std"]
 std = ["alloc", "either/use_std"]
 alloc = ["rand_core/alloc"]
 
@@ -20,9 +21,12 @@ alloc = ["rand_core/alloc"]
 arbitrary = { version = "1.0", optional = true }
 bolero-generator-derive = { version = "0.11", path = "../bolero-generator-derive" }
 either = { version = "1.5", default-features = false, optional = true }
+getrandom = { version = "0.2", optional = true }
 rand_core = { version = "0.6", default-features = false }
+rand_xoshiro = { version = "0.6", optional = true }
 
 [dev-dependencies]
+insta = "1"
 rand = "0.8"
 
 [lints.rust.unexpected_cfgs]

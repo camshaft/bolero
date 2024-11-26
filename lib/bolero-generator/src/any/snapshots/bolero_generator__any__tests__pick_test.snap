@@ -1,0 +1,9 @@
+---
+source: bolero-generator/src/any/tests.rs
+expression: out
+---
+[
+    1,
+    2,
+    3,
+]

@@ -31,6 +31,8 @@ pub use bolero_generator_derive::*;
 #[cfg(feature = "arbitrary")]
 pub mod arbitrary;
 
+#[cfg(feature = "any")]
+pub mod any;
 pub mod array;
 pub mod atomic;
 pub mod bool;
@@ -38,8 +40,11 @@ pub mod bounded;
 pub mod char;
 pub mod combinator;
 pub mod driver;
+#[cfg(any(test, kani))]
+pub mod kani;
 pub mod num;
 pub mod one_of;
+pub mod prelude;
 pub mod range;
 pub mod result;
 pub mod time;
@@ -268,18 +273,4 @@ impl<T: 'static + Clone> ValueGenerator for Constant<T> {
 #[inline]
 pub fn constant<T: Clone>(value: T) -> Constant<T> {
     Constant { value }
-}
-
-pub mod prelude {
-    pub use crate::{
-        constant, gen, gen_with,
-        one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
-        TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
-    };
-
-    #[allow(deprecated)]
-    pub use crate::driver::DriverMode;
-
-    #[cfg(feature = "arbitrary")]
-    pub use crate::gen_arbitrary;
 }
