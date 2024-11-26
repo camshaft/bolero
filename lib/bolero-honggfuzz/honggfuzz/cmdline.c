@@ -355,6 +355,7 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
                 .runEndTime             = 0,
                 .tmOut                  = 1,
                 .lastCovUpdate          = time(NULL),
+                .exitOnTime             = 0,
                 .timeOfLongestUnitUSecs = 0,
                 .tmoutVTALRM            = false,
             },
@@ -500,6 +501,7 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
         { { "pprocess_cmd", required_argument, NULL, 0x111 }, "External command postprocessing files produced by internal mutators" },
         { { "ffmutate_cmd", required_argument, NULL, 0x110 }, "External command mutating files which have effective coverage feedback" },
         { { "run_time", required_argument, NULL, 0x109 }, "Number of seconds this fuzzing session will last (default: 0 [no limit])" },
+        { { "exit_on_time", required_argument, NULL, 0x10A }, "Stop fuzzing session if no new coverage was found for this number of seconds (default: 0 [no limit])" },
         { { "iterations", required_argument, NULL, 'N' }, "Number of fuzzing iterations (default: 0 [no limit])" },
         { { "rlimit_as", required_argument, NULL, 0x100 }, "Per process RLIMIT_AS in MiB (default: 0 [default limit])" },
         { { "rlimit_rss", required_argument, NULL, 0x101 }, "Per process RLIMIT_RSS in MiB (default: 0 [default limit]). It will also set *SAN's soft_rss_limit_mb" },
@@ -525,6 +527,8 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
         { { "export_feedback", no_argument, NULL, 0x10E }, "Export the coverage feedback structure as ./hfuzz-feedback" },
         { { "const_feedback", required_argument, NULL, 0x112 }, "Use constant integer/string values from fuzzed programs to mangle input files via a dynamic dictionary (default: true)" },
         { { "pin_thread_cpu", required_argument, NULL, 0x114 }, "Pin a single execution thread to this many consecutive CPUs (default: 0 = no CPU pinning)" },
+        { { "dynamic_input", required_argument, NULL, 0x115 }, "Path to a directory containing the dynamic file corpus" },
+        { { "statsfile", required_argument, NULL, 0x116 }, "Stats file" },
 
 #if defined(_HF_ARCH_LINUX)
         { { "linux_symbols_bl", required_argument, NULL, 0x504 }, "Symbols blocklist filter file (one entry per line)" },
@@ -549,6 +553,9 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
         { { "netbsd_symbols_al", required_argument, NULL, 0x505 }, "Symbols allowlist filter file (one entry per line)" },
         { { "netbsd_addr_low_limit", required_argument, NULL, 0x500 }, "Address limit (from si.si_addr) below which crashes are not reported, (default: 0)" },
 #endif // defined(_HF_ARCH_NETBSD)
+#if defined(__FreeBSD__)
+        { { "fbsd_keep_aslr", no_argument, NULL, 0x501 }, "Don't disable ASLR randomization, might be useful with MSAN" },
+#endif
         { { 0, 0, 0, 0 }, NULL },
     };
     // clang-format on
@@ -685,6 +692,9 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
                     hfuzz->timing.runEndTime = time(NULL) + p;
                 }
             } break;
+            case 0x10A:
+                hfuzz->timing.exitOnTime = atol(optarg);
+                break;
             case 'N':
                 hfuzz->mutate.mutationsMax = atol(optarg);
                 break;
@@ -796,6 +806,17 @@ bool cmdlineParse(int argc, char* argv[], honggfuzz_t* hfuzz) {
                 hfuzz->arch_netbsd.symsWlFile = optarg;
                 break;
 #endif /* defined(_HF_ARCH_NETBSD) */
+#if defined(__FreeBSD__)
+            case 0x501:
+                hfuzz->arch_linux.disableRandomization = false;
+                break;
+#endif
+            case 0x115:
+                hfuzz->io.dynamicInputDir = optarg;
+                break;
+            case 0x116:
+                hfuzz->io.statsFileName = optarg;
+                break;
             default:
                 cmdlineHelp(argv[0], custom_opts);
                 return false;

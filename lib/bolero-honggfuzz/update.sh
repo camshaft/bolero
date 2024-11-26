@@ -2,7 +2,7 @@
 
 set -e
 
-version=${1:-2.5}
+version=${1:-2.6}
 project_dir="$(pwd)"
 tmp_dir="$(mktemp -d)"
 honggfuzz_dir="$project_dir/honggfuzz/"

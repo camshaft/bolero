@@ -39,7 +39,7 @@
 #include "libhfcommon/util.h"
 
 #define PROG_NAME    "honggfuzz"
-#define PROG_VERSION "2.5"
+#define PROG_VERSION "2.6"
 
 /* Name of the template which will be replaced with the proper name of the file */
 #define _HF_FILE_PLACEHOLDER "___FILE___"
@@ -153,6 +153,7 @@ struct _dynfile_t {
     char               path[PATH_MAX];
     struct _dynfile_t* src;
     uint32_t           refs;
+    fuzzState_t        phase;
     uint8_t*           data;
     TAILQ_ENTRY(_dynfile_t) pointers;
 };
@@ -215,7 +216,10 @@ typedef struct {
         dynfile_t*  dynfileqCurrent;
         dynfile_t*  dynfileq2Current;
         TAILQ_HEAD(dyns_t, _dynfile_t) dynfileq;
-        bool exportFeedback;
+        bool        exportFeedback;
+        const char* dynamicInputDir;
+        const char* statsFileName;
+        int         statsFileFd;
     } io;
     struct {
         int                argc;
@@ -242,6 +246,7 @@ typedef struct {
         time_t  runEndTime;
         time_t  tmOut;
         time_t  lastCovUpdate;
+        time_t  exitOnTime;
         int64_t timeOfLongestUnitUSecs;
         bool    tmoutVTALRM;
     } timing;
@@ -370,10 +375,7 @@ typedef struct {
     int          perThreadCovFeedbackFd;
     unsigned     triesLeft;
     dynfile_t*   current;
-#if !defined(_HF_ARCH_DARWIN)
-    timer_t timerId;
-#endif    // !defined(_HF_ARCH_DARWIN)
-    hwcnt_t hwCnts;
+    hwcnt_t      hwCnts;
 
     struct {
         /* For Linux code */
