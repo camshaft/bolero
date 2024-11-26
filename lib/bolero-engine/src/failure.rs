@@ -21,6 +21,7 @@ impl<Input: Debug> Display for Failure<Input> {
         if let Some(seed) = &self.seed {
             writeln!(f, "BOLERO_RANDOM_SEED={}\n", seed)?;
         }
+
         writeln!(f, "Input: \n{:#?}\n", self.input)?;
         writeln!(f, "Error: \n{}", self.error)?;
 

@@ -8,7 +8,9 @@ pub mod lib {
     #[allow(unused_imports)]
     use super::*;
 
-    use bolero_engine::{driver, input, kani::Driver as KaniDriver, Engine, TargetLocation, Test};
+    use bolero_engine::{
+        driver, input, kani::Driver as KaniDriver, Engine, ScopedEngine, TargetLocation, Test,
+    };
 
     #[derive(Debug, Default)]
     pub struct KaniEngine {}
@@ -28,6 +30,34 @@ pub mod lib {
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             let mut input = KaniInput { options };
             match test.test(&mut input) {
+                Ok(was_valid) => {
+                    // show if the generator was satisfiable
+                    // TODO fail the harness if it's not: https://github.com/model-checking/kani/issues/2792
+                    #[cfg(kani)]
+                    kani::cover!(
+                        was_valid,
+                        "the generator should produce at least one valid value"
+                    );
+                    let _ = was_valid;
+                }
+                Err(_) => {
+                    panic!("test failed");
+                }
+            }
+        }
+    }
+
+    impl ScopedEngine for KaniEngine {
+        type Output = ();
+
+        fn run<F, R>(self, test: F, options: driver::Options) -> Self::Output
+        where
+            F: FnMut() -> R,
+            R: bolero_engine::IntoResult,
+        {
+            let driver = KaniDriver::new(&options);
+            let (_driver, result) = bolero_engine::any::run(driver, test);
+            match result {
                 Ok(was_valid) => {
                     // show if the generator was satisfiable
                     // TODO fail the harness if it's not: https://github.com/model-checking/kani/issues/2792

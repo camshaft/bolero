@@ -13,7 +13,7 @@ rust-version = "1.66.0"
 
 [features]
 default = ["std"]
-std = ["alloc", "bolero-generator/std"]
+std = ["alloc", "bolero-engine/any", "bolero-generator/std"]
 alloc = ["bolero-generator/alloc"]
 arbitrary = ["bolero-generator/arbitrary"]
 

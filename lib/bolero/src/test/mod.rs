@@ -1,12 +1,15 @@
 #![cfg_attr(fuzzing_random, allow(dead_code))]
 
-use bolero_engine::{driver, rng, Engine, Failure, Seed, TargetLocation, Test};
+use bolero_engine::{
+    driver::{self, exhaustive, object::Object},
+    rng, Engine, Failure, Seed, TargetLocation, Test,
+};
 use core::{fmt, mem::size_of, time::Duration};
 use std::path::PathBuf;
 
-mod input;
+type ExhastiveDriver = Box<Object<exhaustive::Driver>>;
 
-#[cfg(any(fuzzing_random, test))]
+mod input;
 mod report;
 
 /// Engine implementation which mimics Rust's default test
@@ -119,6 +122,14 @@ impl TestEngine {
         })
     }
 
+    #[cfg(fuzzing_random)]
+    fn tests(&self) -> impl Iterator<Item = NamedTest> {
+        self.seed_tests()
+            .map(|t| t.into())
+            .chain(self.rng_tests().map(|t| t.into()))
+    }
+
+    #[cfg(not(fuzzing_random))]
     fn tests(&self) -> impl Iterator<Item = NamedTest> {
         self.seed_tests()
             .map(|t| t.into())
@@ -130,86 +141,39 @@ impl TestEngine {
             .chain(self.rng_tests().map(|t| t.into()))
     }
 
-    #[cfg(any(fuzzing_random, test))]
-    #[cfg_attr(not(fuzzing_random), allow(dead_code))]
-    fn run_fuzzer<T>(mut self, mut test: T, options: driver::Options) -> bolero_engine::Never
+    fn run_with_value<T>(self, test: T, options: driver::Options) -> bolero_engine::Never
     where
         T: Test,
         T::Value: core::fmt::Debug,
     {
         if options.exhaustive() {
-            return self.run_exhaustive(test, options);
-        }
+            let mut buffer = vec![];
 
-        bolero_engine::panic::set_hook();
-        bolero_engine::panic::forward_panic(false);
-
-        let options = &options;
-
-        let mut report = report::Report::default();
-        report.spawn_timer();
-
-        if self.rng_cfg.iterations.is_none() {
-            self.rng_cfg.iterations = Some(usize::MAX);
-        }
-
-        let start_time = std::time::Instant::now();
-        let test_time = self.rng_cfg.test_time;
-
-        let mut buffer = vec![];
-        let mut cache = bolero_generator::driver::cache::Cache::default();
-        let mut testfn = |conf: &input::RngTest| {
-            let mut input = conf.input(&mut buffer, &mut cache, options);
-            test.test(&mut input).map_err(|error| {
-                let seed = Some(conf.seed);
-                // reseed the input and buffer the rng for shrinking
-                let mut input = conf.buffered_input(&mut buffer, options);
-                let _ = test.generate_value(&mut input);
-
-                let input = input::RngReplayInput {
-                    buffer: &mut buffer.clone(),
+            let testfn = |mut driver: Box<Object<exhaustive::Driver>>, test: &mut T| {
+                let mut input = input::ExhastiveInput {
+                    driver: &mut driver,
+                    buffer: &mut buffer,
                 };
-                let shrunken = test.shrink(input, seed, options);
 
-                if let Some(shrunken) = shrunken {
-                    format!("{:#}", shrunken)
-                } else {
-                    buffer.clear();
-                    let mut input = conf.input(&mut buffer, &mut cache, options);
-                    let input = test.generate_value(&mut input);
-                    format!("{:#}", Failure { seed, error, input })
-                }
-            })
-        };
+                let result = match test.test(&mut input) {
+                    Ok(is_valid) => Ok(is_valid),
+                    Err(error) => {
+                        // restart the driver to replay what was selected
+                        input.driver.replay();
+                        let input = test.generate_value(&mut input);
+                        let error = Failure {
+                            seed: None,
+                            error,
+                            input,
+                        };
+                        Err(error.to_string())
+                    }
+                };
 
-        for input in self.rng_tests() {
-            if let Some(test_time) = test_time {
-                if start_time.elapsed() > test_time {
-                    break;
-                }
-            }
+                (driver, result)
+            };
 
-            match testfn(&input) {
-                Ok(is_valid) => {
-                    report.on_result(is_valid);
-                }
-                Err(err) => {
-                    bolero_engine::panic::forward_panic(true);
-                    eprintln!("{}", err);
-                    panic!("test failed");
-                }
-            }
-        }
-    }
-
-    #[cfg(not(fuzzing_random))]
-    fn run_tests<T>(self, mut test: T, options: driver::Options)
-    where
-        T: Test,
-        T::Value: core::fmt::Debug,
-    {
-        if options.exhaustive() {
-            return self.run_exhaustive(test, options);
+            return self.run_exhaustive(test, testfn, options);
         }
 
         let file_options = options.clone();
@@ -220,7 +184,7 @@ impl TestEngine {
 
         let mut buffer = vec![];
         let mut cache = driver::cache::Cache::default();
-        let mut testfn = |data: &input::Test| {
+        let testfn = |test: &mut T, data: &input::Test| {
             buffer.clear();
             match data {
                 input::Test::File(file) => {
@@ -277,58 +241,157 @@ impl TestEngine {
             }
         };
 
+        self.run_tests(test, testfn)
+    }
+
+    #[cfg(feature = "std")]
+    fn run_with_scope<T, R>(self, test: T, options: driver::Options)
+    where
+        T: FnMut() -> R,
+        R: bolero_engine::IntoResult,
+    {
+        if options.exhaustive() {
+            let testfn = |driver: ExhastiveDriver, test: &mut T| {
+                let (driver, result) = bolero_engine::any::run(driver, test);
+                let result = result.map_err(|error| {
+                    Failure {
+                        seed: None,
+                        error,
+                        input: (),
+                    }
+                    .to_string()
+                });
+                (driver, result)
+            };
+
+            return self.run_exhaustive(test, testfn, options);
+        }
+
+        let file_options = options.clone();
+        let rng_options = options;
+
+        let file_options = &file_options;
+        let rng_options = &rng_options;
+
+        let mut buffer = vec![];
+        // TODO
+        // let mut cache = driver::cache::Cache::default();
+        let file_driver = bolero_engine::driver::bytes::Driver::new(vec![], file_options);
+        let file_driver = bolero_engine::driver::object::Object(file_driver);
+        let file_driver = Box::new(file_driver);
+        let mut file_driver = Some(file_driver);
+
+        let testfn = |test: &mut T, data: &input::Test| {
+            buffer.clear();
+            match data {
+                input::Test::File(file) => {
+                    let mut driver = file_driver.take().unwrap();
+
+                    let mut buf = core::mem::take(&mut buffer);
+                    file.read_into(&mut buf);
+                    driver.reset(buf, file_options);
+                    let (mut driver, result) = bolero_engine::any::run(driver, test);
+                    buffer = driver.reset(vec![], file_options);
+                    file_driver = Some(driver);
+
+                    // TODO shrinking
+
+                    result.map_err(|error| {
+                        Failure {
+                            seed: None,
+                            error,
+                            input: (), // TODO figure out a better input to show
+                        }
+                        .to_string()
+                    })
+                }
+                input::Test::Rng(conf) => {
+                    let seed = conf.seed;
+                    let driver = conf.driver(rng_options);
+                    let driver = Box::new(Object(driver));
+                    let (_driver, result) = bolero_engine::any::run(driver, test);
+
+                    // TODO shrinking
+
+                    result.map_err(|error| {
+                        Failure {
+                            seed: Some(seed),
+                            error,
+                            input: (), // TODO figure out a better input to show
+                        }
+                        .to_string()
+                    })
+                }
+            }
+        };
+
+        self.run_tests(test, testfn)
+    }
+
+    fn run_tests<S, T>(mut self, mut state: S, mut testfn: T)
+    where
+        T: FnMut(&mut S, &input::Test) -> Result<bool, String>,
+    {
+        // if we're fuzzing with cargo-bolero and the iteration count isn't specified
+        // then go forever
+        if cfg!(fuzzing_random) && self.rng_cfg.iterations.is_none() {
+            self.rng_cfg.iterations = Some(usize::MAX);
+        }
+
         let tests = self.tests();
+
+        let start_time = std::time::Instant::now();
+        let test_time = if cfg!(fuzzing_random) {
+            self.rng_cfg.test_time
+        } else {
+            Some(self.rng_cfg.test_time_or_default()).filter(|v| *v < Duration::MAX)
+        };
+
+        let mut report = report::Report::default();
+        if cfg!(fuzzing_random) {
+            report.spawn_timer();
+        }
 
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
-        let start_time = std::time::Instant::now();
-        let test_time = self.rng_cfg.test_time_or_default();
-        for test in tests {
-            if start_time.elapsed() > test_time {
-                break;
+        for input in tests {
+            if let Some(test_time) = test_time {
+                if start_time.elapsed() > test_time {
+                    break;
+                }
             }
 
             progress();
 
-            if let Err(err) = testfn(&test.data) {
-                bolero_engine::panic::forward_panic(true);
-                eprintln!("{}", err);
-                panic!("test failed: {}", test);
-            }
-        }
-
-        fn progress() {
-            if cfg!(miri) {
-                use std::io::{stderr, Write};
-
-                // miri doesn't capture explicit writes to stderr
-                #[allow(clippy::explicit_write)]
-                let _ = write!(stderr(), ".");
+            match testfn(&mut state, &input.data) {
+                Ok(is_valid) => {
+                    report.on_result(is_valid);
+                }
+                Err(err) => {
+                    bolero_engine::panic::forward_panic(true);
+                    eprintln!("{}", err);
+                    panic!("test failed");
+                }
             }
         }
     }
 
-    fn run_exhaustive<T>(self, mut test: T, options: driver::Options)
+    fn run_exhaustive<S, F>(self, mut state: S, mut testfn: F, options: driver::Options)
     where
-        T: Test,
-        T::Value: core::fmt::Debug,
+        F: FnMut(ExhastiveDriver, &mut S) -> (ExhastiveDriver, Result<bool, String>),
     {
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
-        let mut driver = bolero_generator::driver::exhaustive::Driver::new(&options);
+        let driver = exhaustive::Driver::new(&options);
+        let mut driver = Box::new(Object(driver));
         let test_time = self.rng_cfg.test_time;
         let start_time = std::time::Instant::now();
 
-        let mut buffer = vec![];
-
-        #[cfg(any(fuzzing_random, test))]
-        let mut report = {
-            let report = report::Report::default();
-            report.spawn_timer();
-            report
-        };
+        let mut report = report::Report::default();
+        // when running exhaustive tests, it's nice to have the progress displayed
+        report.spawn_timer();
 
         while driver.step().is_continue() {
             if let Some(test_time) = test_time {
@@ -337,29 +400,15 @@ impl TestEngine {
                 }
             }
 
-            let mut input = input::ExhastiveInput {
-                driver: &mut driver,
-                buffer: &mut buffer,
-            };
+            let (drvr, result) = testfn(driver, &mut state);
+            driver = drvr;
 
-            match test.test(&mut input) {
+            match result {
                 Ok(is_valid) => {
-                    #[cfg(any(fuzzing_random, test))]
                     report.on_estimate(driver.estimate());
-
-                    #[cfg(any(fuzzing_random, test))]
                     report.on_result(is_valid);
-                    let _ = is_valid;
                 }
                 Err(error) => {
-                    // restart the driver to replay what was selected
-                    input.driver.replay();
-                    let input = test.generate_value(&mut input);
-                    let error = Failure {
-                        seed: None,
-                        error,
-                        input,
-                    };
                     bolero_engine::panic::forward_panic(true);
                     eprintln!("{error}");
                     panic!("test failed");
@@ -374,21 +423,34 @@ where
     T: Test,
     T::Value: core::fmt::Debug,
 {
-    #[cfg(fuzzing_random)]
-    type Output = bolero_engine::Never;
-    #[cfg(not(fuzzing_random))]
     type Output = ();
 
-    #[cfg(fuzzing_random)]
     fn run(self, test: T, options: driver::Options) -> Self::Output {
-        let out = self.run_fuzzer(test, options);
+        self.run_with_value(test, options);
         bolero_engine::panic::forward_panic(true);
-        out
     }
+}
 
-    #[cfg(not(fuzzing_random))]
-    fn run(self, test: T, options: driver::Options) -> Self::Output {
-        self.run_tests(test, options);
+#[cfg(feature = "std")]
+impl bolero_engine::ScopedEngine for TestEngine {
+    type Output = ();
+
+    fn run<F, R>(self, test: F, options: driver::Options) -> Self::Output
+    where
+        F: FnMut() -> R,
+        R: bolero_engine::IntoResult,
+    {
+        self.run_with_scope(test, options);
         bolero_engine::panic::forward_panic(true);
+    }
+}
+
+fn progress() {
+    if cfg!(miri) {
+        use std::io::{stderr, Write};
+
+        // miri doesn't capture explicit writes to stderr
+        #[allow(clippy::explicit_write)]
+        let _ = write!(stderr(), ".");
     }
 }
