@@ -475,7 +475,7 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
     #[cfg(feature = "std")]
     pub fn run<T, R>(self, test: T) -> E::Output
     where
-        T: FnMut() -> R,
+        T: FnMut() -> R + core::panic::RefUnwindSafe,
         R: bolero_engine::IntoResult,
         E: bolero_engine::ScopedEngine,
     {

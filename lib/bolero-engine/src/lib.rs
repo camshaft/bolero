@@ -43,7 +43,7 @@ pub trait ScopedEngine {
 
     fn run<F, R>(self, test: F, options: driver::Options) -> Self::Output
     where
-        F: FnMut() -> R,
+        F: FnMut() -> R + core::panic::RefUnwindSafe,
         R: IntoResult;
 }
 

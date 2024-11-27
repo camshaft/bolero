@@ -247,7 +247,7 @@ impl TestEngine {
     #[cfg(feature = "std")]
     fn run_with_scope<T, R>(self, test: T, options: driver::Options)
     where
-        T: FnMut() -> R,
+        T: FnMut() -> R + core::panic::RefUnwindSafe,
         R: bolero_engine::IntoResult,
     {
         if options.exhaustive() {
@@ -437,7 +437,7 @@ impl bolero_engine::ScopedEngine for TestEngine {
 
     fn run<F, R>(self, test: F, options: driver::Options) -> Self::Output
     where
-        F: FnMut() -> R,
+        F: FnMut() -> R + core::panic::RefUnwindSafe,
         R: bolero_engine::IntoResult,
     {
         self.run_with_scope(test, options);

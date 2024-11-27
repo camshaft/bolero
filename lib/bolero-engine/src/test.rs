@@ -244,7 +244,7 @@ impl<F: RefUnwindSafe + FnMut(G::Output) -> Ret, G: ValueGenerator, Ret> Test
     for ClonedGeneratorTest<F, G, G::Output>
 where
     Ret: IntoResult,
-    G::Output: core::fmt::Debug + Clone,
+    G::Output: core::fmt::Debug + Clone + RefUnwindSafe,
 {
     type Value = G::Output;
 
