@@ -1,13 +1,13 @@
 [package]
 name = "cargo-bolero"
-version = "0.11.2"
+version = "0.12.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "cargo command for running bolero fuzz tests"
 homepage = "https://github.com/camshaft/bolero"
 repository = "https://github.com/camshaft/bolero"
 keywords = ["testing", "quickcheck", "property", "fuzz", "fuzzing"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 rust-version = "1.76.0"
 
@@ -20,10 +20,10 @@ libfuzzer = []
 
 [dependencies]
 anyhow = "1.0"
-bit-set = "0.5"
-bolero-afl = { version = "0.11", path = "../../lib/bolero-afl", default-features = false, features = ["bin"], optional = true }
-bolero-honggfuzz = { version = "0.11", path = "../../lib/bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
-cargo_metadata = "0.18"
+bit-set = "0.8"
+bolero-afl = { version = "0.12", path = "../../lib/bolero-afl", default-features = false, features = ["bin"], optional = true }
+bolero-honggfuzz = { version = "0.12", path = "../../lib/bolero-honggfuzz", default-features = false, features = ["bin"], optional = true }
+cargo_metadata = "0.19"
 humantime = "2"
 lazy_static = "1"
 rustc_version = "0.4"
@@ -34,7 +34,7 @@ tar = "0.4"
 tempfile = "3"
 
 [dev-dependencies]
-bolero = { version = "0.11", path = "../../lib/bolero" }
+bolero = { version = "0.12", path = "../../lib/bolero" }
 
 [[test]]
 name = "fuzz_bytes"

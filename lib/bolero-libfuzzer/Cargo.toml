@@ -1,13 +1,13 @@
 [package]
 name = "bolero-libfuzzer"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "libfuzzer plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
 repository = "https://github.com/camshaft/bolero"
 keywords = ["testing", "fuzz", "fuzzing"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 readme = "../../README.md"
 
 [features]
@@ -16,7 +16,7 @@ bin = []
 lib = ["bolero-engine"]
 
 [dependencies]
-bolero-engine = { version = "0.11", path = "../bolero-engine", features = ["cache"], optional = true }
+bolero-engine = { version = "0.12", path = "../bolero-engine", features = ["cache"], optional = true }
 
 [build-dependencies]
 cc = "1.0"

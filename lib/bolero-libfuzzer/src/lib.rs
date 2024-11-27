@@ -86,7 +86,7 @@ pub mod fuzzer {
 
         fn run<F, R>(self, mut test: F, options: driver::Options) -> Self::Output
         where
-            F: FnMut() -> R,
+            F: FnMut() -> R + core::panic::RefUnwindSafe,
             R: bolero_engine::IntoResult,
         {
             panic::set_hook();

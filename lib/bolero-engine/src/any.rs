@@ -6,7 +6,7 @@ pub use bolero_generator::any::*;
 pub fn run<D, F, R>(driver: Box<D>, test: F) -> (Box<D>, Result<bool, crate::panic::PanicError>)
 where
     D: 'static + bolero_generator::driver::object::DynDriver + core::any::Any + Sized,
-    F: FnMut() -> R,
+    F: FnMut() -> R + core::panic::RefUnwindSafe,
     R: super::IntoResult,
 {
     let mut test = core::panic::AssertUnwindSafe(test);
