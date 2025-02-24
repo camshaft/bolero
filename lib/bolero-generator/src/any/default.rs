@@ -27,7 +27,7 @@ fn default() -> impl crate::Driver {
 
     let mut seed = [42; 16];
     // make a best effort to get random seeds
-    let _ = getrandom::getrandom(&mut seed);
+    let _ = getrandom::fill(&mut seed);
     let rng = Xoshiro128PlusPlus::from_seed(seed);
     crate::driver::Rng::new(rng, &Default::default())
 }

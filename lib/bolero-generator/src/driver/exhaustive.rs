@@ -338,11 +338,6 @@ impl rand_core::RngCore for Rng<'_> {
         let value = self.0.select((1 << dest.len()) * 8);
         dest.copy_from_slice(&value.to_be_bytes()[..dest.len()]);
     }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.fill_bytes(dest);
-        Ok(())
-    }
 }
 
 #[cfg(test)]

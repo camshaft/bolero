@@ -95,14 +95,9 @@ impl<'a> rand::RngCore for BufferedRng<'a> {
         u64::from_le_bytes(data)
     }
 
-    fn try_fill_bytes(&mut self, bytes: &mut [u8]) -> Result<(), rand::Error> {
-        self.rng.try_fill_bytes(bytes)?;
-        self.buffer.extend_from_slice(bytes);
-        Ok(())
-    }
-
     fn fill_bytes(&mut self, bytes: &mut [u8]) {
-        self.try_fill_bytes(bytes).unwrap()
+        self.rng.fill_bytes(bytes);
+        self.buffer.extend_from_slice(bytes);
     }
 }
 
@@ -141,18 +136,13 @@ impl<'a> rand::RngCore for ReplayRng<'a> {
         u64::from_le_bytes(data)
     }
 
-    fn try_fill_bytes(&mut self, bytes: &mut [u8]) -> Result<(), rand::Error> {
+    fn fill_bytes(&mut self, bytes: &mut [u8]) {
         let len = self.buffer.len().min(bytes.len());
         let (copy_from, remaining) = self.buffer.split_at(len);
         let (copy_to, fill_to) = bytes.split_at_mut(len);
         copy_to.copy_from_slice(copy_from);
         fill_to.fill(0);
         self.buffer = remaining;
-        Ok(())
-    }
-
-    fn fill_bytes(&mut self, bytes: &mut [u8]) {
-        self.try_fill_bytes(bytes).unwrap()
     }
 }
 
