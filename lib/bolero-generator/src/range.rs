@@ -73,8 +73,8 @@ macro_rules! range_generator {
         impl<T: TypeGenerator> TypeGenerator for core::ops::$ty<T> {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 driver.enter_product::<Self, _, _>(|driver| {
-                    let $start = driver.gen()?;
-                    let $end = driver.gen()?;
+                    let $start = driver.produce()?;
+                    let $end = driver.produce()?;
                     Some($new)
                 })
             }

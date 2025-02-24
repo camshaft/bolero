@@ -3,7 +3,7 @@ use alloc::{rc::Rc, sync::Arc};
 
 impl<T: TypeGenerator> TypeGenerator for Arc<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        driver.depth_guard(|driver| Some(Self::new(driver.gen()?)))
+        driver.depth_guard(|driver| Some(Self::new(driver.produce()?)))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
@@ -17,7 +17,7 @@ impl<T: TypeGenerator> TypeGenerator for Arc<T> {
 
 impl<T: TypeGenerator> TypeGenerator for Rc<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        driver.depth_guard(|driver| Some(Self::new(driver.gen()?)))
+        driver.depth_guard(|driver| Some(Self::new(driver.produce()?)))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {

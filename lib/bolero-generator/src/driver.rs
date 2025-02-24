@@ -40,8 +40,14 @@ macro_rules! gen_method {
 pub trait Driver: Sized {
     /// Generate a value with type `T`
     #[inline(always)]
-    fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
+    fn produce<T: TypeGenerator>(&mut self) -> Option<T> {
         T::generate(self)
+    }
+    
+    #[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
+    #[inline(always)]
+    fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
+        self.produce()
     }
 
     #[inline]

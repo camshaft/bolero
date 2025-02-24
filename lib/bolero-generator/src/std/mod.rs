@@ -66,7 +66,7 @@ fn hash_map_type_test() {
 
 impl<T: TypeGenerator> TypeGenerator for Mutex<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        Some(Self::new(driver.produce()?))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {

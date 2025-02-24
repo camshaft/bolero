@@ -14,7 +14,7 @@ impl<T: 'static + TypeGenerator> TypeGenerator for Box<T> {
                     }
                 }
             } else {
-                let value = driver.gen()?;
+                let value = driver.produce()?;
                 Some(Box::new(value))
             }
         })
@@ -33,7 +33,7 @@ impl<T: 'static + TypeGenerator> TypeGenerator for Box<T> {
 
 impl<T: 'static + TypeGenerator> TypeGenerator for Box<[T]> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(driver.gen::<Vec<T>>()?.into_boxed_slice())
+        Some(driver.produce::<Vec<T>>()?.into_boxed_slice())
     }
 
     // TODO mutate
@@ -41,7 +41,7 @@ impl<T: 'static + TypeGenerator> TypeGenerator for Box<[T]> {
 
 impl TypeGenerator for Box<str> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(driver.gen::<String>()?.into_boxed_str())
+        Some(driver.produce::<String>()?.into_boxed_str())
     }
 
     // TODO mutate

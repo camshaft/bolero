@@ -243,6 +243,6 @@ where
     <T as ToOwned>::Owned: TypeGenerator,
 {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Cow::Owned(driver.gen()?))
+        Some(Cow::Owned(driver.produce()?))
     }
 }

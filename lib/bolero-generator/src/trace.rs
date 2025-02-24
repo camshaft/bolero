@@ -352,7 +352,7 @@ mod tests {
         #[inline]
         fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
             driver.enter_product::<Self, _, _>(|driver| {
-                let value = driver.gen()?;
+                let value = driver.produce()?;
                 // return `None` on odds. This can be used to test what happens when generators fail.
                 if value % 2 == 0 {
                     Some(Self { value })

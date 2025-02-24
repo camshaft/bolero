@@ -13,11 +13,11 @@ use core::{
 
 impl TypeGenerator for AtomicBool {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(AtomicBool::new(driver.gen()?))
+        Some(AtomicBool::new(driver.produce()?))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        self.store(driver.gen()?, Ordering::SeqCst);
+        self.store(driver.produce()?, Ordering::SeqCst);
         Some(())
     }
 }
@@ -26,11 +26,11 @@ macro_rules! impl_atomic_integer {
     ($ty:ident, $inner:ident) => {
         impl TypeGenerator for $ty {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                Some(Self::new(driver.gen()?))
+                Some(Self::new(driver.produce()?))
             }
 
             fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-                self.store(driver.gen()?, Ordering::SeqCst);
+                self.store(driver.produce()?, Ordering::SeqCst);
                 Some(())
             }
         }
@@ -99,18 +99,18 @@ impl_atomic_integer!(AtomicUsize, usize);
 
 impl<T: TypeGenerator> TypeGenerator for Cell<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        Some(Self::new(driver.produce()?))
     }
 }
 
 impl<T: TypeGenerator> TypeGenerator for RefCell<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        Some(Self::new(driver.produce()?))
     }
 }
 
 impl<T: TypeGenerator> TypeGenerator for UnsafeCell<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        Some(Self::new(driver.produce()?))
     }
 }

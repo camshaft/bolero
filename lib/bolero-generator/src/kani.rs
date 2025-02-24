@@ -64,7 +64,7 @@ impl crate::Driver for Driver {
     gen!(gen_f64, f64);
 
     #[inline(always)]
-    fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
+    fn produce<T: TypeGenerator>(&mut self) -> Option<T> {
         let value = T::generate(self);
         shim::assume(value.is_some());
         value
