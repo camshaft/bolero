@@ -107,25 +107,25 @@ pub struct ConstGenericArray<T, const LEN: usize> {
 
 #[test]
 fn derive_struct_test() {
-    let _ = generator_test!(Struct::gen());
+    let _ = generator_test!(Struct::produce());
 }
 
 #[test]
 fn derive_enum_test() {
-    let _ = generator_test!(Enum::gen());
+    let _ = generator_test!(Enum::produce());
 }
 
 #[test]
 fn derive_animal_test() {
-    let _ = generator_test!(Animal::gen());
+    let _ = generator_test!(Animal::produce());
 }
 
 #[test]
 fn derive_union_test() {
-    let _ = generator_no_clone_test!(Union::gen());
+    let _ = generator_no_clone_test!(Union::produce());
 }
 
 #[test]
 fn derive_expr_test() {
-    let _ = generator_test!(Expr::gen());
+    let _ = generator_test!(Expr::produce());
 }

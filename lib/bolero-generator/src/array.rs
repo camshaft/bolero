@@ -58,7 +58,7 @@ impl<T: TypeGenerator, const LEN: usize> TypeGeneratorWithParams for [T; LEN] {
     type Output = [TypeValueGenerator<T>; LEN];
 
     fn gen_with() -> Self::Output {
-        [T::gen(); LEN]
+        [T::produce(); LEN]
     }
 }
 

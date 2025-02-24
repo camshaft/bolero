@@ -123,7 +123,7 @@ macro_rules! impl_values_collection_generator {
             #[inline]
             fn mutate<D: $crate::Driver>(&mut self, driver: &mut D) -> Option<()> {
                 driver.enter_list::<Self, _, _, _>(&$default_len_range, |driver, len| {
-                    $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::gen())?;
+                    $crate::alloc_generators::CollectionGenerator::mutate_collection(self, driver, len, &V::produce())?;
 
                     if self.len() != len {
                         None
