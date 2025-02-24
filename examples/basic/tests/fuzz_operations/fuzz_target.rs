@@ -14,7 +14,7 @@ fn main() {
     let len = if should_panic() { 16 } else { 4 };
 
     check!()
-        .with_generator(gen::<Vec<Operation>>().with().len(0usize..=len))
+        .with_generator(produce::<Vec<Operation>>().with().len(0usize..=len))
         .for_each(|operations| {
             let mut subject: ArrayVec<[_; 4]> = ArrayVec::new();
             let mut oracle = LinkedList::new();

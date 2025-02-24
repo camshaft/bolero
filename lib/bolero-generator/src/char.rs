@@ -38,10 +38,10 @@ impl TypeGeneratorWithParams for char {
 
 #[test]
 fn char_type_test() {
-    let _ = generator_test!(gen::<char>());
+    let _ = generator_test!(produce::<char>());
 }
 
 #[test]
 fn char_bounds_test() {
-    let _ = generator_test!(gen::<char>().with().bounds('a'..='f'));
+    let _ = generator_test!(produce::<char>().with().bounds('a'..='f'));
 }

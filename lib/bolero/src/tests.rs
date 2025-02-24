@@ -116,7 +116,7 @@ fn with_shrinking() {
 
     std::panic::catch_unwind(|| {
         check!()
-            .with_generator(gen::<u8>())
+            .with_generator(produce::<u8>())
             .with_shrink_time(Duration::from_secs(10))
             .for_each(|value| {
                 last_seen_value.store(*value, Ordering::Relaxed);
@@ -138,7 +138,7 @@ fn without_shrinking() {
 
         std::panic::catch_unwind(|| {
             check!()
-                .with_generator(gen::<u8>())
+                .with_generator(produce::<u8>())
                 .with_shrink_time(Duration::ZERO)
                 .for_each(|value| {
                     last_seen_value.store(*value, Ordering::Relaxed);

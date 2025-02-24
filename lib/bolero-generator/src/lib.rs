@@ -83,7 +83,7 @@ pub trait TypeGenerator: 'static + Sized {
     /// Returns a generator for a given type
     #[inline]
     fn gen() -> TypeValueGenerator<Self> {
-        gen()
+        produce()
     }
 }
 
@@ -230,6 +230,13 @@ impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
 }
 
 /// Generate a value for a given type
+#[inline]
+pub fn produce<T: TypeGenerator>() -> TypeValueGenerator<T> {
+    TypeValueGenerator(PhantomData)
+}
+
+/// Generate a value for a given type
+#[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
 #[inline]
 pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
     TypeValueGenerator(PhantomData)

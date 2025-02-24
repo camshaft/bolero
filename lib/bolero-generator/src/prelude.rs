@@ -1,5 +1,5 @@
 pub use crate::{
-    constant, gen, gen_with,
+    constant, produce, gen_with,
     one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
     TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
 };

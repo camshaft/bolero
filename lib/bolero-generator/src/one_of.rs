@@ -256,9 +256,9 @@ pub fn one_value_of<O: OneValueOfGenerator>(options: O) -> OneValueOf<O> {
 
 #[test]
 fn one_of_array_test() {
-    use crate::gen;
+    use crate::produce;
 
-    let options = [gen::<u8>(), gen(), gen()];
+    let options = [produce::<u8>(), produce(), produce()];
     let _ = generator_test!(one_of(options));
     let _ = generator_test!(options.one_of());
     let _ = generator_test!(one_of(&options[..]));
@@ -282,7 +282,7 @@ fn one_of_slice_test() {
 
 #[test]
 fn one_of_tuple_test() {
-    let _ = generator_test!(one_of((gen::<u8>(), 0..4, 8..9)));
+    let _ = generator_test!(one_of((produce::<u8>(), 0..4, 8..9)));
 }
 
 #[test]

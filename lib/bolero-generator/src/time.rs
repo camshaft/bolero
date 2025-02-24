@@ -123,5 +123,5 @@ impl BoundedValue for Duration {
 
 #[test]
 fn duration_test() {
-    let _ = generator_test!(gen::<Duration>());
+    let _ = generator_test!(produce::<Duration>());
 }

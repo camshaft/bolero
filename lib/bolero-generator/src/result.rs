@@ -257,10 +257,10 @@ impl<V: TypeGenerator> TypeGeneratorWithParams for Option<V> {
 
 #[test]
 fn result_test() {
-    let _ = generator_test!(gen::<Result<u8, u8>>());
+    let _ = generator_test!(produce::<Result<u8, u8>>());
 }
 
 #[test]
 fn option_test() {
-    let _ = generator_test!(gen::<Option<u8>>());
+    let _ = generator_test!(produce::<Option<u8>>());
 }

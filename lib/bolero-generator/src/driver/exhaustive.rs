@@ -356,7 +356,7 @@ mod tests {
 
         let mut count = 0usize;
         while driver.step().is_continue() {
-            let value = crate::gen::<u8>().generate(&mut driver).unwrap();
+            let value = crate::produce::<u8>().generate(&mut driver).unwrap();
             assert_eq!(value as usize, count);
             count += 1;
             eprintln!("{:.2}", count as f64 / driver.estimate() * 100.0);
@@ -373,7 +373,7 @@ mod tests {
         let mut count = 0usize;
         let mut expected = -128i16;
         while driver.step().is_continue() {
-            let value = crate::gen::<i8>().generate(&mut driver).unwrap();
+            let value = crate::produce::<i8>().generate(&mut driver).unwrap();
             assert_eq!(value as i16, expected);
             count += 1;
             expected += 1;

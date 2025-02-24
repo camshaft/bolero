@@ -1,4 +1,4 @@
-use crate::{gen, TypeGenerator, ValueGenerator};
+use crate::{produce, TypeGenerator, ValueGenerator};
 
 #[cfg(not(kani))]
 mod default;
@@ -32,7 +32,7 @@ impl<G: 'static + ValueGenerator> Any for G {
 
 #[inline]
 pub fn any<T: TypeGenerator>() -> T {
-    gen().any()
+    produce().any()
 }
 
 pub trait AnySliceExt<T> {

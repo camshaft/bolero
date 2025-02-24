@@ -242,7 +242,7 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         self,
     ) -> TestTarget<TypeValueGenerator<T>, Engine, InputOwnership> {
         TestTarget {
-            generator: generator::gen(),
+            generator: generator::produce(),
             engine: self.engine,
             driver_options: self.driver_options,
             input_ownership: self.input_ownership,

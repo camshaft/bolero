@@ -16,10 +16,10 @@ macro_rules! generator_test {
 
         let mut results = vec![];
 
-        let inputs = $crate::gen::<Vec<_>>()
+        let inputs = $crate::produce::<Vec<_>>()
             .with()
             .len(1000usize)
-            .values($crate::gen::<Vec<u8>>().with().len(0usize..512))
+            .values($crate::produce::<Vec<u8>>().with().len(0usize..512))
             .generate(&mut rng_driver)
             .unwrap();
 
@@ -66,10 +66,10 @@ macro_rules! generator_no_clone_test {
 
         let mut rng_driver = Rng::new(rand::thread_rng(), &options);
 
-        let inputs = $crate::gen::<Vec<_>>()
+        let inputs = $crate::produce::<Vec<_>>()
             .with()
             .len(1000usize)
-            .values($crate::gen::<Vec<u8>>().with().len(0usize..512))
+            .values($crate::produce::<Vec<u8>>().with().len(0usize..512))
             .generate(&mut rng_driver)
             .unwrap();
 
