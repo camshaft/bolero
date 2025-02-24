@@ -23,9 +23,12 @@ macro_rules! impl_either {
         impl<$A: ValueGenerator, $B: ValueGenerator> $generator<$A, $B> {
             pub fn $with_a<Gen: ValueGenerator<Output = $A::Output>>(
                 self,
-                gen: Gen,
+                produce: Gen,
             ) -> $generator<Gen, $B> {
-                $generator { a: gen, b: self.b }
+                $generator {
+                    a: produce,
+                    b: self.b,
+                }
             }
 
             pub fn $map_a<Gen: ValueGenerator<Output = $A::Output>, F: Fn($A) -> Gen>(
@@ -40,9 +43,12 @@ macro_rules! impl_either {
 
             pub fn $with_b<Gen: ValueGenerator<Output = $B::Output>>(
                 self,
-                gen: Gen,
+                produce: Gen,
             ) -> $generator<$A, Gen> {
-                $generator { a: self.a, b: gen }
+                $generator {
+                    a: self.a,
+                    b: produce,
+                }
             }
 
             pub fn $map_b<Gen: ValueGenerator<Output = $B::Output>, F: Fn($B) -> Gen>(

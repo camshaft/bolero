@@ -94,13 +94,13 @@ where
     gen_from_bytes!();
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
         let slice = self.as_slice();
-        let (len, value) = gen(slice)?;
+        let (len, value) = produce(slice)?;
         self.consume_bytes(len);
         Some(value)
     }
@@ -151,12 +151,12 @@ impl<'a> super::Driver for ByteSliceDriver<'a> {
     gen_from_bytes!();
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
-        self.0.gen_from_bytes(hint, gen)
+        self.0.gen_from_bytes(hint, produce)
     }
 
     #[inline]

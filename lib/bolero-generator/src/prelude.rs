@@ -1,8 +1,11 @@
 pub use crate::{
-    constant, produce, produce_with,
+    constant,
     one_of::{one_of, one_value_of, OneOfExt, OneValueOfExt},
-    TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
+    produce, produce_with, TypeGenerator, TypeGeneratorWithParams, ValueGenerator,
 };
+
+#[allow(deprecated)]
+pub use crate::{gen, gen_with};
 
 #[cfg(feature = "any")]
 pub use crate::any::{

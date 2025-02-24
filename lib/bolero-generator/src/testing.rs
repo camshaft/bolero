@@ -1,11 +1,11 @@
 #[macro_export]
 macro_rules! generator_test {
-    ($gen:expr) => {{
+    ($produce:expr) => {{
         use $crate::{
             driver::{ByteSliceDriver, Options, Rng},
             *,
         };
-        let gen = $gen;
+        let produce = $produce;
 
         let options = Options::default();
 
@@ -28,11 +28,11 @@ macro_rules! generator_test {
 
         for input in inputs.iter() {
             if let Some(value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
+                ValueGenerator::generate(&produce, &mut ByteSliceDriver::new(input, &options))
             {
                 let mut mutated = value.clone();
                 ValueGenerator::mutate(
-                    &gen,
+                    &produce,
                     &mut ByteSliceDriver::new(input, &options),
                     &mut mutated,
                 )
@@ -55,12 +55,12 @@ macro_rules! generator_test {
 
 #[macro_export]
 macro_rules! generator_no_clone_test {
-    ($gen:expr) => {{
+    ($produce:expr) => {{
         use $crate::{
             driver::{ByteSliceDriver, Options, Rng},
             *,
         };
-        let gen = $gen;
+        let produce = $produce;
 
         let options = Options::default();
 
@@ -76,10 +76,10 @@ macro_rules! generator_no_clone_test {
         {
             for input in inputs.iter() {
                 if let Some(mut value) =
-                    ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
+                    ValueGenerator::generate(&produce, &mut ByteSliceDriver::new(input, &options))
                 {
                     ValueGenerator::mutate(
-                        &gen,
+                        &produce,
                         &mut ByteSliceDriver::new(input, &options),
                         &mut value,
                     )
@@ -93,10 +93,10 @@ macro_rules! generator_no_clone_test {
 
         for input in inputs.iter() {
             if let Some(mut value) =
-                ValueGenerator::generate(&gen, &mut ByteSliceDriver::new(input, &options))
+                ValueGenerator::generate(&produce, &mut ByteSliceDriver::new(input, &options))
             {
                 ValueGenerator::mutate(
-                    &gen,
+                    &produce,
                     &mut ByteSliceDriver::new(input, &options),
                     &mut value,
                 )
@@ -108,6 +108,6 @@ macro_rules! generator_no_clone_test {
 
         assert_ne!(failed, inputs.len(), "all the inputs failed");
 
-        ValueGenerator::generate(&gen, &mut rng_driver)
+        ValueGenerator::generate(&produce, &mut rng_driver)
     }};
 }

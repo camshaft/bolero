@@ -85,7 +85,7 @@ pub trait TypeGenerator: 'static + Sized {
     fn produce() -> TypeValueGenerator<Self> {
         produce()
     }
-    
+
     #[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
     #[inline]
     fn gen() -> TypeValueGenerator<Self> {

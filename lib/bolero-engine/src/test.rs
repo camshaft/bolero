@@ -142,13 +142,13 @@ macro_rules! generate_value {
     ($self:ident, $driver:ident) => {{
         let forward_panic = crate::panic::forward_panic(true);
         let value = if let Some(value) = $self.value.as_mut() {
-            if $self.gen.mutate($driver, value).is_some() {
+            if $self.produce.mutate($driver, value).is_some() {
                 value
             } else {
                 crate::panic::forward_panic(forward_panic);
                 return Ok(false);
             }
-        } else if let Some(value) = $self.gen.generate($driver) {
+        } else if let Some(value) = $self.produce.generate($driver) {
             $self.value = Some(value);
             $self.value.as_ref().unwrap()
         } else {
@@ -162,7 +162,7 @@ macro_rules! generate_value {
 #[cfg(kani)]
 macro_rules! generate_value {
     ($self:ident, $driver:ident) => {{
-        $self.value = $self.gen.generate($driver);
+        $self.value = $self.produce.generate($driver);
         kani::assume($self.value.is_some());
         $self.value.as_ref().unwrap()
     }};
@@ -170,15 +170,15 @@ macro_rules! generate_value {
 
 pub struct BorrowedGeneratorTest<F, G, V> {
     fun: F,
-    gen: G,
+    produce: G,
     value: Option<V>,
 }
 
 impl<F, G, V> BorrowedGeneratorTest<F, G, V> {
-    pub fn new(fun: F, gen: G) -> Self {
+    pub fn new(fun: F, produce: G) -> Self {
         Self {
             fun,
-            gen,
+            produce,
             value: None,
         }
     }
@@ -217,7 +217,7 @@ where
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
-            let value = self.gen.generate(driver).unwrap();
+            let value = self.produce.generate(driver).unwrap();
             crate::panic::forward_panic(forward_panic);
             value
         })
@@ -226,15 +226,15 @@ where
 
 pub struct ClonedGeneratorTest<F, G, V> {
     fun: F,
-    gen: G,
+    produce: G,
     value: Option<V>,
 }
 
 impl<F, G, V> ClonedGeneratorTest<F, G, V> {
-    pub fn new(fun: F, gen: G) -> Self {
+    pub fn new(fun: F, produce: G) -> Self {
         Self {
             fun,
-            gen,
+            produce,
             value: None,
         }
     }
@@ -285,7 +285,7 @@ where
     fn generate_value<T: Input<Self::Value>>(&self, input: &mut T) -> Self::Value {
         input.with_driver(&mut |driver| {
             let forward_panic = crate::panic::forward_panic(true);
-            let value = self.gen.generate(driver).unwrap();
+            let value = self.produce.generate(driver).unwrap();
             crate::panic::forward_panic(forward_panic);
             value
         })

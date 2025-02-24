@@ -224,13 +224,13 @@ impl<'a, D: crate::Driver, O: std::io::Write> crate::Driver for Driver<'a, D, O>
     }
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
         self.inner.gen_from_bytes(hint, |bytes| {
-            let res = gen(bytes);
+            let res = produce(bytes);
             self.formatter
                 .emit_prim("bytes", &res.as_ref().map(|(len, _value)| *len));
             res

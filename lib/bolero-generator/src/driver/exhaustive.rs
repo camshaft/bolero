@@ -290,7 +290,7 @@ macro_rules! impl_driver {
             }
 
             #[inline(always)]
-            fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+            fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
             where
                 Hint: FnOnce() -> (usize, Option<usize>),
                 Gen: FnMut(&[u8]) -> Option<(usize, T)>,
@@ -305,7 +305,7 @@ macro_rules! impl_driver {
 
                 let len = self.gen_usize(Bound::Included(&min), Bound::Included(&max))?;
                 self.buffer.fill(len, &mut Rng(&mut self.state))?;
-                let (_consumed, value) = gen(self.buffer.slice_mut(len))?;
+                let (_consumed, value) = produce(self.buffer.slice_mut(len))?;
                 self.buffer.clear();
                 Some(value)
             }

@@ -43,7 +43,7 @@ pub trait Driver: Sized {
     fn produce<T: TypeGenerator>(&mut self) -> Option<T> {
         T::generate(self)
     }
-    
+
     #[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
     #[inline(always)]
     fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
@@ -156,7 +156,7 @@ pub trait Driver: Sized {
     ///
     /// Note that `gen` may be called multiple times with increasing slice lengths, eg. if the
     /// driver is in forced mode.
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>;
