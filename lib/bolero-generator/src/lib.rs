@@ -244,8 +244,15 @@ pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
 
 /// Generate a value for a given type with additional constraints
 #[inline]
-pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
+pub fn produce_with<T: TypeGeneratorWithParams>() -> T::Output {
     T::gen_with()
+}
+
+/// Generate a value for a given type
+#[deprecated = "Use `produce_with` instead (`gen_with` conflicts with edition2024)"]
+#[inline]
+pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
+    produce_with::<T>()
 }
 
 pub use one_of::{one_of, one_value_of};

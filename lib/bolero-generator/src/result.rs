@@ -121,17 +121,17 @@ macro_rules! impl_either {
         impl<$A: TypeGenerator, $B: TypeGenerator> TypeGenerator for $ty<$A, $B> {
             #[inline]
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                crate::gen_with::<Self>().generate(driver)
+                crate::produce_with::<Self>().generate(driver)
             }
 
             #[inline]
             fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-                crate::gen_with::<Self>().mutate(driver, self)
+                crate::produce_with::<Self>().mutate(driver, self)
             }
 
             #[inline]
             fn driver_cache<D: Driver>(self, driver: &mut D) {
-                crate::gen_with::<Self>().driver_cache(driver, self)
+                crate::produce_with::<Self>().driver_cache(driver, self)
             }
         }
 
@@ -231,17 +231,17 @@ impl<V: ValueGenerator> ValueGenerator for OptionGenerator<V> {
 impl<V: TypeGenerator> TypeGenerator for Option<V> {
     #[inline]
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        crate::gen_with::<Self>().generate(driver)
+        crate::produce_with::<Self>().generate(driver)
     }
 
     #[inline]
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        crate::gen_with::<Self>().mutate(driver, self)
+        crate::produce_with::<Self>().mutate(driver, self)
     }
 
     #[inline]
     fn driver_cache<D: Driver>(self, driver: &mut D) {
-        crate::gen_with::<Self>().driver_cache(driver, self)
+        crate::produce_with::<Self>().driver_cache(driver, self)
     }
 }
 
