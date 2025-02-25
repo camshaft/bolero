@@ -153,7 +153,7 @@ fn handle_worker_out<B: 'static + Send + std::io::Read>(
 
 fn handle_worker_status(mut child: Child, chan: mpsc::Sender<Message>) {
     std::thread::spawn(move || {
-        let success = child.wait().map_or(false, |status| status.success());
+        let success = child.wait().is_ok_and(|status| status.success());
 
         let _ = chan.send(Message::Shutdown { success });
     });
