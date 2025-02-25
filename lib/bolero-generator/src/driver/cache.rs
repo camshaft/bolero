@@ -93,14 +93,14 @@ impl<'a, I: super::Driver> Driver<'a, I> {
     }
 }
 
-impl<'a, I: super::Driver> AsRef<I> for Driver<'a, I> {
+impl<I: super::Driver> AsRef<I> for Driver<'_, I> {
     #[inline]
     fn as_ref(&self) -> &I {
         &self.inner
     }
 }
 
-impl<'a, I: super::Driver> super::Driver for Driver<'a, I> {
+impl<I: super::Driver> super::Driver for Driver<'_, I> {
     #[inline(always)]
     fn depth(&self) -> usize {
         self.inner.depth()

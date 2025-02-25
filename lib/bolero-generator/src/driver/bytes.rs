@@ -135,7 +135,7 @@ impl<'a> ByteSliceDriver<'a> {
     }
 }
 
-impl<'a> FillBytes for ByteSliceDriver<'a> {
+impl FillBytes for ByteSliceDriver<'_> {
     #[inline]
     fn peek_bytes(&mut self, offset: usize, bytes: &mut [u8]) -> Option<()> {
         self.0.peek_bytes(offset, bytes)
@@ -147,7 +147,7 @@ impl<'a> FillBytes for ByteSliceDriver<'a> {
     }
 }
 
-impl<'a> super::Driver for ByteSliceDriver<'a> {
+impl super::Driver for ByteSliceDriver<'_> {
     gen_from_bytes!();
 
     #[inline]
