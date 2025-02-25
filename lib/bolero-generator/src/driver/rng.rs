@@ -153,8 +153,7 @@ impl<R: TryRngCore> Driver for Rng<R> {
         let max = max
             .unwrap_or(usize::MAX)
             // make sure max is at least min
-            .max(min)
-            .min(self.remaining_len())
+            .clamp(min, self.remaining_len())
             .min(Buffer::MAX_CAPACITY);
 
         let len = self.gen_usize(Bound::Included(&min), Bound::Included(&max))?;

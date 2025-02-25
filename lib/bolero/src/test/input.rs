@@ -82,7 +82,7 @@ pub struct BufferedRng<'a> {
     buffer: &'a mut Vec<u8>,
 }
 
-impl<'a> rand::RngCore for BufferedRng<'a> {
+impl rand::RngCore for BufferedRng<'_> {
     fn next_u32(&mut self) -> u32 {
         let mut data = [0; 4];
         self.fill_bytes(&mut data);
@@ -123,7 +123,7 @@ pub struct ReplayRng<'a> {
     buffer: &'a [u8],
 }
 
-impl<'a> rand::RngCore for ReplayRng<'a> {
+impl rand::RngCore for ReplayRng<'_> {
     fn next_u32(&mut self) -> u32 {
         let mut data = [0; 4];
         self.fill_bytes(&mut data);
@@ -150,7 +150,7 @@ pub struct RngReplayInput<'a> {
     pub buffer: &'a mut Vec<u8>,
 }
 
-impl<'a> bolero_engine::shrink::Input for RngReplayInput<'a> {
+impl bolero_engine::shrink::Input for RngReplayInput<'_> {
     type Driver<'d>
         = driver::Rng<ReplayRng<'d>>
     where
@@ -164,14 +164,14 @@ impl<'a> bolero_engine::shrink::Input for RngReplayInput<'a> {
     }
 }
 
-impl<'a> AsRef<Vec<u8>> for RngReplayInput<'a> {
+impl AsRef<Vec<u8>> for RngReplayInput<'_> {
     #[inline]
     fn as_ref(&self) -> &Vec<u8> {
         self.buffer
     }
 }
 
-impl<'a> AsMut<Vec<u8>> for RngReplayInput<'a> {
+impl AsMut<Vec<u8>> for RngReplayInput<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut Vec<u8> {
         self.buffer
@@ -183,7 +183,7 @@ pub struct ExhastiveInput<'a> {
     pub driver: &'a mut driver::exhaustive::Driver,
 }
 
-impl<'a, Output> Input<Output> for ExhastiveInput<'a> {
+impl<Output> Input<Output> for ExhastiveInput<'_> {
     type Driver = driver::exhaustive::Driver;
 
     fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
@@ -196,14 +196,14 @@ impl<'a, Output> Input<Output> for ExhastiveInput<'a> {
     }
 }
 
-impl<'a> AsRef<Vec<u8>> for ExhastiveInput<'a> {
+impl AsRef<Vec<u8>> for ExhastiveInput<'_> {
     #[inline]
     fn as_ref(&self) -> &Vec<u8> {
         self.buffer
     }
 }
 
-impl<'a> AsMut<Vec<u8>> for ExhastiveInput<'a> {
+impl AsMut<Vec<u8>> for ExhastiveInput<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut Vec<u8> {
         self.buffer
