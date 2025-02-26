@@ -22,7 +22,7 @@ macro_rules! shrink_test {
         #[test]
         fn $name() {
             #[allow(unused_imports)]
-            use bolero_generator::{gen, ValueGenerator};
+            use bolero_generator::{produce, ValueGenerator};
 
             panic::forward_panic(true);
             panic::capture_backtrace(true);
@@ -39,7 +39,7 @@ macro_rules! shrink_test {
 
 shrink_test!(
     u16_shrink_test_zero_time,
-    gen::<u16>(),
+    produce::<u16>(),
     [255u8; 2],
     Duration::ZERO,
     (None),
@@ -48,7 +48,7 @@ shrink_test!(
 
 shrink_test!(
     u16_shrink_test,
-    gen::<u16>(),
+    produce::<u16>(),
     [255u8; 2],
     Duration::from_secs(1),
     (1),
@@ -60,7 +60,7 @@ shrink_test!(
 
 shrink_test!(
     u32_shrink_test,
-    gen::<u32>(),
+    produce::<u32>(),
     [255u8; 4],
     Duration::from_secs(1),
     (20),
@@ -71,7 +71,7 @@ shrink_test!(
 
 shrink_test!(
     vec_shrink_test,
-    gen::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
+    produce::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     Duration::from_secs(1),
     (vec![4, 0, 0]),
@@ -84,7 +84,7 @@ shrink_test!(
 
 shrink_test!(
     non_start_vec_shrink_test,
-    gen::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
+    produce::<Vec<u32>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     Duration::from_secs(1),
     (vec![0, 5, 0]),
@@ -96,7 +96,7 @@ shrink_test!(
 
 shrink_test!(
     middle_vec_shrink_test,
-    gen::<Vec<u8>>().filter_gen(|vec| vec.len() >= 3),
+    produce::<Vec<u8>>().filter_gen(|vec| vec.len() >= 3),
     [255u8; 256],
     Duration::from_secs(1),
     (vec![1, 1, 1]),

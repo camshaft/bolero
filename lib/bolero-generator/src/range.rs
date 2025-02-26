@@ -73,8 +73,8 @@ macro_rules! range_generator {
         impl<T: TypeGenerator> TypeGenerator for core::ops::$ty<T> {
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
                 driver.enter_product::<Self, _, _>(|driver| {
-                    let $start = driver.gen()?;
-                    let $end = driver.gen()?;
+                    let $start = driver.produce()?;
+                    let $end = driver.produce()?;
                     Some($new)
                 })
             }
@@ -101,14 +101,14 @@ range_generator!(RangeInclusive, RangeInclusiveGenerator, |start, end| start
 fn range_type_test() {
     use core::ops::Range;
 
-    let _ = generator_test!(gen::<Range<usize>>());
+    let _ = generator_test!(produce::<Range<usize>>());
 }
 
 #[test]
 fn range_with_test() {
     use core::ops::Range;
 
-    let _ = generator_test!(gen::<Range<usize>>().with().start(4..6).end(6..10));
+    let _ = generator_test!(produce::<Range<usize>>().with().start(4..6).end(6..10));
 }
 
 #[test]

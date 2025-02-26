@@ -131,5 +131,5 @@ impl<T: BoundedValue, B: RangeBounds<T>> ValueGenerator for BoundedGenerator<T, 
 
 #[test]
 fn with_bounds_test() {
-    let _ = generator_test!(gen::<u8>().with().bounds(0..32));
+    let _ = generator_test!(produce::<u8>().with().bounds(0..32));
 }

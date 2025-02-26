@@ -26,7 +26,7 @@ pub trait DynDriver {
     fn gen_from_bytes(
         &mut self,
         hint: &mut dyn FnMut() -> (usize, Option<usize>),
-        gen: &mut dyn FnMut(&[u8]) -> Option<usize>,
+        produce: &mut dyn FnMut(&[u8]) -> Option<usize>,
     ) -> Option<()>;
 }
 
@@ -164,7 +164,7 @@ impl Driver for Borrowed<'_> {
     }
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
@@ -172,7 +172,7 @@ impl Driver for Borrowed<'_> {
         let mut value = None;
         let mut hint = hint_fn(hint);
         self.0.gen_from_bytes(&mut hint, &mut |bytes| {
-            let (len, v) = gen(bytes)?;
+            let (len, v) = produce(bytes)?;
             value = Some(v);
             Some(len)
         })?;
@@ -282,7 +282,7 @@ impl<D: DynDriver> Driver for D {
     }
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
@@ -290,7 +290,7 @@ impl<D: DynDriver> Driver for D {
         let mut value = None;
         let mut hint = hint_fn(hint);
         <D as DynDriver>::gen_from_bytes(self, &mut hint, &mut |bytes| {
-            let (len, v) = gen(bytes)?;
+            let (len, v) = produce(bytes)?;
             value = Some(v);
             Some(len)
         })?;
@@ -422,10 +422,10 @@ impl<D: super::Driver> DynDriver for Object<D> {
     fn gen_from_bytes(
         &mut self,
         hint: &mut dyn FnMut() -> (usize, Option<usize>),
-        gen: &mut dyn FnMut(&[u8]) -> Option<usize>,
+        produce: &mut dyn FnMut(&[u8]) -> Option<usize>,
     ) -> Option<()> {
         <D as Driver>::gen_from_bytes(self, hint, |bytes| {
-            let len = gen(bytes)?;
+            let len = produce(bytes)?;
             Some((len, ()))
         })?;
         Some(())

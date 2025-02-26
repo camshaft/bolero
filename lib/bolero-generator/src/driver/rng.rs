@@ -143,7 +143,7 @@ impl<R: TryRngCore> Driver for Rng<R> {
     }
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
@@ -158,7 +158,7 @@ impl<R: TryRngCore> Driver for Rng<R> {
 
         let len = self.gen_usize(Bound::Included(&min), Bound::Included(&max))?;
         let bytes = self.fill_buffer(len)?;
-        let (consumed, value) = gen(bytes)?;
+        let (consumed, value) = produce(bytes)?;
         self.consume_bytes(consumed);
         self.buffer.clear();
         Some(value)

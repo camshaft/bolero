@@ -224,13 +224,13 @@ impl<D: crate::Driver, O: std::io::Write> crate::Driver for Driver<'_, D, O> {
     }
 
     #[inline]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
         self.inner.gen_from_bytes(hint, |bytes| {
-            let res = gen(bytes);
+            let res = produce(bytes);
             self.formatter
                 .emit_prim("bytes", &res.as_ref().map(|(len, _value)| *len));
             res
@@ -352,7 +352,7 @@ mod tests {
         #[inline]
         fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
             driver.enter_product::<Self, _, _>(|driver| {
-                let value = driver.gen()?;
+                let value = driver.produce()?;
                 // return `None` on odds. This can be used to test what happens when generators fail.
                 if value % 2 == 0 {
                     Some(Self { value })
@@ -382,7 +382,7 @@ mod tests {
     fn empty_test() {
         run(
             &[],
-            Empty::gen(),
+            Empty::produce(),
             r#"
 product bolero_generator::trace::tests::Empty {}
 "#,
@@ -393,7 +393,7 @@ product bolero_generator::trace::tests::Empty {}
     fn even_test() {
         run(
             &[],
-            Even::gen(),
+            Even::produce(),
             r#"
 product bolero_generator::trace::tests::Even {
     u8 -> 0
@@ -406,7 +406,7 @@ product bolero_generator::trace::tests::Even {
     fn odd_test() {
         run(
             &[1],
-            Even::gen(),
+            Even::produce(),
             r#"
 product bolero_generator::trace::tests::Even {
     u8 -> 1
@@ -419,7 +419,7 @@ product bolero_generator::trace::tests::Even {
     fn tree_even_test() {
         run(
             &[],
-            EvenTree::gen(),
+            EvenTree::produce(),
             r#"
 sum bolero_generator::trace::tests::EvenTree {
     variant Leaf {
@@ -436,7 +436,7 @@ sum bolero_generator::trace::tests::EvenTree {
     fn nested_tree_test() {
         run(
             &[255],
-            EvenTree::gen(),
+            EvenTree::produce(),
             r#"
 sum bolero_generator::trace::tests::EvenTree {
     variant Pair {
@@ -464,7 +464,7 @@ sum bolero_generator::trace::tests::EvenTree {
     fn nested_tree_left_odd_test() {
         run(
             &[255, 0, 1],
-            EvenTree::gen(),
+            EvenTree::produce(),
             r#"
 sum bolero_generator::trace::tests::EvenTree {
     variant Pair {
@@ -485,7 +485,7 @@ sum bolero_generator::trace::tests::EvenTree {
     fn nested_tree_right_odd_test() {
         run(
             &[255, 0, 0, 0, 1],
-            EvenTree::gen(),
+            EvenTree::produce(),
             r#"
 sum bolero_generator::trace::tests::EvenTree {
     variant Pair {

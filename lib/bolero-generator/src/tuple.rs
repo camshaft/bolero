@@ -120,15 +120,15 @@ impl_tuple!(
 
 #[test]
 fn tuple_type_test() {
-    let _ = generator_test!(gen::<(u8, u16, u32, u64)>());
+    let _ = generator_test!(produce::<(u8, u16, u32, u64)>());
 }
 
 #[test]
 fn tuple_gen_test() {
-    let _ = generator_test!((gen::<u8>(), gen::<u16>()));
+    let _ = generator_test!((produce::<u8>(), produce::<u16>()));
 }
 
 #[test]
 fn tuple_with_test() {
-    let _ = generator_test!(gen::<(u8, u8)>().with());
+    let _ = generator_test!(produce::<(u8, u8)>().with());
 }

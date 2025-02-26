@@ -55,18 +55,18 @@ impl_integer!(isize, gen_isize, gen_isize_constant);
 
 #[test]
 fn integer_test() {
-    let _ = generator_test!(gen::<u8>());
-    let _ = generator_test!(gen::<i8>());
-    let _ = generator_test!(gen::<u16>());
-    let _ = generator_test!(gen::<i16>());
-    let _ = generator_test!(gen::<u32>());
-    let _ = generator_test!(gen::<i32>());
-    let _ = generator_test!(gen::<u64>());
-    let _ = generator_test!(gen::<i64>());
-    let _ = generator_test!(gen::<u128>());
-    let _ = generator_test!(gen::<i128>());
-    let _ = generator_test!(gen::<usize>());
-    let _ = generator_test!(gen::<isize>());
+    let _ = generator_test!(produce::<u8>());
+    let _ = generator_test!(produce::<i8>());
+    let _ = generator_test!(produce::<u16>());
+    let _ = generator_test!(produce::<i16>());
+    let _ = generator_test!(produce::<u32>());
+    let _ = generator_test!(produce::<i32>());
+    let _ = generator_test!(produce::<u64>());
+    let _ = generator_test!(produce::<i64>());
+    let _ = generator_test!(produce::<u128>());
+    let _ = generator_test!(produce::<i128>());
+    let _ = generator_test!(produce::<usize>());
+    let _ = generator_test!(produce::<isize>());
 }
 
 macro_rules! impl_float {

@@ -202,12 +202,12 @@ impl<I: super::Driver> super::Driver for Driver<'_, I> {
     }
 
     #[inline(always)]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, hint: Hint, produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
     {
-        self.inner.gen_from_bytes(hint, gen)
+        self.inner.gen_from_bytes(hint, produce)
     }
 
     #[inline(always)]

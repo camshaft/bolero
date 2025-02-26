@@ -47,7 +47,7 @@ impl<T: Ord> CollectionGenerator for BinaryHeap<T> {
 
 #[test]
 fn binary_heap_test() {
-    let _ = generator_no_clone_test!(gen::<BinaryHeap<u8>>());
+    let _ = generator_no_clone_test!(produce::<BinaryHeap<u8>>());
 }
 
 impl_values_collection_generator!(BTreeSet, BTreeSetGenerator, DEFAULT_LEN_RANGE, [Ord]);
@@ -80,7 +80,7 @@ impl<T: Ord> CollectionGenerator for BTreeSet<T> {
 
 #[test]
 fn btree_set_test() {
-    let _ = generator_test!(gen::<BTreeSet<u8>>());
+    let _ = generator_test!(produce::<BTreeSet<u8>>());
 }
 
 impl_values_collection_generator!(LinkedList, LinkedListGenerator, DEFAULT_LEN_RANGE);
@@ -121,7 +121,7 @@ impl<T> CollectionGenerator for LinkedList<T> {
 
 #[test]
 fn linked_list_test() {
-    let _ = generator_test!(gen::<LinkedList<u8>>());
+    let _ = generator_test!(produce::<LinkedList<u8>>());
 }
 
 impl_values_collection_generator!(VecDeque, VecDequeGenerator, DEFAULT_LEN_RANGE);
@@ -163,7 +163,7 @@ impl<T> CollectionGenerator for VecDeque<T> {
 
 #[test]
 fn vecdeque_test() {
-    let _ = generator_test!(gen::<VecDeque<u8>>());
+    let _ = generator_test!(produce::<VecDeque<u8>>());
 }
 
 impl_values_collection_generator!(Vec, VecGenerator, DEFAULT_LEN_RANGE);
@@ -205,30 +205,30 @@ impl<T> CollectionGenerator for Vec<T> {
 
 #[test]
 fn vec_type_test() {
-    let _ = generator_test!(gen::<Vec<u8>>());
+    let _ = generator_test!(produce::<Vec<u8>>());
 }
 
 #[test]
 fn vec_with_len_test() {
-    let results = generator_test!(gen::<Vec<u8>>().with().len(8usize));
+    let results = generator_test!(produce::<Vec<u8>>().with().len(8usize));
     assert!(results.into_iter().all(|v| v.len() == 8));
 }
 
 #[test]
 fn vec_with_values_test() {
-    let _ = generator_test!(gen::<Vec<_>>().with().values(4u16..6));
+    let _ = generator_test!(produce::<Vec<_>>().with().values(4u16..6));
 }
 
 #[test]
 fn vec_gen_test() {
-    let _ = generator_test!(vec![gen::<u8>()]);
+    let _ = generator_test!(vec![produce::<u8>()]);
 }
 
 impl_key_values_collection_generator!(BTreeMap, BTreeMapGenerator, DEFAULT_LEN_RANGE, [Ord]);
 
 #[test]
 fn btree_map_type_test() {
-    let _ = generator_test!(gen::<BTreeMap<u8, u8>>());
+    let _ = generator_test!(produce::<BTreeMap<u8, u8>>());
 }
 
 pub type Bytes = Vec<u8>;
@@ -243,6 +243,6 @@ where
     <T as ToOwned>::Owned: TypeGenerator,
 {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Cow::Owned(driver.gen()?))
+        Some(Cow::Owned(driver.produce()?))
     }
 }

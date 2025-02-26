@@ -13,7 +13,7 @@ impl ToTokens for GeneratorAttr {
             tokens.extend(quote!(#generator));
         } else {
             let krate = &self.krate;
-            tokens.extend(quote!(#krate::gen()));
+            tokens.extend(quote!(#krate::produce()));
         }
     }
 }

@@ -23,9 +23,12 @@ macro_rules! impl_either {
         impl<$A: ValueGenerator, $B: ValueGenerator> $generator<$A, $B> {
             pub fn $with_a<Gen: ValueGenerator<Output = $A::Output>>(
                 self,
-                gen: Gen,
+                produce: Gen,
             ) -> $generator<Gen, $B> {
-                $generator { a: gen, b: self.b }
+                $generator {
+                    a: produce,
+                    b: self.b,
+                }
             }
 
             pub fn $map_a<Gen: ValueGenerator<Output = $A::Output>, F: Fn($A) -> Gen>(
@@ -40,9 +43,12 @@ macro_rules! impl_either {
 
             pub fn $with_b<Gen: ValueGenerator<Output = $B::Output>>(
                 self,
-                gen: Gen,
+                produce: Gen,
             ) -> $generator<$A, Gen> {
-                $generator { a: self.a, b: gen }
+                $generator {
+                    a: self.a,
+                    b: produce,
+                }
             }
 
             pub fn $map_b<Gen: ValueGenerator<Output = $B::Output>, F: Fn($B) -> Gen>(
@@ -121,17 +127,17 @@ macro_rules! impl_either {
         impl<$A: TypeGenerator, $B: TypeGenerator> TypeGenerator for $ty<$A, $B> {
             #[inline]
             fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-                crate::gen_with::<Self>().generate(driver)
+                crate::produce_with::<Self>().generate(driver)
             }
 
             #[inline]
             fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-                crate::gen_with::<Self>().mutate(driver, self)
+                crate::produce_with::<Self>().mutate(driver, self)
             }
 
             #[inline]
             fn driver_cache<D: Driver>(self, driver: &mut D) {
-                crate::gen_with::<Self>().driver_cache(driver, self)
+                crate::produce_with::<Self>().driver_cache(driver, self)
             }
         }
 
@@ -231,17 +237,17 @@ impl<V: ValueGenerator> ValueGenerator for OptionGenerator<V> {
 impl<V: TypeGenerator> TypeGenerator for Option<V> {
     #[inline]
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        crate::gen_with::<Self>().generate(driver)
+        crate::produce_with::<Self>().generate(driver)
     }
 
     #[inline]
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
-        crate::gen_with::<Self>().mutate(driver, self)
+        crate::produce_with::<Self>().mutate(driver, self)
     }
 
     #[inline]
     fn driver_cache<D: Driver>(self, driver: &mut D) {
-        crate::gen_with::<Self>().driver_cache(driver, self)
+        crate::produce_with::<Self>().driver_cache(driver, self)
     }
 }
 
@@ -257,10 +263,10 @@ impl<V: TypeGenerator> TypeGeneratorWithParams for Option<V> {
 
 #[test]
 fn result_test() {
-    let _ = generator_test!(gen::<Result<u8, u8>>());
+    let _ = generator_test!(produce::<Result<u8, u8>>());
 }
 
 #[test]
 fn option_test() {
-    let _ = generator_test!(gen::<Option<u8>>());
+    let _ = generator_test!(produce::<Option<u8>>());
 }

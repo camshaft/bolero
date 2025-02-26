@@ -82,8 +82,14 @@ pub trait TypeGenerator: 'static + Sized {
 
     /// Returns a generator for a given type
     #[inline]
+    fn produce() -> TypeValueGenerator<Self> {
+        produce()
+    }
+
+    #[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
+    #[inline]
     fn gen() -> TypeValueGenerator<Self> {
-        gen()
+        produce()
     }
 }
 
@@ -231,14 +237,28 @@ impl<T: TypeGenerator> ValueGenerator for TypeValueGenerator<T> {
 
 /// Generate a value for a given type
 #[inline]
+pub fn produce<T: TypeGenerator>() -> TypeValueGenerator<T> {
+    TypeValueGenerator(PhantomData)
+}
+
+/// Generate a value for a given type
+#[deprecated = "Use `produce` instead (`gen` conflicts with edition2024)"]
+#[inline]
 pub fn gen<T: TypeGenerator>() -> TypeValueGenerator<T> {
     TypeValueGenerator(PhantomData)
 }
 
 /// Generate a value for a given type with additional constraints
 #[inline]
-pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
+pub fn produce_with<T: TypeGeneratorWithParams>() -> T::Output {
     T::gen_with()
+}
+
+/// Generate a value for a given type
+#[deprecated = "Use `produce_with` instead (`gen_with` conflicts with edition2024)"]
+#[inline]
+pub fn gen_with<T: TypeGeneratorWithParams>() -> T::Output {
+    produce_with::<T>()
 }
 
 pub use one_of::{one_of, one_value_of};

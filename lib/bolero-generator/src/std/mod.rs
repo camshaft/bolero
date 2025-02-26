@@ -43,30 +43,30 @@ impl<T: Hash + Eq> CollectionGenerator for HashSet<T> {
 
 #[test]
 fn hash_set_type_test() {
-    let _ = generator_test!(gen::<HashSet<u8>>());
+    let _ = generator_test!(produce::<HashSet<u8>>());
 }
 
 #[test]
 fn hash_set_with_len_test() {
-    let results = generator_test!(gen::<HashSet<u8>>().with().len(8usize));
+    let results = generator_test!(produce::<HashSet<u8>>().with().len(8usize));
     assert!(results.into_iter().any(|r| r.len() == 8));
 }
 
 #[test]
 fn hash_set_with_values_test() {
-    let _ = generator_test!(gen::<HashSet<_>>().with().values(4u16..6));
+    let _ = generator_test!(produce::<HashSet<_>>().with().values(4u16..6));
 }
 
 impl_key_values_collection_generator!(HashMap, HashMapGenerator, DEFAULT_LEN_RANGE, [Hash, Eq]);
 
 #[test]
 fn hash_map_type_test() {
-    let _ = generator_test!(gen::<HashMap<u8, u8>>());
+    let _ = generator_test!(produce::<HashMap<u8, u8>>());
 }
 
 impl<T: TypeGenerator> TypeGenerator for Mutex<T> {
     fn generate<D: Driver>(driver: &mut D) -> Option<Self> {
-        Some(Self::new(driver.gen()?))
+        Some(Self::new(driver.produce()?))
     }
 
     fn mutate<D: Driver>(&mut self, driver: &mut D) -> Option<()> {
@@ -82,5 +82,5 @@ impl<T: TypeGenerator> TypeGenerator for Mutex<T> {
 
 #[test]
 fn mutex_type_test() {
-    let _ = generator_no_clone_test!(gen::<Mutex<u8>>());
+    let _ = generator_no_clone_test!(produce::<Mutex<u8>>());
 }

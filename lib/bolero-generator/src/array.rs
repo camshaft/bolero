@@ -58,16 +58,16 @@ impl<T: TypeGenerator, const LEN: usize> TypeGeneratorWithParams for [T; LEN] {
     type Output = [TypeValueGenerator<T>; LEN];
 
     fn gen_with() -> Self::Output {
-        [T::gen(); LEN]
+        [T::produce(); LEN]
     }
 }
 
 #[test]
 fn array_type_test() {
-    let _ = generator_test!(gen::<[u8; 10]>());
+    let _ = generator_test!(produce::<[u8; 10]>());
 }
 
 #[test]
 fn array_gen_test() {
-    let _ = generator_test!([gen::<u8>(), gen::<u8>()]);
+    let _ = generator_test!([produce::<u8>(), produce::<u8>()]);
 }

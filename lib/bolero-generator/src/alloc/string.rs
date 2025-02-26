@@ -125,11 +125,11 @@ impl ValueGenerator for String {
 
 #[test]
 fn string_type_test() {
-    let _ = generator_test!(gen::<String>());
+    let _ = generator_test!(produce::<String>());
 }
 
 #[test]
 fn string_with_test() {
-    let results = generator_test!(gen::<String>().with().len(32usize));
+    let results = generator_test!(produce::<String>().with().len(32usize));
     assert!(results.into_iter().any(|s| s.chars().count() == 32));
 }

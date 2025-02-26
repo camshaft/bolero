@@ -23,7 +23,7 @@ impl Driver {
     }
 }
 
-macro_rules! gen {
+macro_rules! produce {
     ($name:ident, $ty:ident) => {
         #[inline(always)]
         fn $name(&mut self, min: Bound<&$ty>, max: Bound<&$ty>) -> Option<$ty> {
@@ -35,36 +35,36 @@ macro_rules! gen {
 }
 
 impl crate::Driver for Driver {
-    gen!(gen_u8, u8);
+    produce!(gen_u8, u8);
 
-    gen!(gen_i8, i8);
+    produce!(gen_i8, i8);
 
-    gen!(gen_u16, u16);
+    produce!(gen_u16, u16);
 
-    gen!(gen_i16, i16);
+    produce!(gen_i16, i16);
 
-    gen!(gen_u32, u32);
+    produce!(gen_u32, u32);
 
-    gen!(gen_i32, i32);
+    produce!(gen_i32, i32);
 
-    gen!(gen_u64, u64);
+    produce!(gen_u64, u64);
 
-    gen!(gen_i64, i64);
+    produce!(gen_i64, i64);
 
-    gen!(gen_u128, u128);
+    produce!(gen_u128, u128);
 
-    gen!(gen_i128, i128);
+    produce!(gen_i128, i128);
 
-    gen!(gen_usize, usize);
+    produce!(gen_usize, usize);
 
-    gen!(gen_isize, isize);
+    produce!(gen_isize, isize);
 
-    gen!(gen_f32, f32);
+    produce!(gen_f32, f32);
 
-    gen!(gen_f64, f64);
+    produce!(gen_f64, f64);
 
     #[inline(always)]
-    fn gen<T: TypeGenerator>(&mut self) -> Option<T> {
+    fn produce<T: TypeGenerator>(&mut self) -> Option<T> {
         let value = T::generate(self);
         shim::assume(value.is_some());
         value
@@ -83,7 +83,7 @@ impl crate::Driver for Driver {
     }
 
     #[inline(always)]
-    fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut gen: Gen) -> Option<T>
+    fn gen_from_bytes<Hint, Gen, T>(&mut self, _hint: Hint, mut produce: Gen) -> Option<T>
     where
         Hint: FnOnce() -> (usize, Option<usize>),
         Gen: FnMut(&[u8]) -> Option<(usize, T)>,
@@ -95,7 +95,7 @@ impl crate::Driver for Driver {
         let len = shim::any::<usize>();
         shim::assume(len <= MAX_LEN);
 
-        let value = gen(&bytes[..len]).map(|v| v.1);
+        let value = produce(&bytes[..len]).map(|v| v.1);
         shim::assume(value.is_some());
         value
     }

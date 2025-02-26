@@ -18,10 +18,10 @@ pub struct Struct {
     #[generator(gen_foo())]
     field_a: u32,
 
-    #[generator(Vec::gen().with().len(1usize..5))]
+    #[generator(Vec::produce().with().len(1usize..5))]
     field_b: Vec<NewType>,
 
-    #[generator(_code = "gen::<u8>().with()")]
+    #[generator(_code = "produce::<u8>().with()")]
     field_c: u8,
 }
 
@@ -33,7 +33,7 @@ pub enum Enum {
         value: u32,
     },
     Remove {
-        #[generator(usize::gen().with().bounds(4..6))]
+        #[generator(usize::produce().with().bounds(4..6))]
         index: usize,
     },
     Struct(Struct, Struct),
@@ -107,25 +107,25 @@ pub struct ConstGenericArray<T, const LEN: usize> {
 
 #[test]
 fn derive_struct_test() {
-    let _ = generator_test!(Struct::gen());
+    let _ = generator_test!(Struct::produce());
 }
 
 #[test]
 fn derive_enum_test() {
-    let _ = generator_test!(Enum::gen());
+    let _ = generator_test!(Enum::produce());
 }
 
 #[test]
 fn derive_animal_test() {
-    let _ = generator_test!(Animal::gen());
+    let _ = generator_test!(Animal::produce());
 }
 
 #[test]
 fn derive_union_test() {
-    let _ = generator_no_clone_test!(Union::gen());
+    let _ = generator_no_clone_test!(Union::produce());
 }
 
 #[test]
 fn derive_expr_test() {
-    let _ = generator_test!(Expr::gen());
+    let _ = generator_test!(Expr::produce());
 }
