@@ -112,7 +112,7 @@ impl TestEngine {
 
         let iterations = self.rng_cfg.iterations_or_default();
         // use StdRng for high entropy seeds
-        let mut seed_rng = StdRng::from_entropy();
+        let mut seed_rng = StdRng::from_os_rng();
 
         (0..iterations).map(move |_| {
             let mut seed = [0; size_of::<Seed>()];

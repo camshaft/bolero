@@ -113,7 +113,7 @@ struct Driver<'a, D: crate::Driver, O: std::io::Write> {
     formatter: Formatter<O>,
 }
 
-impl<'a, D: crate::Driver, O: std::io::Write> Driver<'a, D, O> {
+impl<D: crate::Driver, O: std::io::Write> Driver<'_, D, O> {
     #[inline]
     fn emit_block<F: FnOnce(&mut Self) -> Option<Ret>, Ret>(
         &mut self,
@@ -177,7 +177,7 @@ macro_rules! gen_prim {
     };
 }
 
-impl<'a, D: crate::Driver, O: std::io::Write> crate::Driver for Driver<'a, D, O> {
+impl<D: crate::Driver, O: std::io::Write> crate::Driver for Driver<'_, D, O> {
     #[inline]
     fn depth(&self) -> usize {
         self.inner.depth()

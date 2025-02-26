@@ -159,7 +159,7 @@ pub trait ValueGenerator: Sized {
     }
 }
 
-impl<'a, T: ValueGenerator> ValueGenerator for &'a T {
+impl<T: ValueGenerator> ValueGenerator for &T {
     type Output = T::Output;
 
     #[inline]

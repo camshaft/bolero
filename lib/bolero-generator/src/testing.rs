@@ -9,10 +9,7 @@ macro_rules! generator_test {
 
         let options = Options::default();
 
-        let mut rng_driver = Rng::new(
-            rand::thread_rng(),
-            &options.clone().with_max_len(8 * 1024 * 1024),
-        );
+        let mut rng_driver = Rng::new(rand::rng(), &options.clone().with_max_len(8 * 1024 * 1024));
 
         let mut results = vec![];
 
@@ -64,7 +61,7 @@ macro_rules! generator_no_clone_test {
 
         let options = Options::default();
 
-        let mut rng_driver = Rng::new(rand::thread_rng(), &options);
+        let mut rng_driver = Rng::new(rand::rng(), &options);
 
         let inputs = $crate::gen::<Vec<_>>()
             .with()

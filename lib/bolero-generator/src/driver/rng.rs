@@ -6,7 +6,7 @@ pub(crate) use buffer_alloc::Buffer;
 pub(crate) use buffer_no_alloc::Buffer;
 
 #[derive(Debug)]
-pub struct Rng<R: RngCore> {
+pub struct Rng<R: TryRngCore> {
     rng: R,
     depth: usize,
     max_depth: usize,
@@ -16,7 +16,7 @@ pub struct Rng<R: RngCore> {
     buffer: Buffer,
 }
 
-impl<R: RngCore> Rng<R> {
+impl<R: TryRngCore> Rng<R> {
     pub fn new(rng: R, options: &Options) -> Self {
         Self {
             rng,
@@ -54,7 +54,7 @@ impl<R: RngCore> Rng<R> {
     }
 }
 
-impl<R: RngCore> AsRef<R> for Rng<R> {
+impl<R: TryRngCore> AsRef<R> for Rng<R> {
     #[inline]
     fn as_ref(&self) -> &R {
         &self.rng
@@ -62,8 +62,8 @@ impl<R: RngCore> AsRef<R> for Rng<R> {
 }
 
 #[inline]
-fn fill_bytes<R: RngCore>(rng: &mut R, bytes: &mut [u8]) -> Option<()> {
-    if RngCore::try_fill_bytes(rng, bytes).is_err() {
+fn fill_bytes<R: TryRngCore>(rng: &mut R, bytes: &mut [u8]) -> Option<()> {
+    if TryRngCore::try_fill_bytes(rng, bytes).is_err() {
         // if the rng fails to fill the remaining bytes, then we just start returning 0s
         for byte in bytes.iter_mut() {
             *byte = 0;
@@ -79,7 +79,7 @@ macro_rules! impl_sample {
         fn $sample(&mut self) -> Option<$ty> {
             if self.has_remaining() {
                 self.consumed_len += core::mem::size_of::<$ty>();
-                Some(self.rng.$inner() as $ty)
+                Some(self.rng.$inner().unwrap_or_default() as $ty)
             } else {
                 Some(0)
             }
@@ -87,7 +87,7 @@ macro_rules! impl_sample {
     };
 }
 
-impl<R: RngCore> FillBytes for Rng<R> {
+impl<R: TryRngCore> FillBytes for Rng<R> {
     // prefer sampling the larger values since it's faster to pull from the RNG
     const SHOULD_SHRINK: bool = false;
 
@@ -105,26 +105,26 @@ impl<R: RngCore> FillBytes for Rng<R> {
     fn sample_bool(&mut self) -> Option<bool> {
         if self.has_remaining() {
             self.consumed_len += 1;
-            let value = self.rng.next_u32();
+            let value = self.rng.try_next_u32().unwrap_or_default();
             Some(value < (u32::MAX / 2))
         } else {
             Some(false)
         }
     }
 
-    impl_sample!(sample_u8, u8, next_u32);
-    impl_sample!(sample_i8, i8, next_u32);
-    impl_sample!(sample_u16, u16, next_u32);
-    impl_sample!(sample_i16, i16, next_u32);
-    impl_sample!(sample_u32, u32, next_u32);
-    impl_sample!(sample_i32, i32, next_u32);
-    impl_sample!(sample_u64, u64, next_u64);
-    impl_sample!(sample_i64, i64, next_u64);
-    impl_sample!(sample_usize, usize, next_u64);
-    impl_sample!(sample_isize, isize, next_u64);
+    impl_sample!(sample_u8, u8, try_next_u32);
+    impl_sample!(sample_i8, i8, try_next_u32);
+    impl_sample!(sample_u16, u16, try_next_u32);
+    impl_sample!(sample_i16, i16, try_next_u32);
+    impl_sample!(sample_u32, u32, try_next_u32);
+    impl_sample!(sample_i32, i32, try_next_u32);
+    impl_sample!(sample_u64, u64, try_next_u64);
+    impl_sample!(sample_i64, i64, try_next_u64);
+    impl_sample!(sample_usize, usize, try_next_u64);
+    impl_sample!(sample_isize, isize, try_next_u64);
 }
 
-impl<R: RngCore> Driver for Rng<R> {
+impl<R: TryRngCore> Driver for Rng<R> {
     gen_from_bytes!();
 
     #[inline]
@@ -153,8 +153,7 @@ impl<R: RngCore> Driver for Rng<R> {
         let max = max
             .unwrap_or(usize::MAX)
             // make sure max is at least min
-            .max(min)
-            .min(self.remaining_len())
+            .clamp(min, self.remaining_len())
             .min(Buffer::MAX_CAPACITY);
 
         let len = self.gen_usize(Bound::Included(&min), Bound::Included(&max))?;
@@ -179,7 +178,7 @@ mod buffer_alloc {
         pub const MAX_CAPACITY: usize = isize::MAX as _;
 
         #[inline]
-        pub fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
+        pub fn fill<R: TryRngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             let data = &mut self.bytes;
 
             let initial_len = data.len();
@@ -232,7 +231,7 @@ mod buffer_no_alloc {
         pub const MAX_CAPACITY: usize = 256;
 
         #[inline]
-        pub fn fill<R: RngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
+        pub fn fill<R: TryRngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             if cfg!(test) {
                 assert!(len <= Self::MAX_CAPACITY);
             }

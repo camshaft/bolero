@@ -96,7 +96,7 @@ impl Stats {
         // only report valid percentage if we drop below 100%
         struct Estimate<'a>(&'a Stats);
 
-        impl<'a> fmt::Display for Estimate<'a> {
+        impl fmt::Display for Estimate<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.0.estimate {
                     Some(estimate) => {

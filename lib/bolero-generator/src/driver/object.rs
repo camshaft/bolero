@@ -62,7 +62,7 @@ fn hint_fn<F: FnOnce() -> (usize, Option<usize>)>(f: F) -> impl FnMut() -> (usiz
 
 pub struct Borrowed<'a>(pub &'a mut dyn DynDriver);
 
-impl<'a> Driver for Borrowed<'a> {
+impl Driver for Borrowed<'_> {
     #[inline]
     fn depth(&self) -> usize {
         self.0.depth()

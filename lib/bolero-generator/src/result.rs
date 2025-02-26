@@ -205,7 +205,7 @@ impl<V: ValueGenerator> ValueGenerator for OptionGenerator<V> {
             2,
             0,
             |driver, new_selection| {
-                let prev_selection = if value.is_some() { 1 } else { 0 };
+                let prev_selection = usize::from(value.is_some());
 
                 if prev_selection == new_selection {
                     match value {

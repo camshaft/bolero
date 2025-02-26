@@ -111,7 +111,6 @@ mod tests;
 ///     // implement checks here
 /// });
 /// ```
-
 #[macro_export]
 macro_rules! check {
     () => {{
