@@ -42,6 +42,8 @@ pub mod combinator;
 pub mod driver;
 #[cfg(any(test, kani))]
 pub mod kani;
+#[cfg(feature = "std")]
+pub mod net;
 pub mod num;
 pub mod one_of;
 pub mod prelude;
