@@ -180,12 +180,6 @@ impl Project {
         })
         .chain(flags.iter())
         .cloned()
-        // https://github.com/rust-lang/rust/issues/53945
-        .chain(if cfg!(target_os = "linux") {
-            Some("-Clink-arg=-fuse-ld=gold")
-        } else {
-            None
-        })
         .map(String::from)
         .chain(self.sanitizer_flags())
         .chain(std::env::var(inherits).ok())
