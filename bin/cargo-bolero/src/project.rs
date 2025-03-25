@@ -143,7 +143,6 @@ impl Project {
             "-Ctarget-cpu=native",
             "-Cdebuginfo=2",
             "-Coverflow_checks",
-            "-Clink-dead-code",
         ]
         .iter()
         .chain({
