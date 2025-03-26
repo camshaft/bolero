@@ -30,7 +30,9 @@ fn crate_path() -> TokenStream2 {
         let krate = crate_ident(krate);
         return quote!(#krate::generator::bolero_generator);
     }
-    panic!("current crate seems to import neither bolero nor bolero-generator, but does use the TypeGenerator derive macro")
+    // fallback to using `::bolero_generator` if for whatever reason
+    // we can't find the crate in the `Cargo.toml`
+    quote!(::bolero_generator)
 }
 
 /// Derive the an implementation of `TypeGenerator` for the given type.
