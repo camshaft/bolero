@@ -21,7 +21,8 @@ arbitrary = ["bolero-generator/arbitrary"]
 bolero-engine = { version = "0.13", path = "../bolero-engine" }
 bolero-generator = { version = "0.13", path = "../bolero-generator", default-features = false }
 cfg-if = "1"
-
+serde_json = "1.0"
+lazy_static = "1.5.0"
 [target.'cfg(fuzzing_afl)'.dependencies]
 bolero-afl = { version = "0.13", path = "../bolero-afl" }
 

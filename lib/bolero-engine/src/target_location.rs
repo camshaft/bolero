@@ -175,7 +175,7 @@ impl TargetLocation {
         components.join("__")
     }
 
-    fn item_path(&self) -> String {
+    pub fn item_path(&self) -> String {
         Self::format_symbol_name(self.item_path)
     }
 

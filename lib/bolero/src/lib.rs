@@ -17,7 +17,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(kani)] {
         pub use bolero_kani::KaniEngine as DefaultEngine;
     } else {
-        mod test;
+        pub mod test;
 
         /// The default engine used when defining a test target
         pub use crate::test::TestEngine as DefaultEngine;
