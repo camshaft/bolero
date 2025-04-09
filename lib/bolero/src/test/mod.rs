@@ -179,7 +179,7 @@ impl TestEngine {
             .chain(self.rng_tests().map(|t| t.into()))
     }
 
-    fn run_with_value<T>(self, mut test: T, options: driver::Options) -> bolero_engine::Never
+    fn run_with_value<T>(self, test: T, options: driver::Options) -> bolero_engine::Never
     where
         T: Test,
         T::Value: core::fmt::Debug,
