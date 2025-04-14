@@ -137,53 +137,47 @@ impl Project {
     }
 
     fn rustflags(&self, inherits: &str, flags: &[&str]) -> Result<String> {
-        let flags = [
-            "--cfg fuzzing",
-            "-Cdebug-assertions",
-            "-Ctarget-cpu=native",
-            "-Cdebuginfo=2",
-            "-Coverflow_checks",
-        ]
-        .iter()
-        .chain({
-            let toolchain = self.toolchain();
-            let version_meta = if toolchain == "default" {
-                RUST_VERSION.clone()
-            } else {
-                let mut cmd = Command::new("rustup");
-                let stdout = cmd
-                    .arg("run")
-                    .arg(toolchain)
-                    .arg("rustc")
-                    .arg("-vV")
-                    .output()
-                    .with_context(|| {
-                        format!("failed to determine {} toolchain version", toolchain)
-                    })?
-                    .stdout;
-                let stdout = core::str::from_utf8(&stdout)?;
-                rustc_version::version_meta_for(stdout)?
-            };
+        let flags = ["--cfg fuzzing"]
+            .iter()
+            .chain({
+                let toolchain = self.toolchain();
+                let version_meta = if toolchain == "default" {
+                    RUST_VERSION.clone()
+                } else {
+                    let mut cmd = Command::new("rustup");
+                    let stdout = cmd
+                        .arg("run")
+                        .arg(toolchain)
+                        .arg("rustc")
+                        .arg("-vV")
+                        .output()
+                        .with_context(|| {
+                            format!("failed to determine {} toolchain version", toolchain)
+                        })?
+                        .stdout;
+                    let stdout = core::str::from_utf8(&stdout)?;
+                    rustc_version::version_meta_for(stdout)?
+                };
 
-            // New LLVM pass manager is enabled when Rust 1.59+ and LLVM 13+
-            // https://github.com/rust-lang/rust/pull/88243
+                // New LLVM pass manager is enabled when Rust 1.59+ and LLVM 13+
+                // https://github.com/rust-lang/rust/pull/88243
 
-            let is_rust_159 = version_meta.semver.major == 1 && version_meta.semver.minor >= 59;
-            let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
+                let is_rust_159 = version_meta.semver.major == 1 && version_meta.semver.minor >= 59;
+                let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
 
-            Some(if is_rust_159 && is_llvm_13 {
-                &"-Cpasses=sancov-module"
-            } else {
-                &"-Cpasses=sancov"
+                Some(if is_rust_159 && is_llvm_13 {
+                    &"-Cpasses=sancov-module"
+                } else {
+                    &"-Cpasses=sancov"
+                })
             })
-        })
-        .chain(flags.iter())
-        .cloned()
-        .map(String::from)
-        .chain(self.sanitizer_flags())
-        .chain(std::env::var(inherits).ok())
-        .collect::<Vec<_>>()
-        .join(" ");
+            .chain(flags.iter())
+            .cloned()
+            .map(String::from)
+            .chain(self.sanitizer_flags())
+            .chain(std::env::var(inherits).ok())
+            .collect::<Vec<_>>()
+            .join(" ");
         Ok(flags)
     }
 
