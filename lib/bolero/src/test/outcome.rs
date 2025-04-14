@@ -115,7 +115,7 @@ impl<'a> Outcome<'a> {
 
 impl Drop for Outcome<'_> {
     fn drop(&mut self) {
-        eprintln!("{}", self.to_string());
+        eprintln!("{self}");
     }
 }
 
