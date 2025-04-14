@@ -10,6 +10,7 @@ use std::path::PathBuf;
 type ExhastiveDriver = Box<Object<exhaustive::Driver>>;
 
 mod input;
+mod outcome;
 mod report;
 
 /// Engine implementation which mimics Rust's default test
@@ -352,17 +353,23 @@ impl TestEngine {
             report.spawn_timer();
         }
 
+        let mut outcome = outcome::Outcome::new(&self.location, start_time);
+
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
         for input in tests {
             if let Some(test_time) = test_time {
                 if start_time.elapsed() > test_time {
+                    outcome.on_exit(outcome::ExitReason::MaxDurationExceeded {
+                        limit: test_time,
+                        default: self.rng_cfg.test_time.is_none(),
+                    });
                     break;
                 }
             }
 
-            progress();
+            outcome.on_named_test(&input.data);
 
             match testfn(&mut state, &input.data) {
                 Ok(is_valid) => {
@@ -370,6 +377,8 @@ impl TestEngine {
                 }
                 Err(err) => {
                     bolero_engine::panic::forward_panic(true);
+                    outcome.on_exit(outcome::ExitReason::TestFailure);
+                    drop(outcome);
                     eprintln!("{}", err);
                     panic!("test failed");
                 }
@@ -393,12 +402,20 @@ impl TestEngine {
         // when running exhaustive tests, it's nice to have the progress displayed
         report.spawn_timer();
 
+        let mut outcome = outcome::Outcome::new(&self.location, start_time);
+
         while driver.step().is_continue() {
             if let Some(test_time) = test_time {
                 if start_time.elapsed() > test_time {
+                    outcome.on_exit(outcome::ExitReason::MaxDurationExceeded {
+                        limit: test_time,
+                        default: false,
+                    });
                     break;
                 }
             }
+
+            outcome.on_exhaustive_input();
 
             let (drvr, result) = testfn(driver, &mut state);
             driver = drvr;
@@ -410,6 +427,8 @@ impl TestEngine {
                 }
                 Err(error) => {
                     bolero_engine::panic::forward_panic(true);
+                    outcome.on_exit(outcome::ExitReason::TestFailure);
+                    drop(outcome);
                     eprintln!("{error}");
                     panic!("test failed");
                 }
@@ -442,15 +461,5 @@ impl bolero_engine::ScopedEngine for TestEngine {
     {
         self.run_with_scope(test, options);
         bolero_engine::panic::forward_panic(true);
-    }
-}
-
-fn progress() {
-    if cfg!(miri) {
-        use std::io::{stderr, Write};
-
-        // miri doesn't capture explicit writes to stderr
-        #[allow(clippy::explicit_write)]
-        let _ = write!(stderr(), ".");
     }
 }
