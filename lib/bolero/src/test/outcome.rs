@@ -4,7 +4,6 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::collections::HashMap;
-use serde_json::json;
 use std::io::Write;
 
 pub enum ExitReason {
@@ -36,10 +35,11 @@ pub struct Outcome<'a> {
     exhaustive_input: u64,
     total: u64,
     exit_reason: Option<ExitReason>,
-    features: serde_json::Value,
-    arguments: serde_json::Value,
-    coverage: serde_json::Value,
+    features: String,
+    arguments: String,
+    coverage: String,
     representation: String,
+    json_path: String,
     json_time: std::time::Duration,
 }
 
@@ -90,14 +90,16 @@ impl<'a> Outcome<'a> {
             rng_input: 0,
             exhaustive_input: 0,
             total: 0,
-            representation: String::new(),
+            representation: String::from("{}"),
             exit_reason: None,
-            features: json!({}),
-            arguments: json!({}),
-            coverage: json!({}),
+            features: String::from("{}"),
+            arguments: String::from("{}"),
+            coverage: String::from("{}"),
+            json_path: String::new(),
             json_time: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards"),
+            
         }
     }
 
@@ -132,16 +134,13 @@ impl<'a> Outcome<'a> {
     pub fn set_representation(&mut self, representation: String) {
         self.representation = representation;
     }
-    pub fn set_features(&mut self, features: Option<HashMap<String, String>>) {
-        self.features = match features {
-            None => json!({}),
-            Some(map) => serde_json::json!(map),
-        };
+    pub fn set_jsonpath(&mut self, json_path: String) {
+        self.json_path = json_path;
     }
     pub fn output_json(&self) -> std::io::Result<()>{
         let status = match &self.exit_reason {
             Some(ExitReason::TestFailure) => "failed",
-            Some(ExitReason::MaxDurationExceeded { .. }) => "timed out",
+            Some(ExitReason::MaxDurationExceeded { .. }) => "max duration exceeded",
             None => "passed",
         };
 
@@ -154,37 +153,28 @@ impl<'a> Outcome<'a> {
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.location.item_path.to_string());
 
-        let how_generated = if self.corpus_input > 0 {
-            "loaded from corpus"
-        } else if self.rng_input > 0 {
-            "generated during unknown phase"
-        } else {
-            "unknown"
-        };
+        let how_generated = "generated during unknown phase";
 
-        let metadata = json!({
-            "traceback": null
-        });
+        let metadata = String::from("{\"traceback\":null}");
+        let file_name = self.json_path.clone();
 
-        let output = json!({
-            "type": "test_case",
-            "run_start": self.json_time.as_secs(),
-            "property": property,
-            "status": status,
-            "status_reason": status_reason,
-            "representation": self.representation,
-            "arguments": self.arguments,
-            "how_generated": how_generated,
-            "features": self.features,
-            "metadata": metadata,
-            "coverage": self.coverage
-        });
-        let output_string = output.to_string();
-        let filename = "tyche_test.jsonl";
+        let output_string = format!("{{\"type\":\"{typ}\",\
+        \"run_start\":{run_start},\
+        \"property\":\"{prop}\",\
+        \"status\":\"{status}\",\
+        \"status_reason\":\"{sr}\",\
+        \"representation\":\"{rep}\",\
+        \"arguments\":{arg},\
+        \"how_generated\":\"{hg}\",\
+        \"features\":{feat},\
+        \"metadata\":{meta},\
+        \"coverage\":{cov}}}", typ="test_case", run_start=self.json_time.as_secs().to_string(),prop=property,
+        sr= status_reason, rep=self.representation, arg=self.arguments, hg=how_generated, feat=self.features,
+        meta=metadata, cov=self.coverage);
         let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(filename)?;
+        .open(file_name)?;
         
         let mut buffered_writer = std::io::BufWriter::new(file);
         writeln!(buffered_writer, "{}", output_string);

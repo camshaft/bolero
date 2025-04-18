@@ -8,31 +8,9 @@ use core::{fmt, mem::size_of, time::Duration};
 use std::path::PathBuf;
 use std::env;
 type ExhastiveDriver = Box<Object<exhaustive::Driver>>;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-lazy_static! {
-    static ref GLOBAL_CONTEXT: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
-}
-fn initialize_global_context() {
-    let mut context = GLOBAL_CONTEXT.lock().unwrap();
-    *context = Some(HashMap::new());
-}
-pub fn print_global_context() {
-    let context_lock = GLOBAL_CONTEXT.lock().unwrap();
-    if let Some(map) = context_lock.as_ref() {
-        for (key, value) in map {
-            println!("{}: {}", key, value);
-        }
-    } else {
-        println!("Global context has not been initialized.");
-    }
-}
-fn copy_global_context() -> Option<HashMap<String, String>> {
-    let context_lock = GLOBAL_CONTEXT.lock().unwrap();
-    context_lock.as_ref().cloned()
-}
 
 
 mod outcome;
@@ -41,14 +19,14 @@ mod input;
 mod report;
 
 
-pub fn event_with_payload<T: ToString>(key: &str, value: T) {
+/*pub fn event_with_payload<T: ToString>(key: &str, value: T) {
     let mut context = GLOBAL_CONTEXT.lock().unwrap();
     if let Some(map) = context.as_mut() {
         map.insert(key.to_string(), value.to_string());
     }
 }
 
-
+*/
 
 /// Engine implementation which mimics Rust's default test
 /// harness. By default, the test inputs will include any present
@@ -192,13 +170,23 @@ impl TestEngine {
                     driver: &mut driver,
                     buffer: &mut buffer,
                 };
+                let mut representation = String::from("");
+                let tyche_on = match env::var("BOLERO_TYCHE") {
+                    Ok(v) => v,
+                    Err(_) => "".to_string(),
+                };
+        
 
                 let result = match test.test(&mut input) {
                     Ok(is_valid) => {
                         // restart the driver to replay what was selected
-                        input.driver.replay();
-                        let value = test.generate_value(&mut input);
-                        let representation = format!("{:?}", value);
+                        if tyche_on != "" {
+                            input.driver.replay();
+
+                            
+                            let value = test.generate_value(&mut input);
+                            representation = format!("{:?}", value);
+                        }
                         Ok((is_valid, representation))
                     }
                     Err(error) => {
@@ -320,14 +308,14 @@ impl TestEngine {
                 let result = result.map(|r| {
                     // For scope tests, we don't have a good way to get a representation
                     // so we'll use a placeholder
-                    (r, "scope test".to_string())
+                    (r, "".to_string())
                 }).map_err(|error| {
                     (Failure {
                         seed: None,
                         error,
                         input: (),
                     }
-                    .to_string(), "scope test".to_string())
+                    .to_string(), "".to_string())
                 });
                 (driver, result)
             };
@@ -361,14 +349,14 @@ impl TestEngine {
                     file_driver = Some(driver);
 
                     // For scope tests, use a placeholder representation
-                    result.map(|r| (r, "file scope test".to_string()))
+                    result.map(|r| (r, "".to_string()))
                         .map_err(|error| {
                             (Failure {
                                 seed: None,
                                 error,
                                 input: (), // TODO figure out a better input to show
                             }
-                            .to_string(), "scope test".to_string())
+                            .to_string(), "".to_string())
                         })
                 }
                 input::Test::Rng(conf) => {
@@ -378,14 +366,14 @@ impl TestEngine {
                     let (_driver, result) = bolero_engine::any::run(driver, test);
 
                     // For scope tests, use a placeholder representation
-                    result.map(|r| (r, "rng scope test".to_string()))
+                    result.map(|r| (r, "".to_string()))
                         .map_err(|error| {
                             (Failure {
                                 seed: Some(seed),
                                 error,
                                 input: (), // TODO figure out a better input to show
                             }
-                            .to_string(), "scope test".to_string())
+                            .to_string(), "".to_string())
                         })
                 }
             }
@@ -418,15 +406,16 @@ impl TestEngine {
             report.spawn_timer();
         }
         let mut outcome = outcome::Outcome::new(&self.location, start_time);
-        let tyche_on = env::var("BOLERO_TYCHE")
-        .map(|val|val.to_lowercase() == "true")
-        .unwrap_or(false);
+        let tyche_on = match env::var("BOLERO_TYCHE") {
+            Ok(v) => v,
+            Err(_) => "".to_string(),
+        };
+        outcome.set_jsonpath(tyche_on.clone());
 
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
         for input in tests {
-            initialize_global_context();
         
             if let Some(test_time) = test_time {
                 if start_time.elapsed() > test_time {
@@ -434,7 +423,7 @@ impl TestEngine {
                         limit: test_time,
                         default: self.rng_cfg.test_time.is_none(),
                     });
-                    if tyche_on {
+                    if tyche_on != "" {
                         let _ = outcome.output_json();
                     }
                     break;
@@ -446,15 +435,13 @@ impl TestEngine {
 
             match testfn(&mut state, &input.data){ 
                 Ok((is_valid, representation)) => {
-                    let copy_context = copy_global_context();
 
-                    outcome.set_features(copy_context);
 
 
 
                     report.on_result(is_valid);
                     outcome.set_representation(representation);
-                    if tyche_on {
+                    if tyche_on != "" {
                         let _ = outcome.output_json();
                     }
 
@@ -462,9 +449,7 @@ impl TestEngine {
 
                 }
                 Err((err, rep)) => {
-                    let copy_context = copy_global_context();
 
-                    outcome.set_features(copy_context);
                     outcome.set_representation(rep);
 
 
@@ -472,7 +457,7 @@ impl TestEngine {
                     
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
-                    if tyche_on{
+                    if tyche_on != "" {
                         let _ = outcome.output_json();
                     }
                     eprintln!("{}", err);
