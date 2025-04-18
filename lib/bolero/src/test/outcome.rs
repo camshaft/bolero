@@ -140,8 +140,7 @@ impl<'a> Outcome<'a> {
     pub fn output_json(&self) -> std::io::Result<()>{
         let status = match &self.exit_reason {
             Some(ExitReason::TestFailure) => "failed",
-            Some(ExitReason::MaxDurationExceeded { .. }) => "max duration exceeded",
-            None => "passed",
+            _ => "passed",
         };
 
         let status_reason = match &self.exit_reason {

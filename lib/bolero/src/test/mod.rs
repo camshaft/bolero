@@ -423,9 +423,6 @@ impl TestEngine {
                         limit: test_time,
                         default: self.rng_cfg.test_time.is_none(),
                     });
-                    if tyche_on != "" {
-                        let _ = outcome.output_json();
-                    }
                     break;
                 }
 
