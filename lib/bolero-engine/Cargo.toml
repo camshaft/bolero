@@ -24,9 +24,6 @@ pretty-hex = { version = "0.4", default-features = false }
 rand = { version = "0.9", optional = true }
 rand_xoshiro = { version = "0.7", optional = true }
 
-[target.'cfg(not(kani))'.dependencies]
-backtrace = { version = "0.3", default-features = false, features = ["std"] }
-
 [dev-dependencies]
 bolero-generator = { version = "0.13", path = "../bolero-generator", features = ["std"] }
 rand = "0.9"

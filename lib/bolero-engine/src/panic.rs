@@ -1,6 +1,6 @@
 use core::{
     cell::RefCell,
-    fmt::{self, Debug, Display},
+    fmt::{Debug, Display},
     panic::PanicInfo,
 };
 use lazy_static::lazy_static;
@@ -12,7 +12,7 @@ use std::{
 macro_rules! backtrace {
     () => {{
         if CAPTURE_BACKTRACE.with(|capture| *capture.borrow()) {
-            Some(mini_backtrace())
+            Some(std::backtrace::Backtrace::capture())
         } else {
             None
         }
@@ -58,7 +58,7 @@ pub struct PanicError {
     #[allow(dead_code)]
     pub(crate) location: Option<String>,
     #[allow(dead_code)]
-    pub(crate) backtrace: Option<Backtrace>,
+    pub(crate) backtrace: Option<std::backtrace::Backtrace>,
     #[allow(dead_code)]
     pub(crate) thread_name: String,
 }
@@ -160,103 +160,6 @@ pub fn thread_name() -> String {
 }
 
 #[inline(never)]
-fn mini_backtrace() -> Backtrace {
-    let mut frames = vec![];
-
-    enum State {
-        Backtrace,
-        ThisCrate,
-        Application,
-    }
-
-    let mut state = State::Backtrace;
-
-    let parent = std::path::Path::new(file!()).parent().unwrap();
-
-    backtrace::trace(|frame| {
-        let mut is_done = false;
-
-        backtrace::resolve_frame(frame, |symbol| {
-            let is_this_crate = symbol
-                .filename()
-                .map(|path| path.starts_with(parent))
-                .unwrap_or(false);
-
-            match state {
-                State::Backtrace => {
-                    if is_this_crate {
-                        state = State::ThisCrate;
-                    }
-                }
-                State::ThisCrate => {
-                    if is_this_crate {
-                    } else {
-                        state = State::Application;
-                    }
-                }
-                State::Application => {
-                    if is_this_crate {
-                        is_done = true;
-                    } else if let Some(frame) = BacktraceFrame::from_symbol(symbol) {
-                        frames.push(frame);
-                    }
-                }
-            }
-        });
-
-        !is_done
-    });
-
-    Backtrace::new(frames)
-}
-
-#[inline(never)]
 fn __panic_marker_start__<F: FnOnce() -> R, R>(f: F) -> R {
     f()
-}
-
-#[derive(Debug)]
-pub struct Backtrace {
-    frames: Vec<BacktraceFrame>,
-}
-
-impl Display for Backtrace {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, frame) in self.frames.iter().enumerate() {
-            writeln!(f, "   {}: {}", i, frame.symbol)?;
-            if let Some(location) = frame.location.as_ref() {
-                writeln!(f, "             at {}", location)?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct BacktraceFrame {
-    symbol: String,
-    location: Option<String>,
-}
-
-impl BacktraceFrame {
-    fn from_symbol(symbol: &backtrace::Symbol) -> Option<Self> {
-        let name = format!("{:#}", symbol.name()?);
-        Some(BacktraceFrame {
-            symbol: name,
-            location: symbol.filename().map(|filename| {
-                if let Some(lineno) = symbol.lineno() {
-                    format!("{}:{}", filename.display(), lineno)
-                } else {
-                    filename.display().to_string()
-                }
-            }),
-        })
-    }
-}
-
-impl Backtrace {
-    fn new(frames: Vec<BacktraceFrame>) -> Self {
-        Self { frames }
-    }
 }
