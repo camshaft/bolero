@@ -18,14 +18,14 @@ rng = ["rand", "rand_xoshiro", "bolero-generator/alloc"]
 
 [dependencies]
 anyhow = "1"
-bolero-generator = { version = "0.13", path = "../bolero-generator", default-features = false }
+bolero-generator = { version = "0.13.3", path = "../bolero-generator", default-features = false }
 lazy_static = "1"
 pretty-hex = { version = "0.4", default-features = false }
 rand = { version = "0.9", optional = true }
 rand_xoshiro = { version = "0.7", optional = true }
 
 [dev-dependencies]
-bolero-generator = { version = "0.13", path = "../bolero-generator", features = ["std"] }
+bolero-generator = { version = "0.13.3", path = "../bolero-generator", features = ["std"] }
 rand = "0.9"
 rand_xoshiro = "0.7"
 
