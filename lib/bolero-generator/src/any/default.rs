@@ -29,7 +29,11 @@ fn default() -> impl crate::Driver {
     // make a best effort to get random seeds
     let _ = getrandom::fill(&mut seed);
     let rng = Xoshiro128PlusPlus::from_seed(seed);
-    crate::driver::Rng::new(rng, &Default::default())
+    // we don't want to limit the output of this by default for when it hasn't been configured by a fuzzer
+    let config = crate::driver::Options::default()
+        .with_max_len(usize::MAX)
+        .with_max_depth(10);
+    crate::driver::Rng::new(rng, &config)
 }
 
 fn set(value: Type) -> Type {
