@@ -1,6 +1,6 @@
 [package]
 name = "bolero-generator"
-version = "0.13.3"
+version = "0.13.4"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 description = "value generator for testing and fuzzing"
 homepage = "https://github.com/camshaft/bolero"
@@ -37,5 +37,5 @@ check-cfg = [
   'cfg(fuzzing_afl)',
   'cfg(fuzzing_libfuzzer)',
   'cfg(fuzzing_honggfuzz)',
-  'cfg(fuzzing_random)'
+  'cfg(fuzzing_random)',
 ]
