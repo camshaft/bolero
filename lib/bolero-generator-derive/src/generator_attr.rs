@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse::Error, spanned::Spanned, Attribute, Expr, Lit, Meta, MetaList, NestedMeta};
+use syn::{parse::Error, spanned::Spanned, Attribute, LitStr, Meta, MetaList};
 
 pub struct GeneratorAttr {
     krate: TokenStream2,
@@ -28,7 +28,7 @@ impl GeneratorAttr {
         attributes: I,
     ) -> Self {
         for attr in attributes {
-            if attr.path.is_ident("generator") {
+            if attr.path().is_ident("generator") {
                 return match Self::from_attr(krate, attr) {
                     Ok(generator) => generator,
                     Err(err) => Self {
@@ -46,13 +46,13 @@ impl GeneratorAttr {
     }
 
     pub fn from_attr(krate: &TokenStream2, attr: &Attribute) -> Result<Self, Error> {
-        match attr.parse_meta() {
-            Ok(Meta::Path(_)) => Ok(Self {
+        match &attr.meta {
+            Meta::Path(_) => Ok(Self {
                 krate: krate.clone(),
                 generator: None,
             }),
-            Ok(Meta::List(meta)) => {
-                if let Some(generator) = parse_code_hack(&meta)? {
+            Meta::List(meta) => {
+                if let Some(generator) = parse_code_hack(meta)? {
                     // #[generator(_code = "...")]
                     return Ok(Self {
                         krate: krate.clone(),
@@ -60,59 +60,53 @@ impl GeneratorAttr {
                     });
                 }
 
-                if meta.nested.len() != 1 {
-                    return Err(Error::new(
-                        if meta.nested.is_empty() {
-                            meta.span()
-                        } else {
-                            meta.nested.span()
-                        },
-                        "Expected single value in #[generator(...)]",
-                    ));
-                }
-
                 // #[generator(...)]
-                let generator = meta
-                    .nested
-                    .first()
-                    .expect("length already checked above")
-                    .to_token_stream();
                 Ok(Self {
                     krate: krate.clone(),
-                    generator: Some(generator),
+                    generator: Some(meta.tokens.clone()),
                 })
             }
-            Ok(Meta::NameValue(meta)) => Ok(Self {
+            Meta::NameValue(meta) => Ok(Self {
                 krate: krate.clone(),
-                generator: Some(meta.lit.to_token_stream()),
+                generator: Some(meta.value.to_token_stream()),
             }),
-            Err(error) => {
-                // last effort to make it work
-                if let Ok(expr) = attr.parse_args::<Expr>() {
-                    return Ok(Self {
-                        krate: krate.clone(),
-                        generator: Some(expr.to_token_stream()),
-                    });
-                }
-
-                Err(error)
-            }
         }
     }
 }
 
 fn parse_code_hack(meta: &MetaList) -> Result<Option<TokenStream2>, Error> {
-    for meta in meta.nested.iter() {
-        if let NestedMeta::Meta(Meta::NameValue(meta)) = meta {
+    let mut nested_len = 0;
+    let mut code_hack = None;
+    if meta
+        .parse_nested_meta(|meta| {
+            nested_len += 1;
+
             if !meta.path.is_ident("_code") {
-                continue;
+                return Ok(());
             }
-            if let Lit::Str(lit) = &meta.lit {
-                return Ok(Some(lit.parse()?));
-            }
-        };
+
+            let lit: LitStr = meta.value()?.parse()?;
+            code_hack = Some(lit.parse()?);
+            Ok(())
+        })
+        .is_err()
+    {
+        // last effort to make it work
+        return Ok(None);
     }
-    Ok(None)
+
+    if nested_len != 1 {
+        return Err(Error::new(
+            if nested_len == 0 {
+                meta.span()
+            } else {
+                meta.tokens.span()
+            },
+            "Expected single value in #[generator(...)]",
+        ));
+    }
+
+    Ok(code_hack)
 }
 
 pub struct GeneratorAttrValue<'a>(&'a GeneratorAttr);
