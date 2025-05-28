@@ -19,4 +19,4 @@ proc-macro2 = "1"
 quote = "1"
 # The `full` feature is required to correctly parse attributes
 # TODO investigate if this can be reduced in scope
-syn = { version = "1", features = ["full"] }
+syn = { version = "2", features = ["full"] }
