@@ -90,6 +90,7 @@ jobs:
         profile: minimal
 
     - name: Install kani
+      if: matrix.rust != '1.66.0'
       run: |
         cargo install --locked kani-verifier
         cargo kani setup
