@@ -61,7 +61,7 @@ pub mod fuzzer {
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
                         if let Some(shrunken) = shrunken {
-                            eprintln!("{:#}", shrunken);
+                            eprintln!("{shrunken:#}");
                         } else {
                             let input = input::Bytes::new(slice, options);
                             eprintln!(

@@ -196,7 +196,7 @@ impl TestEngine {
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
                         if let Some(shrunken) = shrunken {
-                            format!("{:#}", shrunken)
+                            format!("{shrunken:#}")
                         } else {
                             format!(
                                 "{:#}",
@@ -223,7 +223,7 @@ impl TestEngine {
                         };
 
                         if let Some(shrunken) = shrunken {
-                            format!("{:#}", shrunken)
+                            format!("{shrunken:#}")
                         } else {
                             buffer.clear();
                             let mut input = conf.input(&mut buffer, &mut cache, rng_options);
@@ -379,7 +379,7 @@ impl TestEngine {
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
-                    eprintln!("{}", err);
+                    eprintln!("{err}");
                     panic!("test failed");
                 }
             }

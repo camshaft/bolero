@@ -35,9 +35,9 @@ impl Selection {
             .env("CARGO_BOLERO_SELECT", "one");
         let output = output_command
             .output()
-            .with_context(|| format!("getting output of command {:?}", output_command))?
+            .with_context(|| format!("getting output of command {output_command:?}"))?
             .status_as_result()
-            .with_context(|| format!("getting status of command {:?}", output_command))?;
+            .with_context(|| format!("getting status of command {output_command:?}"))?;
 
         TestTarget::from_stdout(&output.stdout)
     }

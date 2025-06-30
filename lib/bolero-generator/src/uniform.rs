@@ -319,7 +319,7 @@ impl Uniform for char {
         let value = char_from_u32(bytes);
 
         if cfg!(test) {
-            assert!(value.is_some(), "invalid value generated: {}", bytes);
+            assert!(value.is_some(), "invalid value generated: {bytes}");
         }
 
         value
@@ -457,16 +457,13 @@ mod tests {
                     if let Some(value) = result {
                         assert!(
                             (min_b, max_b).contains(&value),
-                            "generated value ({:?}) outside of bounds ({:?}, {:?})",
-                            value,
-                            min_b,
-                            max_b,
+                            "generated value ({value:?}) outside of bounds ({min_b:?}, {max_b:?})",
                         );
                         actual.insert(value);
                     }
                 }
 
-                assert_eq!(&expected, &actual, "min: {:?}, max: {:?}", min_b, max_b);
+                assert_eq!(&expected, &actual, "min: {min_b:?}, max: {max_b:?}");
             }
         }
     }

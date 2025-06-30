@@ -25,17 +25,17 @@ fn build(target: &str, file: &str, lib: &str) -> String {
     assert!(status.success());
 
     std::fs::copy(
-        format!("honggfuzz/{}", target),
-        format!("{}/{}", out_dir, file),
+        format!("honggfuzz/{target}"),
+        format!("{out_dir}/{file}"),
     )
     .expect("could not copy target");
 
-    println!("cargo:rustc-link-lib=static={}", lib);
+    println!("cargo:rustc-link-lib=static={lib}");
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
     std::fs::copy(
         "honggfuzz/libhfcommon/libhfcommon.a",
-        format!("{}/libhfcommon.a", out_dir),
+        format!("{out_dir}/libhfcommon.a"),
     )
     .expect("could not copy libhfcommon.a");
 
@@ -80,7 +80,7 @@ fn main() {
             ]
             .iter()
             {
-                println!("cargo:rustc-link-lib=framework={}", framework);
+                println!("cargo:rustc-link-lib=framework={framework}");
             }
         }
 
@@ -94,7 +94,7 @@ fn main() {
             ]
             .iter()
             {
-                println!("cargo:rustc-link-lib={}", lib);
+                println!("cargo:rustc-link-lib={lib}");
             }
         }
     }
