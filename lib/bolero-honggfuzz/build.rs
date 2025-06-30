@@ -24,11 +24,8 @@ fn build(target: &str, file: &str, lib: &str) -> String {
         .unwrap();
     assert!(status.success());
 
-    std::fs::copy(
-        format!("honggfuzz/{target}"),
-        format!("{out_dir}/{file}"),
-    )
-    .expect("could not copy target");
+    std::fs::copy(format!("honggfuzz/{target}"), format!("{out_dir}/{file}"))
+        .expect("could not copy target");
 
     println!("cargo:rustc-link-lib=static={lib}");
     println!("cargo:rustc-link-search=native={}", &out_dir);

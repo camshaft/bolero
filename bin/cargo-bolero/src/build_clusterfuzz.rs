@@ -107,9 +107,7 @@ env BOLERO_TEST_NAME="{1}" \
                 header.set_cksum();
                 tarball
                     .append_data(&mut header, &path, &*contents)
-                    .with_context(|| {
-                        format!("adding relay script {path:?} to {output_path:?}")
-                    })?;
+                    .with_context(|| format!("adding relay script {path:?} to {output_path:?}"))?;
             }
         }
         tarball
