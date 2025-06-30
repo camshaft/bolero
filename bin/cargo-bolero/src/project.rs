@@ -41,6 +41,10 @@ pub struct Project {
     #[structopt(short, long)]
     package: Option<String>,
 
+    /// Whether to run tests for the whole workspace
+    #[structopt(long)]
+    workspace: bool,
+
     /// Path to Cargo.toml
     #[structopt(long)]
     manifest_path: Option<String>,
@@ -102,6 +106,10 @@ impl Project {
 
         if let Some(value) = self.features.as_ref() {
             cmd.arg("--features").arg(value);
+        }
+
+        if self.workspace {
+            cmd.arg("--workspace");
         }
 
         if let Some(value) = self.package.as_ref() {
