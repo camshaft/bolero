@@ -30,7 +30,7 @@ impl BuildClusterfuzz {
         let output_path = output_dir.join("clusterfuzz.tar");
         let mut tarball = tar::Builder::new(
             std::fs::File::create(&output_path)
-                .with_context(|| format!("creating {:?}", output_path))?,
+                .with_context(|| format!("creating {output_path:?}"))?,
         );
 
         // Figure out the list of fuzz targets, grouped by which test executable they use
@@ -51,7 +51,7 @@ impl BuildClusterfuzz {
             list_exe.hash(&mut hasher);
             let hash = hasher.finish();
             let list_bin = Path::new(&list_exe).file_name().unwrap().to_string_lossy();
-            let dir = PathBuf::from(format!("{}-{:x}", list_bin, hash));
+            let dir = PathBuf::from(format!("{list_bin}-{hash:x}"));
 
             let fuzz_exe =
                 crate::libfuzzer::build(self.project.clone(), tests[0].test_name.clone())
@@ -107,16 +107,14 @@ env BOLERO_TEST_NAME="{1}" \
                 header.set_cksum();
                 tarball
                     .append_data(&mut header, &path, &*contents)
-                    .with_context(|| {
-                        format!("adding relay script {:?} to {:?}", path, output_path)
-                    })?;
+                    .with_context(|| format!("adding relay script {path:?} to {output_path:?}"))?;
             }
         }
         tarball
             .finish()
-            .with_context(|| format!("finishing writing {:?}", output_path))?;
+            .with_context(|| format!("finishing writing {output_path:?}"))?;
 
-        println!("Built the tarball in {:?}", output_path);
+        println!("Built the tarball in {output_path:?}");
         Ok(())
     }
 }

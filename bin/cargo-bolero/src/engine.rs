@@ -90,7 +90,7 @@ impl FromStr for Engine {
 
             "random" => Ok(Self::Random),
 
-            _ => Err(format!("invalid engine {:?}", value)),
+            _ => Err(format!("invalid engine {value:?}")),
         }
     }
 }

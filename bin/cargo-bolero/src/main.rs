@@ -59,18 +59,18 @@ fn main() {
 
     if let Err(err) = Commands::from_iter(args).exec() {
         // Formatting anyhow error with {:#} to print all the error causes.
-        eprintln!("error: {:#}", err);
+        eprintln!("error: {err:#}");
         std::process::exit(1);
     }
 }
 
 pub(crate) fn exec(mut cmd: std::process::Command) -> Result<()> {
     cmd.spawn()
-        .with_context(|| format!("spawning command {:?}", cmd))?
+        .with_context(|| format!("spawning command {cmd:?}"))?
         .wait()
-        .with_context(|| format!("waiting for command {:?}", cmd))?
+        .with_context(|| format!("waiting for command {cmd:?}"))?
         .status_as_result()
-        .with_context(|| format!("getting status result from command {:?}", cmd))
+        .with_context(|| format!("getting status result from command {cmd:?}"))
 }
 
 pub(crate) trait StatusAsResult {

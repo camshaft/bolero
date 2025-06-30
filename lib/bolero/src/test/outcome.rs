@@ -64,7 +64,7 @@ impl fmt::Display for Outcome<'_> {
         }
 
         if let Some(reason) = &self.exit_reason {
-            write!(f, " | exit reason: {}", reason)?;
+            write!(f, " | exit reason: {reason}")?;
         }
 
         Ok(())

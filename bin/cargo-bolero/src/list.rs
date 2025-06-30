@@ -34,7 +34,7 @@ impl List {
 
     pub fn exec(&self) -> Result<()> {
         for target in self.list()? {
-            println!("{}", target);
+            println!("{target}");
         }
 
         Ok(())

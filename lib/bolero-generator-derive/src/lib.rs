@@ -405,7 +405,7 @@ fn generate_fields_unnamed_type_mutate(
     fields: &FieldsUnnamed,
 ) -> TokenStream2 {
     let fields = fields.unnamed.iter().enumerate().map(|(index, field)| {
-        let value = Ident::new(&format!("__bolero_unnamed_{}", index), field.span());
+        let value = Ident::new(&format!("__bolero_unnamed_{index}"), field.span());
         let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
 
         let span = generator.span();
@@ -421,7 +421,7 @@ fn generate_fields_unnamed_type_driver_cache(
     fields: &FieldsUnnamed,
 ) -> TokenStream2 {
     let fields = fields.unnamed.iter().enumerate().map(|(index, field)| {
-        let value = Ident::new(&format!("__bolero_unnamed_{}", index), field.span());
+        let value = Ident::new(&format!("__bolero_unnamed_{index}"), field.span());
         let generator = GeneratorAttr::from_attrs(krate, field.attrs.iter());
 
         let span = generator.span();
@@ -448,7 +448,7 @@ fn generate_fields_unnamed_type_destructure<C: ToTokens>(
         .unnamed
         .iter()
         .enumerate()
-        .map(|(index, field)| Ident::new(&format!("__bolero_unnamed_{}", index), field.span()));
+        .map(|(index, field)| Ident::new(&format!("__bolero_unnamed_{index}"), field.span()));
     quote!(#constructor (#(#fields),*))
 }
 
