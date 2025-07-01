@@ -16,7 +16,7 @@ bin = []
 lib = ["bolero-engine"]
 
 [dependencies]
-bolero-engine = { version = "0.13.3", path = "../bolero-engine", optional = true }
+bolero-engine = { version = "0.13.4", path = "../bolero-engine", optional = true }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
