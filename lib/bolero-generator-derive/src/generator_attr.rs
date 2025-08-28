@@ -19,7 +19,7 @@ impl ToTokens for GeneratorAttr {
 }
 
 impl GeneratorAttr {
-    pub fn value_generate(&self) -> GeneratorAttrValue {
+    pub fn value_generate(&self) -> GeneratorAttrValue<'_> {
         GeneratorAttrValue(self)
     }
 
