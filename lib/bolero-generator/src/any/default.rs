@@ -3,14 +3,14 @@ use core::fmt;
 use std::cell::RefCell;
 
 pub trait Scope: 'static + DynDriver + core::any::Any {
-    fn borrowed(&mut self) -> object::Borrowed;
+    fn borrowed(&mut self) -> object::Borrowed<'_>;
 }
 
 impl<T> Scope for T
 where
     T: 'static + DynDriver + core::any::Any,
 {
-    fn borrowed(&mut self) -> object::Borrowed {
+    fn borrowed(&mut self) -> object::Borrowed<'_> {
         object::Borrowed(self)
     }
 }
