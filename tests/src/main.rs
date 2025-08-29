@@ -5,12 +5,14 @@ mod cargo_bolero;
 mod engines;
 mod env;
 mod examples;
+mod reduce;
 
 fn main() -> Result {
     bolero::test()?;
     cargo_bolero::test()?;
     examples::test()?;
     engines::test()?;
+    reduce::test()?;
 
     Ok(())
 }

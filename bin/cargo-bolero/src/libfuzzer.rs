@@ -4,7 +4,7 @@ use bit_set::BitSet;
 use core::cmp::Ordering;
 use std::{
     fs,
-    io::{BufRead, BufReader, Result as IOResult, Write},
+    io::{BufRead, BufReader, Result as IOResult},
     path::{Path, PathBuf},
 };
 
@@ -85,9 +85,9 @@ pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()>
     fs::create_dir_all(&corpus_dir)?;
     fs::create_dir_all(&tmp_corpus)?;
 
-    let mut control_file = tempfile::NamedTempFile::new()?;
+    let control_file = tempfile::NamedTempFile::new()?;
 
-    let inputs = write_control_file(&mut control_file, &corpus_dir)?;
+    let inputs = read_inputs(&corpus_dir)?;
 
     // no point in shrinking an empty corpus
     if inputs.is_empty() {
@@ -98,7 +98,9 @@ pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()>
 
     let mut args = vec![
         format!("-merge_control_file={}", control_file.as_ref().display()),
-        "-merge_inner=1".to_string(),
+        "-merge=1".to_string(),
+        tmp_corpus.path().to_str().unwrap().into(),
+        corpus_dir.to_str().unwrap().into(),
     ];
 
     args.extend(reduce.engine_args.iter().cloned());
@@ -127,33 +129,12 @@ pub(crate) fn reduce(selection: &Selection, reduce: &reduce::Args) -> Result<()>
     Ok(())
 }
 
-fn write_control_file<W: Write>(file: &mut W, corpus_dir: &Path) -> Result<Vec<PathBuf>> {
+fn read_inputs(corpus_dir: &Path) -> Result<Vec<PathBuf>> {
     let mut inputs = vec![];
     for entry in fs::read_dir(corpus_dir)? {
         inputs.push(entry?.path());
     }
     inputs.sort();
-
-    // The control file example:
-    //
-    // 3 # The number of inputs
-    // 1 # The number of inputs in the first corpus, <= the previous number
-    // file0
-    // file1
-    // file2  # One file name per line.
-    // STARTED 0 123  # FileID, file size
-    // FT 0 1 4 6 8  # FileID COV1 COV2 ...
-    // COV 0 7 8 9 # FileID COV1 COV1
-    // STARTED 1 456  # If FT is missing, the input crashed while processing.
-    // STARTED 2 567
-    // FT 2 8 9
-    // COV 2 11 12
-
-    writeln!(file, "{}", inputs.len())?;
-    writeln!(file, "{}", inputs.len())?;
-    for input in inputs.iter() {
-        writeln!(file, "{}", input.display())?;
-    }
 
     Ok(inputs)
 }
@@ -170,6 +151,21 @@ fn parse_control_file<'a, I: Iterator<Item = IOResult<String>>>(
     inputs: &'a [PathBuf],
 ) -> Result<Vec<ControlResult<'a>>> {
     let mut results: Vec<_> = (0..inputs.len()).map(|_| None).collect();
+
+    // The control file example:
+    //
+    // 3 # The number of inputs
+    // 1 # The number of inputs in the first corpus, <= the previous number
+    // file0
+    // file1
+    // file2  # One file name per line.
+    // STARTED 0 123  # FileID, file size
+    // FT 0 1 4 6 8  # FileID COV1 COV2 ...
+    // COV 0 7 8 9 # FileID COV1 COV1
+    // STARTED 1 456  # If FT is missing, the input crashed while processing.
+    // STARTED 2 567
+    // FT 2 8 9
+    // COV 2 11 12
 
     let mut state = None;
 
