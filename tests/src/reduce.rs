@@ -5,7 +5,10 @@ use xshell::{cmd, Shell};
 pub fn test() -> Result {
     let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
-    Test { rustc_bootstrap: !is_nightly }.run()?;
+    Test {
+        rustc_bootstrap: !is_nightly,
+    }
+    .run()?;
 
     Ok(())
 }
