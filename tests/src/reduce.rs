@@ -3,24 +3,22 @@ use std::{fs, path::PathBuf};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
-    let rust_version = env::rustc();
+    let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
-    let use_stable = rust_version.map_or(false, |v| v.major > 1 && v.minor <= 65);
-
-    Test { use_stable }.run()?;
+    Test { rustc_bootstrap: !is_nightly }.run()?;
 
     Ok(())
 }
 
 struct Test {
-    use_stable: bool,
+    rustc_bootstrap: bool,
 }
 
 impl Test {
     fn run(&self) -> Result {
         let sh = Shell::new()?;
         sh.change_dir(env::examples());
-        let _dir = sh.push_dir("reduce");
+        sh.change_dir("reduce");
 
         // make sure this is up-to-date
         let _ = sh.remove_path("Cargo.lock");
@@ -30,7 +28,7 @@ impl Test {
         let cargo_bolero = env::bins().to_string() + "/target/debug/cargo-bolero";
 
         let mut args = Vec::new();
-        if self.use_stable {
+        if self.rustc_bootstrap {
             args.push("--rustc-bootstrap".to_string());
         }
 
