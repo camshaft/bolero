@@ -64,6 +64,14 @@ pub struct Project {
     /// Fake using a nightly toolchain while using the default toolchain by using RUSTC_BOOTSTRAP
     #[structopt(long)]
     rustc_bootstrap: bool,
+
+    /// Use cargo nextest instead of cargo test
+    #[structopt(long)]
+    use_nextest: bool,
+
+    /// Set a specific nextest profile, eg. to set a one second timeout for listing fuzzers
+    #[structopt(long)]
+    nextest_profile: Option<String>,
 }
 
 impl Project {
@@ -90,11 +98,38 @@ impl Project {
         }
     }
 
-    pub fn cmd(&self, call: &str, flags: &[&str], fuzzer: Option<&str>) -> Result<Command> {
+    pub fn cmd(
+        &self,
+        call: &str,
+        no_capture: bool,
+        cargoflags: &[&str],
+        rustflags: &[&str],
+        fuzzer: Option<&str>,
+    ) -> Result<Command> {
         let mut cmd = self.cargo();
 
-        cmd.arg(call).arg("--target").arg(&self.target);
-        cmd.arg("--profile").arg(&self.profile);
+        let use_nextest = self.use_nextest && call == "test";
+
+        if use_nextest {
+            cmd.arg("nextest").arg("run");
+        } else {
+            cmd.arg(call);
+        }
+
+        cmd.arg("--target").arg(&self.target);
+
+        if use_nextest {
+            cmd.arg("--cargo-profile").arg(&self.profile);
+            if let Some(nextest_profile) = &self.nextest_profile {
+                cmd.arg("--profile").arg(nextest_profile);
+            }
+        } else {
+            anyhow::ensure!(
+                self.nextest_profile.is_none(),
+                "Requested nextest profile without using nextest"
+            );
+            cmd.arg("--profile").arg(&self.profile);
+        }
 
         if self.no_default_features {
             cmd.arg("--no-default-features");
@@ -121,13 +156,13 @@ impl Project {
         }
 
         if let Some(fuzzer) = fuzzer {
-            let rustflags = self.rustflags("RUSTFLAGS", flags)?;
+            let final_rustflags = self.rustflags("RUSTFLAGS", rustflags)?;
 
             if let Some(value) = self.target_dir.as_ref() {
                 cmd.arg("--target-dir").arg(value);
             } else {
                 let mut hasher = DefaultHasher::new();
-                rustflags.hash(&mut hasher);
+                final_rustflags.hash(&mut hasher);
                 cmd.arg("--target-dir")
                     .arg(format!("target/fuzz/build_{:x}", hasher.finish()));
             }
@@ -136,9 +171,21 @@ impl Project {
                 cmd.arg("-Zbuild-std");
             }
 
-            cmd.env("RUSTFLAGS", rustflags)
-                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", flags)?)
+            cmd.env("RUSTFLAGS", final_rustflags)
+                .env("RUSTDOCFLAGS", self.rustflags("RUSTDOCFLAGS", rustflags)?)
                 .env("BOLERO_FUZZER", fuzzer);
+        }
+
+        for f in cargoflags {
+            cmd.arg(f);
+        }
+
+        if no_capture {
+            if use_nextest {
+                cmd.arg("--no-capture");
+            } else {
+                cmd.arg("--").arg("--nocapture");
+            }
         }
 
         Ok(cmd)
