@@ -478,7 +478,12 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
         R: bolero_engine::IntoResult,
         E: bolero_engine::ScopedEngine,
     {
-        self.engine.run(test, self.driver_options)
+        // Default to unbounded entropy for run() - set max_len to usize::MAX if not explicitly set
+        let mut options = self.driver_options;
+        if options.max_len().is_none() {
+            options.set_max_len(usize::MAX);
+        }
+        self.engine.run(test, options)
     }
 }
 
