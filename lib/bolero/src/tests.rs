@@ -198,11 +198,9 @@ fn scope_exhaustive_panic_test() {
     });
 }
 
+/// This test verifies that run() uses unbounded entropy by default (max_len = usize::MAX)
 #[test]
 fn scope_unbounded_entropy_test() {
-    // This test verifies that run() uses unbounded entropy by default (max_len = usize::MAX)
-    // We generate many values in a single run, consuming more than the default 4096 bytes
-    // If max_len was limited to 4096, this test would fail
     let runs = AtomicUsize::new(0);
 
     check!().with_iterations(1).run(|| {
@@ -211,22 +209,27 @@ fn scope_unbounded_entropy_test() {
         for _ in 0..1000 {
             let _: u64 = any();
         }
-        runs.fetch_add(1, Ordering::Relaxed);
-    });
 
-    assert_eq!(runs.load(Ordering::Relaxed), 1);
+        for _ in 0..1000 {
+            if any() {
+                return;
+            }
+        }
+
+        panic!("did not generate non-empty entropy as expected");
+    });
 }
 
+/// Verify that when max_len is explicitly set, it is still respected
 #[test]
 fn scope_explicit_max_len_test() {
-    // Verify that when max_len is explicitly set, it is still respected
-    let runs = AtomicUsize::new(0);
-
     check!().with_max_len(100).with_iterations(5).run(|| {
-        // Try to generate a small value - this should work fine with max_len=100
-        let _: u8 = any();
-        runs.fetch_add(1, Ordering::Relaxed);
-    });
+        for _ in 0..1000 {
+            let _: u64 = any();
+        }
 
-    assert_eq!(runs.load(Ordering::Relaxed), 5);
+        for _ in 0..1000 {
+            assert_eq!(any::<u8>(), 0u8);
+        }
+    });
 }
