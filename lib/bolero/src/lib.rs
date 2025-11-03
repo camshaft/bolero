@@ -289,6 +289,14 @@ impl<G, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
         self.driver_options.set_exhaustive(true);
         self
     }
+
+    fn as_unbounded_options(&self) -> bolero_generator::driver::Options {
+        let mut options = self.driver_options.clone();
+        if options.max_len().is_none() {
+            options.set_max_len(usize::MAX);
+        }
+        options
+    }
 }
 
 impl<G: generator::ValueGenerator, Engine, InputOwnership> TestTarget<G, Engine, InputOwnership> {
@@ -439,8 +447,9 @@ where
         E: Engine<bolero_engine::BorrowedGeneratorTest<F, G, G::Output>>,
         bolero_engine::BorrowedGeneratorTest<F, G, G::Output>: Test,
     {
+        let options = self.as_unbounded_options();
         let test = bolero_engine::BorrowedGeneratorTest::new(test, self.generator);
-        self.engine.run(test, self.driver_options)
+        self.engine.run(test, options)
     }
 }
 
@@ -454,8 +463,9 @@ where
         E: Engine<bolero_engine::ClonedGeneratorTest<F, G, G::Output>>,
         bolero_engine::ClonedGeneratorTest<F, G, G::Output>: Test,
     {
+        let options = self.as_unbounded_options();
         let test = bolero_engine::ClonedGeneratorTest::new(test, self.generator);
-        self.engine.run(test, self.driver_options)
+        self.engine.run(test, options)
     }
 }
 
@@ -478,11 +488,7 @@ impl<E> TestTarget<ByteSliceGenerator, E, BorrowedInput> {
         R: bolero_engine::IntoResult,
         E: bolero_engine::ScopedEngine,
     {
-        // Default to unbounded entropy for run() - set max_len to usize::MAX if not explicitly set
-        let mut options = self.driver_options;
-        if options.max_len().is_none() {
-            options.set_max_len(usize::MAX);
-        }
+        let options = self.as_unbounded_options();
         self.engine.run(test, options)
     }
 }

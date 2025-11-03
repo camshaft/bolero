@@ -201,8 +201,6 @@ fn scope_exhaustive_panic_test() {
 /// This test verifies that run() uses unbounded entropy by default (max_len = usize::MAX)
 #[test]
 fn scope_unbounded_entropy_test() {
-    let runs = AtomicUsize::new(0);
-
     check!().with_iterations(1).run(|| {
         // Generate 1000 u64 values, which requires 8000 bytes of entropy
         // This exceeds the default max_len of 4096 bytes
