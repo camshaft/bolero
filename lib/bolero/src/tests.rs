@@ -197,3 +197,37 @@ fn scope_exhaustive_panic_test() {
         assert!(any::<bool>(), "oops");
     });
 }
+
+/// This test verifies that run() uses unbounded entropy by default (max_len = usize::MAX)
+#[test]
+fn scope_unbounded_entropy_test() {
+    check!().with_iterations(1).run(|| {
+        // Generate 1000 u64 values, which requires 8000 bytes of entropy
+        // This exceeds the default max_len of 4096 bytes
+        for _ in 0..1000 {
+            let _: u64 = any();
+        }
+
+        for _ in 0..1000 {
+            if any() {
+                return;
+            }
+        }
+
+        panic!("did not generate non-empty entropy as expected");
+    });
+}
+
+/// Verify that when max_len is explicitly set, it is still respected
+#[test]
+fn scope_explicit_max_len_test() {
+    check!().with_max_len(100).with_iterations(5).run(|| {
+        for _ in 0..1000 {
+            let _: u64 = any();
+        }
+
+        for _ in 0..1000 {
+            assert_eq!(any::<u8>(), 0u8);
+        }
+    });
+}
