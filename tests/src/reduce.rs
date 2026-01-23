@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
-    let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
+    let is_nightly = env::rustc_build().is_some_and(|b| b == "nightly");
 
     Test {
         rustc_bootstrap: !is_nightly,
