@@ -14,7 +14,7 @@ readme = "../bolero-generator/README.md"
 proc-macro = true
 
 [dependencies]
-proc-macro-crate = "2"
+proc-macro-crate = "3"
 proc-macro2 = "1"
 quote = "1"
 # The `full` feature is required to correctly parse attributes
