@@ -119,6 +119,7 @@ impl<'a, Output> Input<Output> for RngBufferedInput<'a> {
     }
 }
 
+#[allow(dead_code)]
 pub struct ReplayRng<'a> {
     buffer: &'a [u8],
 }
@@ -146,6 +147,7 @@ impl rand::RngCore for ReplayRng<'_> {
     }
 }
 
+#[allow(dead_code)]
 pub struct RngReplayInput<'a> {
     pub buffer: &'a mut Vec<u8>,
 }
