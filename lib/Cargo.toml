@@ -15,6 +15,3 @@ codegen-units = 1
 lto = true
 codegen-units = 1
 incremental = false
-
-[patch.crates-io]
-indexmap = "=2.11.4"
