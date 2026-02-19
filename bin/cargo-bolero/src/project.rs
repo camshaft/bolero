@@ -171,7 +171,7 @@ impl Project {
                 // https://github.com/rust-lang/rust/pull/88243
 
                 let is_rust_159 = version_meta.semver.major == 1 && version_meta.semver.minor >= 59;
-                let is_llvm_13 = version_meta.llvm_version.is_none_or(|v| v.major >= 13);
+                let is_llvm_13 = version_meta.llvm_version.map_or(true, |v| v.major >= 13);
 
                 Some(if is_rust_159 && is_llvm_13 {
                     &"-Cpasses=sancov-module"

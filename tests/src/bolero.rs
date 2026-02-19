@@ -4,7 +4,7 @@ use xshell::{cmd, Shell};
 pub fn test() -> Result {
     let rust_version = env::rustc();
 
-    let supports_arbitrary = rust_version.is_none_or(|v| v.major > 1 && v.minor >= 63);
+    let supports_arbitrary = rust_version.map_or(true, |v| v.major > 1 && v.minor >= 63);
 
     Test { supports_arbitrary }.run()?;
 

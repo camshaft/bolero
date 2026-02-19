@@ -2,7 +2,9 @@ extern crate proc_macro;
 
 mod generator_attr;
 
+// Ensure the pinned dependency is considered "used" (avoids unused-deps lint in CI).
 use generator_attr::GeneratorAttr;
+use indexmap as _;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use proc_macro_crate::{crate_name, FoundCrate};

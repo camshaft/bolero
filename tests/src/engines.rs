@@ -2,7 +2,7 @@ use crate::{env, Result};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
-    let is_nightly = env::rustc_build().is_some_and(|b| b == "nightly");
+    let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
     for engine in ["random", "libfuzzer", "afl", "honggfuzz", "kani"] {
         // TODO fix honggfuzz
