@@ -33,17 +33,17 @@ bolero-honggfuzz = { version = "0.13", path = "../bolero-honggfuzz" }
 
 [target.'cfg(fuzzing_random)'.dependencies]
 bolero-engine = { version = "0.13.4", path = "../bolero-engine", features = ["cache", "rng"] }
-rand = { version = "0.9" }
+rand = "0.10"
 
 [target.'cfg(kani)'.dependencies]
 bolero-kani = { version = "0.13", path = "../bolero-kani" }
 
 [target.'cfg(not(any(fuzzing, kani)))'.dependencies]
 bolero-engine = { version = "0.13.4", path = "../bolero-engine", features = ["cache", "rng"] }
-rand = { version = "0.9" }
+rand = "0.10"
 
 [dev-dependencies]
-rand = "0.9"
+rand = "0.10"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

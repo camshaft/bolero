@@ -3,7 +3,7 @@ use crate::{
     TypeGenerator, ValueGenerator,
 };
 use core::ops::Bound;
-use rand_core::TryRngCore;
+use rand_core::TryRng;
 
 #[macro_use]
 mod macros;

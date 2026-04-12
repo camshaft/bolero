@@ -6,7 +6,7 @@ pub(crate) use buffer_alloc::Buffer;
 pub(crate) use buffer_no_alloc::Buffer;
 
 #[derive(Debug)]
-pub struct Rng<R: TryRngCore> {
+pub struct Rng<R: TryRng> {
     rng: R,
     depth: usize,
     max_depth: usize,
@@ -16,7 +16,7 @@ pub struct Rng<R: TryRngCore> {
     buffer: Buffer,
 }
 
-impl<R: TryRngCore> Rng<R> {
+impl<R: TryRng> Rng<R> {
     pub fn new(rng: R, options: &Options) -> Self {
         Self {
             rng,
@@ -54,7 +54,7 @@ impl<R: TryRngCore> Rng<R> {
     }
 }
 
-impl<R: TryRngCore> AsRef<R> for Rng<R> {
+impl<R: TryRng> AsRef<R> for Rng<R> {
     #[inline]
     fn as_ref(&self) -> &R {
         &self.rng
@@ -62,8 +62,8 @@ impl<R: TryRngCore> AsRef<R> for Rng<R> {
 }
 
 #[inline]
-fn fill_bytes<R: TryRngCore>(rng: &mut R, bytes: &mut [u8]) -> Option<()> {
-    if TryRngCore::try_fill_bytes(rng, bytes).is_err() {
+fn fill_bytes<R: TryRng>(rng: &mut R, bytes: &mut [u8]) -> Option<()> {
+    if TryRng::try_fill_bytes(rng, bytes).is_err() {
         // if the rng fails to fill the remaining bytes, then we just start returning 0s
         for byte in bytes.iter_mut() {
             *byte = 0;
@@ -87,7 +87,7 @@ macro_rules! impl_sample {
     };
 }
 
-impl<R: TryRngCore> FillBytes for Rng<R> {
+impl<R: TryRng> FillBytes for Rng<R> {
     // prefer sampling the larger values since it's faster to pull from the RNG
     const SHOULD_SHRINK: bool = false;
 
@@ -124,7 +124,7 @@ impl<R: TryRngCore> FillBytes for Rng<R> {
     impl_sample!(sample_isize, isize, try_next_u64);
 }
 
-impl<R: TryRngCore> Driver for Rng<R> {
+impl<R: TryRng> Driver for Rng<R> {
     gen_from_bytes!();
 
     #[inline]
@@ -178,7 +178,7 @@ mod buffer_alloc {
         pub const MAX_CAPACITY: usize = isize::MAX as _;
 
         #[inline]
-        pub fn fill<R: TryRngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
+        pub fn fill<R: TryRng>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             let data = &mut self.bytes;
 
             let initial_len = data.len();
@@ -231,7 +231,7 @@ mod buffer_no_alloc {
         pub const MAX_CAPACITY: usize = 256;
 
         #[inline]
-        pub fn fill<R: TryRngCore>(&mut self, len: usize, rng: &mut R) -> Option<()> {
+        pub fn fill<R: TryRng>(&mut self, len: usize, rng: &mut R) -> Option<()> {
             if cfg!(test) {
                 assert!(len <= Self::MAX_CAPACITY);
             }

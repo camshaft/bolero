@@ -21,13 +21,13 @@ anyhow = "1"
 bolero-generator = { version = "0.13.5", path = "../bolero-generator", default-features = false }
 lazy_static = "1"
 pretty-hex = { version = "0.4", default-features = false }
-rand = { version = "0.9", optional = true }
-rand_xoshiro = { version = "0.7", optional = true }
+rand = { version = "0.10", optional = true }
+rand_xoshiro = { version = "0.8", optional = true }
 
 [dev-dependencies]
 bolero-generator = { version = "0.13.5", path = "../bolero-generator", features = ["std"] }
-rand = "0.9"
-rand_xoshiro = "0.7"
+rand = "0.10"
+rand_xoshiro = "0.8"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

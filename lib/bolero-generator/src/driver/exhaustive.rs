@@ -4,6 +4,7 @@ use crate::{
     uniform::{self, Uniform},
 };
 use alloc::vec::Vec;
+use core::convert::Infallible;
 use core::ops::{Bound, ControlFlow};
 
 #[derive(Clone, Debug)]
@@ -318,25 +319,28 @@ impl_driver!(&mut Driver);
 
 struct Rng<'a>(&'a mut State);
 
-impl rand_core::RngCore for Rng<'_> {
-    fn next_u32(&mut self) -> u32 {
-        self.0.select(u32::MAX as _) as _
+impl rand_core::TryRng for Rng<'_> {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(self.0.select(u32::MAX as _) as _)
     }
 
-    fn next_u64(&mut self) -> u64 {
-        self.0.select(u64::MAX)
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(self.0.select(u64::MAX))
     }
 
-    fn fill_bytes(&mut self, mut dest: &mut [u8]) {
+    fn try_fill_bytes(&mut self, mut dest: &mut [u8]) -> Result<(), Self::Error> {
         while dest.len() >= 8 {
             let (chunk, rest) = dest.split_at_mut(8);
             dest = rest;
-            let value = self.next_u64();
+            let value = self.try_next_u64()?;
             chunk.copy_from_slice(&value.to_be_bytes());
         }
 
         let value = self.0.select((1 << dest.len()) * 8);
         dest.copy_from_slice(&value.to_be_bytes()[..dest.len()]);
+        Ok(())
     }
 }
 
