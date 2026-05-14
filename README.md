@@ -70,3 +70,29 @@ available the requirement can be relaxed by executing `cargo install cargo-boler
 ```bash
 $ sudo apt install binutils-dev libunwind-dev
 ```
+
+### Verbose Output
+
+Set `BOLERO_VERBOSE` to enable additional output during test runs:
+
+```console
+$ BOLERO_VERBOSE=seed cargo test
+running tests::model_test with seed=257980385844766853829307593552934182957
+running tests::model_test with seed=89281095907698073451614483067208970550
+```
+
+Accepted values (comma-separated):
+- `seed` — print the seed before each RNG-based iteration
+- `1` or `all` — enable all verbose output
+
+This can also be enabled per-test in code:
+
+```rust
+use bolero::{check, Verbose};
+
+check!()
+    .with_verbose(Verbose::Seed)
+    .for_each(|input| {
+        // ...
+    });
+```

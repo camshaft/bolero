@@ -40,6 +40,13 @@ pub use bolero_engine::{Driver, Engine, Test};
 #[cfg(test)]
 mod tests;
 
+/// Controls what additional verbose output is printed during a test run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Verbose {
+    /// Print the seed for each RNG-based test input
+    Seed,
+}
+
 /// Execute tests for a given target
 ///
 /// This should be executed in a separate test target, for example
@@ -392,6 +399,12 @@ cfg_if::cfg_if! {
                 self.driver_options.set_max_len(max_len);
                 self
             }
+
+            /// Configure additional verbose output during the test run
+            pub fn with_verbose(self, output: Verbose) -> Self {
+                let _ = output;
+                self
+            }
         }
     } else {
         impl<G, InputOwnership> TestTarget<G, crate::test::TestEngine, InputOwnership> {
@@ -411,6 +424,12 @@ cfg_if::cfg_if! {
             pub fn with_max_len(mut self, max_len: usize) -> Self {
                 self.driver_options.set_max_len(max_len);
                 self.engine.with_max_len(max_len);
+                self
+            }
+
+            /// Configure additional verbose output during the test run
+            pub fn with_verbose(mut self, output: Verbose) -> Self {
+                self.engine.with_verbose(output);
                 self
             }
         }

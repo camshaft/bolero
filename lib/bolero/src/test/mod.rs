@@ -1,5 +1,6 @@
 #![cfg_attr(fuzzing_random, allow(dead_code))]
 
+use crate::Verbose;
 use bolero_engine::{
     driver::{self, exhaustive, object::Object},
     rng, Engine, Failure, Seed, TargetLocation, Test,
@@ -20,6 +21,7 @@ mod report;
 pub struct TestEngine {
     location: TargetLocation,
     rng_cfg: rng::Options,
+    outputs: Vec<Verbose>,
 }
 
 struct NamedTest {
@@ -53,6 +55,7 @@ impl TestEngine {
         Self {
             location,
             rng_cfg: Default::default(),
+            outputs: parse_verbose_env(),
         }
     }
 
@@ -68,6 +71,13 @@ impl TestEngine {
 
     pub fn with_max_len(&mut self, max_len: usize) -> &mut Self {
         self.rng_cfg.max_len = self.rng_cfg.max_len.or(Some(max_len));
+        self
+    }
+
+    pub fn with_verbose(&mut self, output: Verbose) -> &mut Self {
+        if !self.outputs.contains(&output) {
+            self.outputs.push(output);
+        }
         self
     }
 
@@ -348,6 +358,13 @@ impl TestEngine {
             Some(self.rng_cfg.test_time_or_default()).filter(|v| *v < Duration::MAX)
         };
 
+        let has_verbose = |v: Verbose| self.outputs.contains(&v);
+        let test_name = self
+            .location
+            .test_name
+            .clone()
+            .unwrap_or_else(|| self.location.item_path());
+
         let mut report = report::Report::default();
         if cfg!(fuzzing_random) {
             report.spawn_timer();
@@ -366,6 +383,12 @@ impl TestEngine {
                         default: self.rng_cfg.test_time.is_none(),
                     });
                     break;
+                }
+            }
+
+            if has_verbose(Verbose::Seed) {
+                if let input::Test::Rng(rng) = &input.data {
+                    eprintln!("running {test_name} with seed={}", rng.seed);
                 }
             }
 
@@ -462,4 +485,20 @@ impl bolero_engine::ScopedEngine for TestEngine {
         self.run_with_scope(test, options);
         bolero_engine::panic::forward_panic(true);
     }
+}
+
+fn parse_verbose_env() -> Vec<Verbose> {
+    let Ok(val) = std::env::var("BOLERO_VERBOSE") else {
+        return Vec::new();
+    };
+
+    let mut outputs = Vec::new();
+    for item in val.split(',') {
+        match item.trim().to_lowercase().as_str() {
+            "1" | "all" => return vec![Verbose::Seed],
+            "seed" => outputs.push(Verbose::Seed),
+            _ => {}
+        }
+    }
+    outputs
 }
