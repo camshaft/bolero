@@ -231,3 +231,55 @@ fn scope_explicit_max_len_test() {
         }
     });
 }
+
+#[test]
+fn test_context_is_running() {
+    assert!(!is_running(), "should not be running before check!");
+
+    check!().with_iterations(1).for_each(|_input: &[u8]| {
+        assert!(is_running(), "should be running inside check!");
+        assert!(current_context().is_some());
+        let ctx = current_context().unwrap();
+        assert_eq!(ctx.engine, EngineKind::Test);
+    });
+
+    assert!(!is_running(), "should not be running after check!");
+}
+
+#[test]
+fn test_context_seed() {
+    let seed_seen = AtomicUsize::new(0);
+
+    check!().with_iterations(5).for_each(|_input: &[u8]| {
+        let ctx = current_context().unwrap();
+        // RNG iterations have a seed
+        if ctx.input.seed.is_some() {
+            seed_seen.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+
+    // At least some iterations should have a seed (rng tests)
+    assert!(seed_seen.load(Ordering::Relaxed) > 0);
+}
+
+#[test]
+fn test_context_exhaustive() {
+    let num_iters = AtomicUsize::new(0);
+
+    check!()
+        .with_type::<u8>()
+        .cloned()
+        .exhaustive()
+        .for_each(|_value| {
+            assert!(is_running());
+            let ctx = current_context().unwrap();
+            assert_eq!(ctx.engine, EngineKind::Test);
+            // exhaustive mode has no seed or file
+            assert!(ctx.input.seed.is_none());
+            assert!(ctx.input.file.is_none());
+            num_iters.fetch_add(1, Ordering::Relaxed);
+        });
+
+    assert_eq!(num_iters.load(Ordering::Relaxed), 256);
+    assert!(!is_running(), "context should be cleared after exhaustive run");
+}

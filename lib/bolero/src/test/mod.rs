@@ -371,12 +371,25 @@ impl TestEngine {
 
             outcome.on_named_test(&input.data);
 
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Test,
+                match &input.data {
+                    input::Test::Rng(t) => {
+                        bolero_engine::TestInput::new(Some(t.seed), None)
+                    }
+                    input::Test::File(f) => {
+                        bolero_engine::TestInput::new(None, Some(f.path.clone()))
+                    }
+                },
+            ));
+
             match testfn(&mut state, &input.data) {
                 Ok(is_valid) => {
                     report.on_result(is_valid);
                 }
                 Err(err) => {
                     bolero_engine::panic::forward_panic(true);
+                    bolero_engine::test_context::clear_context();
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
                     eprintln!("{err}");
@@ -384,6 +397,8 @@ impl TestEngine {
                 }
             }
         }
+
+        bolero_engine::test_context::clear_context();
     }
 
     fn run_exhaustive<S, F>(self, mut state: S, mut testfn: F, options: driver::Options)
@@ -417,6 +432,11 @@ impl TestEngine {
 
             outcome.on_exhaustive_input();
 
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Test,
+                bolero_engine::TestInput::default(),
+            ));
+
             let (drvr, result) = testfn(driver, &mut state);
             driver = drvr;
 
@@ -427,6 +447,7 @@ impl TestEngine {
                 }
                 Err(error) => {
                     bolero_engine::panic::forward_panic(true);
+                    bolero_engine::test_context::clear_context();
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
                     eprintln!("{error}");
@@ -434,6 +455,8 @@ impl TestEngine {
                 }
             }
         }
+
+        bolero_engine::test_context::clear_context();
     }
 }
 

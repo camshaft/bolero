@@ -29,6 +29,11 @@ pub mod fuzzer {
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             bolero_panic::set_hook();
 
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Honggfuzz,
+                bolero_engine::TestInput::default(),
+            ));
+
             let mut input = HonggfuzzInput::new(options);
 
             loop {
@@ -48,6 +53,11 @@ pub mod fuzzer {
             R: bolero_engine::IntoResult,
         {
             bolero_panic::set_hook();
+
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Honggfuzz,
+                bolero_engine::TestInput::default(),
+            ));
 
             // extend the lifetime of the bytes so it can be stored in local storage
             let driver = bolero_engine::driver::bytes::Driver::new(&[][..], &options);

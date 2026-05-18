@@ -28,6 +28,11 @@ pub mod lib {
         type Output = ();
 
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Kani,
+                bolero_engine::TestInput::default(),
+            ));
+
             let mut input = KaniInput { options };
             match test.test(&mut input) {
                 Ok(was_valid) => {
@@ -55,6 +60,11 @@ pub mod lib {
             F: FnMut() -> R,
             R: bolero_engine::IntoResult,
         {
+            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Kani,
+                bolero_engine::TestInput::default(),
+            ));
+
             let driver = KaniDriver::new(&options);
             let (_driver, result) = bolero_engine::any::run(driver, test);
             match result {

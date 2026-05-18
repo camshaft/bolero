@@ -37,6 +37,8 @@ pub use bolero_engine::{self, TargetLocation, __item_path__};
 
 pub use bolero_engine::{Driver, Engine, Test};
 
+pub use bolero_engine::{current_context, is_running, EngineKind, TestInput, TestRunContext};
+
 #[cfg(test)]
 mod tests;
 
