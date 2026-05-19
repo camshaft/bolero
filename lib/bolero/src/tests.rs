@@ -238,8 +238,7 @@ fn test_context_is_running() {
 
     check!().with_iterations(1).for_each(|_input: &[u8]| {
         assert!(is_active(), "should be running inside check!");
-        assert!(current_context().is_some());
-        let ctx = current_context().unwrap();
+        let ctx = current_context().expect("context should be set inside check!");
         assert_eq!(ctx.engine, EngineKind::Test);
     });
 
