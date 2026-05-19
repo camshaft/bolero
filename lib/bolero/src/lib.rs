@@ -33,7 +33,7 @@ pub mod generator {
 pub use bolero_generator::prelude::*;
 
 #[doc(hidden)]
-pub use bolero_engine::{self, TargetLocation, __item_path__};
+pub use bolero_engine::{self, __item_path__, TargetLocation};
 
 pub use bolero_engine::{Driver, Engine, Test};
 

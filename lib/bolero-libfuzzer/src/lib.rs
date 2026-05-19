@@ -43,10 +43,11 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::LibFuzzer,
-                bolero_engine::TestInput::default(),
-            ));
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::LibFuzzer,
+                    bolero_engine::TestInput::default(),
+                ));
 
             let options = &options;
             let mut cache = driver::cache::Cache::default();
@@ -97,10 +98,11 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::LibFuzzer,
-                bolero_engine::TestInput::default(),
-            ));
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::LibFuzzer,
+                    bolero_engine::TestInput::default(),
+                ));
 
             let options = &options;
             // TODO implement caching

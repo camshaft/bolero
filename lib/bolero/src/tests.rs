@@ -280,5 +280,8 @@ fn test_context_exhaustive() {
         });
 
     assert_eq!(num_iters.load(Ordering::Relaxed), 256);
-    assert!(!is_active(), "context should be cleared after exhaustive run");
+    assert!(
+        !is_active(),
+        "context should be cleared after exhaustive run"
+    );
 }

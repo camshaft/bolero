@@ -29,10 +29,11 @@ pub mod fuzzer {
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             bolero_panic::set_hook();
 
-            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::Honggfuzz,
-                bolero_engine::TestInput::default(),
-            ));
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::Honggfuzz,
+                    bolero_engine::TestInput::default(),
+                ));
 
             let mut input = HonggfuzzInput::new(options);
 
@@ -54,10 +55,11 @@ pub mod fuzzer {
         {
             bolero_panic::set_hook();
 
-            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::Honggfuzz,
-                bolero_engine::TestInput::default(),
-            ));
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::Honggfuzz,
+                    bolero_engine::TestInput::default(),
+                ));
 
             // extend the lifetime of the bytes so it can be stored in local storage
             let driver = bolero_engine::driver::bytes::Driver::new(&[][..], &options);

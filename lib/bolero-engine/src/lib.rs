@@ -15,8 +15,8 @@ pub mod rng;
 pub mod shrink;
 #[doc(hidden)]
 pub mod target_location;
-pub mod test_context;
 mod test;
+pub mod test_context;
 
 pub use crate::failure::Failure;
 pub use anyhow::Error;
@@ -31,9 +31,7 @@ pub use result::IntoResult;
 #[doc(hidden)]
 pub use target_location::TargetLocation;
 pub use test::*;
-pub use test_context::{
-    current_context, is_active, EngineKind, TestInput, TestRunContext,
-};
+pub use test_context::{current_context, is_active, EngineKind, TestInput, TestRunContext};
 
 /// Trait for defining an engine that executes a test
 pub trait Engine<T: Test>: Sized {
