@@ -371,6 +371,17 @@ impl TestEngine {
 
             outcome.on_named_test(&input.data);
 
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::Test,
+                    match &input.data {
+                        input::Test::Rng(t) => bolero_engine::TestInput::new(Some(t.seed), None),
+                        input::Test::File(f) => {
+                            bolero_engine::TestInput::new(None, Some(f.path.clone()))
+                        }
+                    },
+                ));
+
             match testfn(&mut state, &input.data) {
                 Ok(is_valid) => {
                     report.on_result(is_valid);
@@ -416,6 +427,12 @@ impl TestEngine {
             }
 
             outcome.on_exhaustive_input();
+
+            let _ctx_guard =
+                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
+                    bolero_engine::EngineKind::Test,
+                    bolero_engine::TestInput::default(),
+                ));
 
             let (drvr, result) = testfn(driver, &mut state);
             driver = drvr;
