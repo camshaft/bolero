@@ -1,4 +1,5 @@
 use crate::Seed;
+#[cfg(not(kani))]
 use core::cell::RefCell;
 
 /// The engine kind currently running the test
@@ -52,6 +53,40 @@ impl TestRunContext {
     }
 }
 
+/// Returns `true` if the current code is executing inside a bolero test harness
+///
+/// # Example
+///
+/// ```rust,ignore
+/// fn my_function(input: &[u8]) {
+///     if bolero::is_active() {
+///         // modify behavior during fuzzing/property testing
+///     }
+/// }
+/// ```
+#[cfg(kani)]
+pub fn is_active() -> bool {
+    true
+}
+
+/// Returns the current [`TestRunContext`] if executing inside a bolero test harness,
+/// or `None` otherwise
+///
+/// # Example
+///
+/// ```rust,ignore
+/// fn my_function(input: &[u8]) {
+///     if let Some(ctx) = bolero::current_context() {
+///         eprintln!("engine: {:?}, seed: {:?}", ctx.engine, ctx.input.seed);
+///     }
+/// }
+/// ```
+#[cfg(kani)]
+pub fn current_context() -> Option<TestRunContext> {
+    Some(TestRunContext::new(EngineKind::Kani, TestInput::default()))
+}
+
+#[cfg(not(kani))]
 thread_local! {
     static CONTEXT: RefCell<Option<TestRunContext>> = const { RefCell::new(None) };
 }
@@ -67,6 +102,7 @@ thread_local! {
 ///     }
 /// }
 /// ```
+#[cfg(not(kani))]
 pub fn is_active() -> bool {
     CONTEXT.with(|ctx| ctx.borrow().is_some())
 }
@@ -83,6 +119,7 @@ pub fn is_active() -> bool {
 ///     }
 /// }
 /// ```
+#[cfg(not(kani))]
 pub fn current_context() -> Option<TestRunContext> {
     CONTEXT.with(|ctx| ctx.borrow().clone())
 }
@@ -91,10 +128,12 @@ pub fn current_context() -> Option<TestRunContext> {
 ///
 /// Obtained by calling [`enter`].
 #[doc(hidden)]
+#[cfg(not(kani))]
 pub struct ContextGuard {
     prev: Option<TestRunContext>,
 }
 
+#[cfg(not(kani))]
 impl Drop for ContextGuard {
     fn drop(&mut self) {
         CONTEXT.with(|ctx| *ctx.borrow_mut() = self.prev.take());
@@ -103,6 +142,7 @@ impl Drop for ContextGuard {
 
 /// Enter a test context, returning a [`ContextGuard`] that restores the previous context on drop.
 #[doc(hidden)]
+#[cfg(not(kani))]
 pub fn enter(context: TestRunContext) -> ContextGuard {
     let prev = CONTEXT.with(|ctx| ctx.borrow_mut().replace(context));
     ContextGuard { prev }
