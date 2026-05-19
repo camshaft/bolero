@@ -43,7 +43,7 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::LibFuzzer,
                 bolero_engine::TestInput::default(),
             ));
@@ -97,7 +97,7 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::LibFuzzer,
                 bolero_engine::TestInput::default(),
             ));

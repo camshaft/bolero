@@ -62,12 +62,12 @@ thread_local! {
 ///
 /// ```rust,ignore
 /// fn my_function(input: &[u8]) {
-///     if bolero::is_running() {
+///     if bolero::is_active() {
 ///         // modify behavior during fuzzing/property testing
 ///     }
 /// }
 /// ```
-pub fn is_running() -> bool {
+pub fn is_active() -> bool {
     CONTEXT.with(|ctx| ctx.borrow().is_some())
 }
 
@@ -87,12 +87,23 @@ pub fn current_context() -> Option<TestRunContext> {
     CONTEXT.with(|ctx| ctx.borrow().clone())
 }
 
+/// A guard that restores the previous test context when dropped.
+///
+/// Obtained by calling [`enter`].
 #[doc(hidden)]
-pub fn set_context(context: TestRunContext) {
-    CONTEXT.with(|ctx| *ctx.borrow_mut() = Some(context));
+pub struct ContextGuard {
+    prev: Option<TestRunContext>,
 }
 
+impl Drop for ContextGuard {
+    fn drop(&mut self) {
+        CONTEXT.with(|ctx| *ctx.borrow_mut() = self.prev.take());
+    }
+}
+
+/// Enter a test context, returning a [`ContextGuard`] that restores the previous context on drop.
 #[doc(hidden)]
-pub fn clear_context() {
-    CONTEXT.with(|ctx| *ctx.borrow_mut() = None);
+pub fn enter(context: TestRunContext) -> ContextGuard {
+    let prev = CONTEXT.with(|ctx| ctx.borrow_mut().replace(context));
+    ContextGuard { prev }
 }

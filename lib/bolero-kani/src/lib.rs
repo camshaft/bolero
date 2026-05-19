@@ -28,7 +28,7 @@ pub mod lib {
         type Output = ();
 
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::Kani,
                 bolero_engine::TestInput::default(),
             ));
@@ -60,7 +60,7 @@ pub mod lib {
             F: FnMut() -> R,
             R: bolero_engine::IntoResult,
         {
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::Kani,
                 bolero_engine::TestInput::default(),
             ));

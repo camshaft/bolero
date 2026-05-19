@@ -234,16 +234,16 @@ fn scope_explicit_max_len_test() {
 
 #[test]
 fn test_context_is_running() {
-    assert!(!is_running(), "should not be running before check!");
+    assert!(!is_active(), "should not be running before check!");
 
     check!().with_iterations(1).for_each(|_input: &[u8]| {
-        assert!(is_running(), "should be running inside check!");
+        assert!(is_active(), "should be running inside check!");
         assert!(current_context().is_some());
         let ctx = current_context().unwrap();
         assert_eq!(ctx.engine, EngineKind::Test);
     });
 
-    assert!(!is_running(), "should not be running after check!");
+    assert!(!is_active(), "should not be running after check!");
 }
 
 #[test]
@@ -271,7 +271,7 @@ fn test_context_exhaustive() {
         .cloned()
         .exhaustive()
         .for_each(|_value| {
-            assert!(is_running());
+            assert!(is_active());
             let ctx = current_context().unwrap();
             assert_eq!(ctx.engine, EngineKind::Test);
             // exhaustive mode has no seed or file
@@ -281,5 +281,5 @@ fn test_context_exhaustive() {
         });
 
     assert_eq!(num_iters.load(Ordering::Relaxed), 256);
-    assert!(!is_running(), "context should be cleared after exhaustive run");
+    assert!(!is_active(), "context should be cleared after exhaustive run");
 }

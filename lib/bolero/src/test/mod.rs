@@ -371,7 +371,7 @@ impl TestEngine {
 
             outcome.on_named_test(&input.data);
 
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::Test,
                 match &input.data {
                     input::Test::Rng(t) => {
@@ -389,7 +389,6 @@ impl TestEngine {
                 }
                 Err(err) => {
                     bolero_engine::panic::forward_panic(true);
-                    bolero_engine::test_context::clear_context();
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
                     eprintln!("{err}");
@@ -397,8 +396,6 @@ impl TestEngine {
                 }
             }
         }
-
-        bolero_engine::test_context::clear_context();
     }
 
     fn run_exhaustive<S, F>(self, mut state: S, mut testfn: F, options: driver::Options)
@@ -432,7 +429,7 @@ impl TestEngine {
 
             outcome.on_exhaustive_input();
 
-            bolero_engine::test_context::set_context(bolero_engine::TestRunContext::new(
+            let _ctx_guard = bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                 bolero_engine::EngineKind::Test,
                 bolero_engine::TestInput::default(),
             ));
@@ -447,7 +444,6 @@ impl TestEngine {
                 }
                 Err(error) => {
                     bolero_engine::panic::forward_panic(true);
-                    bolero_engine::test_context::clear_context();
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
                     eprintln!("{error}");
@@ -455,8 +451,6 @@ impl TestEngine {
                 }
             }
         }
-
-        bolero_engine::test_context::clear_context();
     }
 }
 
