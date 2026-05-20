@@ -266,6 +266,8 @@ mod std_impl {
     /// # Example
     ///
     /// ```rust,ignore
+    /// // This example must be `ignore` because it requires running inside a bolero
+    /// // test harness (i.e., inside a `check!` target).
     /// fn my_function(input: &[u8]) {
     ///     let log_guard = capture_logs(); // returns buffered log handle
     ///     bolero::on_failure(move || {

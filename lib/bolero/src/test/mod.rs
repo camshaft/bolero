@@ -349,7 +349,9 @@ impl TestEngine {
             }
         };
 
-        // run_with_scope has no shrinking yet (TODO)
+        // run_with_scope does not yet implement shrinking (see TODO comments inside
+        // the testfn closure above). Pass shrink_enabled=false so the context
+        // accurately reflects that no shrink phase will occur.
         self.run_tests(test, testfn, false)
     }
 
