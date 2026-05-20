@@ -42,12 +42,22 @@ pub struct TestRunContext {
     pub engine: EngineKind,
     /// Information about the current test input
     pub input: TestInput,
+    /// The number of test iterations executed so far in this harness run.
+    ///
+    /// This can be used by logging/tracing filters to suppress output during the
+    /// bulk of test iterations and only emit diagnostics on a specific iteration
+    /// (e.g., the final replay after shrinking).
+    pub iteration: u64,
 }
 
 impl TestRunContext {
     #[doc(hidden)]
-    pub fn new(engine: EngineKind, input: TestInput) -> Self {
-        Self { engine, input }
+    pub fn new(engine: EngineKind, input: TestInput, iteration: u64) -> Self {
+        Self {
+            engine,
+            input,
+            iteration,
+        }
     }
 }
 
@@ -83,7 +93,7 @@ mod kani_impl {
     /// }
     /// ```
     pub fn current_context() -> Option<TestRunContext> {
-        Some(TestRunContext::new(EngineKind::Kani, TestInput::default()))
+        Some(TestRunContext::new(EngineKind::Kani, TestInput::default(), 0))
     }
 }
 

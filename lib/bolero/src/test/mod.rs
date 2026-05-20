@@ -358,6 +358,8 @@ impl TestEngine {
         bolero_engine::panic::set_hook();
         bolero_engine::panic::forward_panic(false);
 
+        let mut iteration: u64 = 0;
+
         for input in tests {
             if let Some(test_time) = test_time {
                 if start_time.elapsed() > test_time {
@@ -380,7 +382,10 @@ impl TestEngine {
                             bolero_engine::TestInput::new(None, Some(f.path.clone()))
                         }
                     },
+                    iteration,
                 ));
+
+            iteration += 1;
 
             match testfn(&mut state, &input.data) {
                 Ok(is_valid) => {
@@ -414,6 +419,7 @@ impl TestEngine {
         report.spawn_timer();
 
         let mut outcome = outcome::Outcome::new(&self.location, start_time);
+        let mut iteration: u64 = 0;
 
         while driver.step().is_continue() {
             if let Some(test_time) = test_time {
@@ -432,7 +438,10 @@ impl TestEngine {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::Test,
                     bolero_engine::TestInput::default(),
+                    iteration,
                 ));
+
+            iteration += 1;
 
             let (drvr, result) = testfn(driver, &mut state);
             driver = drvr;

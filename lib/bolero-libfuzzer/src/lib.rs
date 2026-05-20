@@ -47,6 +47,7 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
+                    0,
                 ));
 
             let options = &options;
@@ -102,6 +103,7 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
+                    0,
                 ));
 
             let options = &options;
