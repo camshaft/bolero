@@ -159,7 +159,13 @@ impl TestEngine {
                 let result = match test.test(&mut input) {
                     Ok(is_valid) => Ok(is_valid),
                     Err(error) => {
-                        // restart the driver to replay what was selected
+                        // restart the driver to replay what was selected, set failure phase,
+                        // then re-run so the application can capture diagnostic output
+                        input.driver.replay();
+                        bolero_engine::test_context::update(|ctx| {
+                            ctx.run_phase = bolero_engine::RunPhase::Failure;
+                        });
+                        let _ = test.test(&mut input);
                         input.driver.replay();
                         let input = test.generate_value(&mut input);
                         let error = Failure {
@@ -193,14 +199,19 @@ impl TestEngine {
 
                     let mut input = input::Bytes::new(&buffer, file_options);
                     test.test(&mut input).map_err(|error| {
-                        bolero_engine::test_context::update(|ctx| {
-                            ctx.run_phase = bolero_engine::RunPhase::Shrink;
-                        });
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
                         if let Some(shrunken) = shrunken {
                             format!("{shrunken:#}")
                         } else {
+                            // Shrinking was skipped or made no progress.
+                            // Set failure phase and re-run the original input so the
+                            // application can capture diagnostic output.
+                            bolero_engine::test_context::update(|ctx| {
+                                ctx.run_phase = bolero_engine::RunPhase::Failure;
+                            });
+                            let mut replay = input::Bytes::new(&buffer, file_options);
+                            let _ = test.test(&mut replay);
                             format!(
                                 "{:#}",
                                 Failure {
@@ -218,9 +229,6 @@ impl TestEngine {
                         let shrunken = if rng_options.shrink_time_or_default().is_zero() {
                             None
                         } else {
-                            bolero_engine::test_context::update(|ctx| {
-                                ctx.run_phase = bolero_engine::RunPhase::Shrink;
-                            });
                             // reseed the input and buffer the rng for shrinking
                             let mut input = conf.buffered_input(&mut buffer, rng_options);
                             let _ = test.generate_value(&mut input);
@@ -231,6 +239,15 @@ impl TestEngine {
                         if let Some(shrunken) = shrunken {
                             format!("{shrunken:#}")
                         } else {
+                            // Shrinking was skipped or made no progress.
+                            // Set failure phase and re-run the original input so the
+                            // application can capture diagnostic output.
+                            bolero_engine::test_context::update(|ctx| {
+                                ctx.run_phase = bolero_engine::RunPhase::Failure;
+                            });
+                            buffer.clear();
+                            let mut replay = conf.input(&mut buffer, &mut cache, rng_options);
+                            let _ = test.test(&mut replay);
                             buffer.clear();
                             let mut input = conf.input(&mut buffer, &mut cache, rng_options);
                             let input = test.generate_value(&mut input);

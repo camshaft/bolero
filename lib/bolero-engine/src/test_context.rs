@@ -142,6 +142,10 @@ mod kani_impl {
         let ctx = TestRunContext::new(EngineKind::Kani, TestInput::default(), 0, RunPhase::Normal);
         Some(f(&ctx))
     }
+
+    /// No-op in kani — context state is not tracked.
+    #[doc(hidden)]
+    pub fn update<F: FnOnce(&mut TestRunContext)>(_f: F) {}
 }
 
 #[cfg(not(kani))]
@@ -246,7 +250,7 @@ mod std_impl {
 }
 
 #[cfg(kani)]
-pub use kani_impl::{current_context, is_active, with_context};
+pub use kani_impl::{current_context, is_active, update, with_context};
 
 #[cfg(not(kani))]
 pub use std_impl::{current_context, enter, is_active, update, with_context, ContextGuard};
