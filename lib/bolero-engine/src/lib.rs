@@ -31,7 +31,10 @@ pub use result::IntoResult;
 #[doc(hidden)]
 pub use target_location::TargetLocation;
 pub use test::*;
-pub use test_context::{current_context, is_active, EngineKind, TestInput, TestRunContext};
+pub use test_context::{
+    current_context, is_active, on_failure, with_context, EngineKind, RunPhase, TestInput,
+    TestRunContext,
+};
 
 /// Trait for defining an engine that executes a test
 pub trait Engine<T: Test>: Sized {

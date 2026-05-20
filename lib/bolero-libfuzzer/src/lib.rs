@@ -47,6 +47,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let options = &options;
@@ -67,8 +69,18 @@ pub mod fuzzer {
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
                         if let Some(shrunken) = shrunken {
+                            // shrink.rs already ran the final confirmed-failure execution
+                            // with RunPhase::Failure set
                             eprintln!("{shrunken:#}");
                         } else {
+                            // Shrinking was skipped or made no progress.
+                            // Set failure phase and re-run the original input so the
+                            // application can capture diagnostic output.
+                            bolero_engine::test_context::update(|ctx| {
+                                ctx.run_phase = bolero_engine::RunPhase::Failure;
+                            });
+                            let mut replay = input::cache::Bytes::new(slice, options, &mut cache);
+                            let _ = test.test(&mut replay);
                             let input = input::Bytes::new(slice, options);
                             eprintln!(
                                 "{:#}",
@@ -80,6 +92,7 @@ pub mod fuzzer {
                             );
                         }
 
+                        bolero_engine::test_context::invoke_on_failure();
                         std::process::abort();
                     }
                 }
@@ -102,6 +115,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let options = &options;

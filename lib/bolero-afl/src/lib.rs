@@ -42,6 +42,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::Afl,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let mut input = AflInput::new(options);
@@ -74,6 +76,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::Afl,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             // extend the lifetime of the bytes so it can be stored in local storage

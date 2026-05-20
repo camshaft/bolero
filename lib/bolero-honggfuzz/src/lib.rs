@@ -33,6 +33,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::Honggfuzz,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let mut input = HonggfuzzInput::new(options);
@@ -59,6 +61,8 @@ pub mod fuzzer {
                 bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
                     bolero_engine::EngineKind::Honggfuzz,
                     bolero_engine::TestInput::default(),
+                    0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             // extend the lifetime of the bytes so it can be stored in local storage
