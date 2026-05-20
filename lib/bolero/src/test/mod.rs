@@ -374,7 +374,7 @@ impl TestEngine {
                 bolero_engine::RunPhase::Normal,
             ));
 
-        let mut iteration: u64 = 0;
+        let mut iteration = 0u64;
 
         for input in tests {
             if let Some(test_time) = test_time {
@@ -443,7 +443,7 @@ impl TestEngine {
                 bolero_engine::RunPhase::Normal,
             ));
 
-        let mut iteration: u64 = 0;
+        let mut iteration = 0u64;
 
         while driver.step().is_continue() {
             if let Some(test_time) = test_time {

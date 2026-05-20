@@ -164,7 +164,9 @@ mod std_impl {
 
     /// Updates the `iteration` field of the current test context in-place.
     ///
-    /// Has no effect when called outside a bolero test harness.
+    /// Called by test harnesses at the start of each iteration to increment the
+    /// iteration counter without reconstructing the context guard. Has no effect
+    /// when called outside a bolero test harness.
     #[doc(hidden)]
     pub fn set_iteration(iteration: u64) {
         CONTEXT.with(|ctx| {
@@ -176,6 +178,9 @@ mod std_impl {
 
     /// Updates the `run_phase` field of the current test context in-place.
     ///
+    /// Called by test harnesses to signal phase transitions within an iteration
+    /// (e.g., switching from [`RunPhase::Normal`] to [`RunPhase::Shrink`] when
+    /// shrinking begins, or to [`RunPhase::Failure`] once the failure is confirmed).
     /// Has no effect when called outside a bolero test harness.
     #[doc(hidden)]
     pub fn set_run_phase(run_phase: RunPhase) {
@@ -188,7 +193,9 @@ mod std_impl {
 
     /// Updates the `input` field of the current test context in-place.
     ///
-    /// Has no effect when called outside a bolero test harness.
+    /// Called by test harnesses at the start of each iteration to update the
+    /// current test input (seed or file path) without reconstructing the context
+    /// guard. Has no effect when called outside a bolero test harness.
     #[doc(hidden)]
     pub fn set_input(input: TestInput) {
         CONTEXT.with(|ctx| {
