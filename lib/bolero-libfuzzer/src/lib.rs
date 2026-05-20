@@ -92,6 +92,7 @@ pub mod fuzzer {
                             );
                         }
 
+                        bolero_engine::test_context::invoke_on_failure();
                         std::process::abort();
                     }
                 }

@@ -265,7 +265,7 @@ impl TestEngine {
             }
         };
 
-        self.run_tests(test, testfn)
+        self.run_tests(test, testfn, !rng_options.shrink_time_or_default().is_zero())
     }
 
     #[cfg(feature = "std")]
@@ -349,10 +349,11 @@ impl TestEngine {
             }
         };
 
-        self.run_tests(test, testfn)
+        // run_with_scope has no shrinking yet (TODO)
+        self.run_tests(test, testfn, false)
     }
 
-    fn run_tests<S, T>(mut self, mut state: S, mut testfn: T)
+    fn run_tests<S, T>(mut self, mut state: S, mut testfn: T, shrink_enabled: bool)
     where
         T: FnMut(&mut S, &input::Test) -> Result<bool, String>,
     {
@@ -383,13 +384,14 @@ impl TestEngine {
 
         // Enter the context once before the loop; update mutable fields per iteration
         // using setters to avoid the cost of constructing a new guard each iteration.
-        let _ctx_guard =
-            bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::Test,
-                bolero_engine::TestInput::default(),
-                0,
-                bolero_engine::RunPhase::Normal,
-            ));
+        let mut ctx = bolero_engine::TestRunContext::new(
+            bolero_engine::EngineKind::Test,
+            bolero_engine::TestInput::default(),
+            0,
+            bolero_engine::RunPhase::Normal,
+        );
+        ctx.shrink_enabled = shrink_enabled;
+        let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
         let mut iteration = 0u64;
 
@@ -406,6 +408,9 @@ impl TestEngine {
 
             outcome.on_named_test(&input.data);
 
+            // Clear any on_failure callback from the previous iteration, then update
+            // the context for this iteration.
+            bolero_engine::test_context::clear_on_failure();
             bolero_engine::test_context::update(|ctx| {
                 ctx.input = match &input.data {
                     input::Test::Rng(t) => bolero_engine::TestInput::new(Some(t.seed), None),
@@ -426,6 +431,7 @@ impl TestEngine {
                     bolero_engine::test_context::update(|ctx| {
                         ctx.run_phase = bolero_engine::RunPhase::Failure;
                     });
+                    bolero_engine::test_context::invoke_on_failure();
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
@@ -456,13 +462,15 @@ impl TestEngine {
 
         // Enter the context once before the loop; update mutable fields per iteration
         // using setters to avoid the cost of constructing a new guard each iteration.
-        let _ctx_guard =
-            bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                bolero_engine::EngineKind::Test,
-                bolero_engine::TestInput::default(),
-                0,
-                bolero_engine::RunPhase::Normal,
-            ));
+        let mut ctx = bolero_engine::TestRunContext::new(
+            bolero_engine::EngineKind::Test,
+            bolero_engine::TestInput::default(),
+            0,
+            bolero_engine::RunPhase::Normal,
+        );
+        // Exhaustive mode never shrinks
+        ctx.shrink_enabled = false;
+        let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
         let mut iteration = 0u64;
 
@@ -479,6 +487,9 @@ impl TestEngine {
 
             outcome.on_exhaustive_input();
 
+            // Clear any on_failure callback from the previous iteration, then update
+            // the context for this iteration.
+            bolero_engine::test_context::clear_on_failure();
             bolero_engine::test_context::update(|ctx| {
                 ctx.iteration = iteration;
                 ctx.run_phase = bolero_engine::RunPhase::Normal;
@@ -497,6 +508,7 @@ impl TestEngine {
                     bolero_engine::test_context::update(|ctx| {
                         ctx.run_phase = bolero_engine::RunPhase::Failure;
                     });
+                    bolero_engine::test_context::invoke_on_failure();
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);

@@ -67,6 +67,16 @@ pub struct TestRunContext {
     /// specific phases, for example suppressing output during [`RunPhase::Normal`]
     /// and enabling it during [`RunPhase::Shrink`] or [`RunPhase::Failure`].
     pub run_phase: RunPhase,
+    /// Whether the harness will attempt to shrink failing inputs.
+    ///
+    /// When `false`, the harness transitions directly from [`RunPhase::Normal`] to
+    /// [`RunPhase::Failure`] on the first detected failure without any
+    /// [`RunPhase::Shrink`] iterations in between.  Applications that buffer
+    /// diagnostic output and emit it only on [`RunPhase::Failure`] do not need to
+    /// change their strategy — a [`RunPhase::Failure`] re-run always occurs
+    /// regardless of this flag — but they can use it to decide, for example,
+    /// whether to capture a full trace or just a lightweight summary.
+    pub shrink_enabled: bool,
 }
 
 impl TestRunContext {
@@ -77,6 +87,7 @@ impl TestRunContext {
             input,
             iteration,
             run_phase,
+            shrink_enabled: true,
         }
     }
 }
@@ -146,6 +157,19 @@ mod kani_impl {
     /// No-op in kani — context state is not tracked.
     #[doc(hidden)]
     pub fn update<F: FnOnce(&mut TestRunContext)>(_f: F) {}
+
+    /// Register a callback to be invoked right before the test failure is reported.
+    ///
+    /// No-op in kani — the model checker does not support this mechanism.
+    pub fn on_failure(_f: impl FnOnce() + 'static) {}
+
+    /// No-op in kani.
+    #[doc(hidden)]
+    pub fn invoke_on_failure() {}
+
+    /// No-op in kani.
+    #[doc(hidden)]
+    pub fn clear_on_failure() {}
 }
 
 #[cfg(not(kani))]
@@ -155,6 +179,7 @@ mod std_impl {
 
     thread_local! {
         static CONTEXT: RefCell<Option<TestRunContext>> = const { RefCell::new(None) };
+        static ON_FAILURE: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
     }
 
     /// Returns `true` if the current code is executing inside a bolero test harness
@@ -227,6 +252,52 @@ mod std_impl {
         });
     }
 
+    /// Register a callback to be invoked right before the test failure is reported.
+    ///
+    /// The callback is called once, immediately before the harness panics (or aborts in
+    /// fuzz engines) to report the confirmed failure. This allows applications to flush
+    /// any buffered diagnostic output (e.g., captured tracing spans) in response to the
+    /// failure.
+    ///
+    /// Any previously registered callback for the current iteration is replaced. The
+    /// callback is cleared at the start of each test iteration so it must be re-registered
+    /// on every call to the test function.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// fn my_function(input: &[u8]) {
+    ///     let log_guard = capture_logs(); // returns buffered log handle
+    ///     bolero::on_failure(move || {
+    ///         eprintln!("=== captured logs ===\n{}", log_guard.dump());
+    ///     });
+    ///     // ... test logic ...
+    /// }
+    /// ```
+    pub fn on_failure(f: impl FnOnce() + 'static) {
+        ON_FAILURE.with(|cb| *cb.borrow_mut() = Some(Box::new(f)));
+    }
+
+    /// Take and invoke the registered `on_failure` callback, if any.
+    ///
+    /// Called by the harness just before it panics or aborts to report a test failure.
+    #[doc(hidden)]
+    pub fn invoke_on_failure() {
+        let cb = ON_FAILURE.with(|cb| cb.borrow_mut().take());
+        if let Some(f) = cb {
+            f();
+        }
+    }
+
+    /// Clear any registered `on_failure` callback.
+    ///
+    /// Called at the start of each test iteration so that a callback registered during a
+    /// previous iteration cannot fire on a subsequent failure.
+    #[doc(hidden)]
+    pub fn clear_on_failure() {
+        ON_FAILURE.with(|cb| *cb.borrow_mut() = None);
+    }
+
     /// A guard that restores the previous test context when dropped.
     ///
     /// Obtained by calling [`enter`].
@@ -250,7 +321,13 @@ mod std_impl {
 }
 
 #[cfg(kani)]
-pub use kani_impl::{current_context, is_active, update, with_context};
+pub use kani_impl::{
+    clear_on_failure, current_context, invoke_on_failure, is_active, on_failure, update,
+    with_context,
+};
 
 #[cfg(not(kani))]
-pub use std_impl::{current_context, enter, is_active, update, with_context, ContextGuard};
+pub use std_impl::{
+    clear_on_failure, current_context, enter, invoke_on_failure, is_active, on_failure, update,
+    with_context, ContextGuard,
+};

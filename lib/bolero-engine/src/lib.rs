@@ -32,7 +32,8 @@ pub use result::IntoResult;
 pub use target_location::TargetLocation;
 pub use test::*;
 pub use test_context::{
-    current_context, is_active, with_context, EngineKind, RunPhase, TestInput, TestRunContext,
+    current_context, is_active, on_failure, with_context, EngineKind, RunPhase, TestInput,
+    TestRunContext,
 };
 
 /// Trait for defining an engine that executes a test
