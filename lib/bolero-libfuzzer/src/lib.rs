@@ -48,6 +48,7 @@ pub mod fuzzer {
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
                     0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let options = &options;
@@ -65,8 +66,14 @@ pub mod fuzzer {
                     Err(error) => {
                         eprintln!("test failed; shrinking input...");
 
+                        bolero_engine::test_context::set_run_phase(
+                            bolero_engine::RunPhase::Shrink,
+                        );
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
+                        bolero_engine::test_context::set_run_phase(
+                            bolero_engine::RunPhase::Failure,
+                        );
                         if let Some(shrunken) = shrunken {
                             eprintln!("{shrunken:#}");
                         } else {
@@ -104,6 +111,7 @@ pub mod fuzzer {
                     bolero_engine::EngineKind::LibFuzzer,
                     bolero_engine::TestInput::default(),
                     0,
+                    bolero_engine::RunPhase::Normal,
                 ));
 
             let options = &options;
