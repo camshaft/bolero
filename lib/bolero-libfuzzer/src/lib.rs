@@ -66,14 +66,14 @@ pub mod fuzzer {
                     Err(error) => {
                         eprintln!("test failed; shrinking input...");
 
-                        bolero_engine::test_context::set_run_phase(
-                            bolero_engine::RunPhase::Shrink,
-                        );
+                        bolero_engine::test_context::update(|ctx| {
+                            ctx.run_phase = bolero_engine::RunPhase::Shrink;
+                        });
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
-                        bolero_engine::test_context::set_run_phase(
-                            bolero_engine::RunPhase::Failure,
-                        );
+                        bolero_engine::test_context::update(|ctx| {
+                            ctx.run_phase = bolero_engine::RunPhase::Failure;
+                        });
                         if let Some(shrunken) = shrunken {
                             eprintln!("{shrunken:#}");
                         } else {

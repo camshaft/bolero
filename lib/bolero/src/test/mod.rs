@@ -193,9 +193,9 @@ impl TestEngine {
 
                     let mut input = input::Bytes::new(&buffer, file_options);
                     test.test(&mut input).map_err(|error| {
-                        bolero_engine::test_context::set_run_phase(
-                            bolero_engine::RunPhase::Shrink,
-                        );
+                        bolero_engine::test_context::update(|ctx| {
+                            ctx.run_phase = bolero_engine::RunPhase::Shrink;
+                        });
                         let shrunken = test.shrink(buffer.clone(), data.seed(), file_options);
 
                         if let Some(shrunken) = shrunken {
@@ -218,9 +218,9 @@ impl TestEngine {
                         let shrunken = if rng_options.shrink_time_or_default().is_zero() {
                             None
                         } else {
-                            bolero_engine::test_context::set_run_phase(
-                                bolero_engine::RunPhase::Shrink,
-                            );
+                            bolero_engine::test_context::update(|ctx| {
+                                ctx.run_phase = bolero_engine::RunPhase::Shrink;
+                            });
                             // reseed the input and buffer the rng for shrinking
                             let mut input = conf.buffered_input(&mut buffer, rng_options);
                             let _ = test.generate_value(&mut input);
@@ -389,14 +389,16 @@ impl TestEngine {
 
             outcome.on_named_test(&input.data);
 
-            bolero_engine::test_context::set_input(match &input.data {
-                input::Test::Rng(t) => bolero_engine::TestInput::new(Some(t.seed), None),
-                input::Test::File(f) => {
-                    bolero_engine::TestInput::new(None, Some(f.path.clone()))
-                }
+            bolero_engine::test_context::update(|ctx| {
+                ctx.input = match &input.data {
+                    input::Test::Rng(t) => bolero_engine::TestInput::new(Some(t.seed), None),
+                    input::Test::File(f) => {
+                        bolero_engine::TestInput::new(None, Some(f.path.clone()))
+                    }
+                };
+                ctx.iteration = iteration;
+                ctx.run_phase = bolero_engine::RunPhase::Normal;
             });
-            bolero_engine::test_context::set_iteration(iteration);
-            bolero_engine::test_context::set_run_phase(bolero_engine::RunPhase::Normal);
             iteration += 1;
 
             match testfn(&mut state, &input.data) {
@@ -404,7 +406,9 @@ impl TestEngine {
                     report.on_result(is_valid);
                 }
                 Err(err) => {
-                    bolero_engine::test_context::set_run_phase(bolero_engine::RunPhase::Failure);
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);
@@ -458,8 +462,10 @@ impl TestEngine {
 
             outcome.on_exhaustive_input();
 
-            bolero_engine::test_context::set_iteration(iteration);
-            bolero_engine::test_context::set_run_phase(bolero_engine::RunPhase::Normal);
+            bolero_engine::test_context::update(|ctx| {
+                ctx.iteration = iteration;
+                ctx.run_phase = bolero_engine::RunPhase::Normal;
+            });
             iteration += 1;
 
             let (drvr, result) = testfn(driver, &mut state);
@@ -471,7 +477,9 @@ impl TestEngine {
                     report.on_result(is_valid);
                 }
                 Err(error) => {
-                    bolero_engine::test_context::set_run_phase(bolero_engine::RunPhase::Failure);
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
                     bolero_engine::panic::forward_panic(true);
                     outcome.on_exit(outcome::ExitReason::TestFailure);
                     drop(outcome);

@@ -120,6 +120,28 @@ mod kani_impl {
             RunPhase::Normal,
         ))
     }
+
+    /// Calls `f` with a reference to the current [`TestRunContext`] and returns the result,
+    /// or returns `None` if not inside a bolero test harness.
+    ///
+    /// This is cheaper than [`current_context`] because it avoids cloning the context.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// fn my_function(input: &[u8]) {
+    ///     bolero::with_context(|ctx| {
+    ///         eprintln!("phase: {:?}", ctx.run_phase);
+    ///     });
+    /// }
+    /// ```
+    pub fn with_context<F, R>(f: F) -> Option<R>
+    where
+        F: FnOnce(&TestRunContext) -> R,
+    {
+        let ctx = TestRunContext::new(EngineKind::Kani, TestInput::default(), 0, RunPhase::Normal);
+        Some(f(&ctx))
+    }
 }
 
 #[cfg(not(kani))]
@@ -162,45 +184,41 @@ mod std_impl {
         CONTEXT.with(|ctx| ctx.borrow().clone())
     }
 
-    /// Updates the `iteration` field of the current test context in-place.
+    /// Calls `f` with a reference to the current [`TestRunContext`] and returns the result,
+    /// or returns `None` if not inside a bolero test harness.
     ///
-    /// Called by test harnesses at the start of each iteration to increment the
-    /// iteration counter without reconstructing the context guard. Has no effect
-    /// when called outside a bolero test harness.
-    #[doc(hidden)]
-    pub fn set_iteration(iteration: u64) {
-        CONTEXT.with(|ctx| {
-            if let Some(c) = ctx.borrow_mut().as_mut() {
-                c.iteration = iteration;
-            }
-        });
+    /// This is cheaper than [`current_context`] because it avoids cloning the context.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// fn my_function(input: &[u8]) {
+    ///     bolero::with_context(|ctx| {
+    ///         eprintln!("phase: {:?}", ctx.run_phase);
+    ///     });
+    /// }
+    /// ```
+    pub fn with_context<F, R>(f: F) -> Option<R>
+    where
+        F: FnOnce(&TestRunContext) -> R,
+    {
+        CONTEXT.with(|ctx| ctx.borrow().as_ref().map(f))
     }
 
-    /// Updates the `run_phase` field of the current test context in-place.
+    /// Mutates the current test context in-place by calling `f`.
     ///
-    /// Called by test harnesses to signal phase transitions within an iteration
-    /// (e.g., switching from [`RunPhase::Normal`] to [`RunPhase::Shrink`] when
-    /// shrinking begins, or to [`RunPhase::Failure`] once the failure is confirmed).
-    /// Has no effect when called outside a bolero test harness.
+    /// Called by test harnesses to update context fields (iteration counter, run phase,
+    /// input) without reconstructing the context guard. A single call can update multiple
+    /// fields with only one TLS borrow. Has no effect when called outside a bolero test
+    /// harness.
     #[doc(hidden)]
-    pub fn set_run_phase(run_phase: RunPhase) {
+    pub fn update<F>(f: F)
+    where
+        F: FnOnce(&mut TestRunContext),
+    {
         CONTEXT.with(|ctx| {
             if let Some(c) = ctx.borrow_mut().as_mut() {
-                c.run_phase = run_phase;
-            }
-        });
-    }
-
-    /// Updates the `input` field of the current test context in-place.
-    ///
-    /// Called by test harnesses at the start of each iteration to update the
-    /// current test input (seed or file path) without reconstructing the context
-    /// guard. Has no effect when called outside a bolero test harness.
-    #[doc(hidden)]
-    pub fn set_input(input: TestInput) {
-        CONTEXT.with(|ctx| {
-            if let Some(c) = ctx.borrow_mut().as_mut() {
-                c.input = input;
+                f(c);
             }
         });
     }
@@ -228,9 +246,7 @@ mod std_impl {
 }
 
 #[cfg(kani)]
-pub use kani_impl::{current_context, is_active};
+pub use kani_impl::{current_context, is_active, with_context};
 
 #[cfg(not(kani))]
-pub use std_impl::{
-    current_context, enter, is_active, set_input, set_iteration, set_run_phase, ContextGuard,
-};
+pub use std_impl::{current_context, enter, is_active, update, with_context, ContextGuard};
