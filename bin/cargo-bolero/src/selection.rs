@@ -18,7 +18,7 @@ impl Selection {
     }
 
     pub fn test_target(&self, flags: &[&str], fuzzer: &str) -> Result<TestTarget> {
-        let mut build_command = self.cmd("test", flags, Some(fuzzer))?;
+        let mut build_command = self.cmd("test", false, &[], flags, Some(fuzzer))?;
         build_command
             .arg(&self.test)
             .arg("--no-run")
@@ -26,7 +26,7 @@ impl Selection {
             .arg("--exact");
         exec(build_command)?;
 
-        let mut output_command = self.cmd("test", flags, Some(fuzzer))?;
+        let mut output_command = self.cmd("test", false, &[], flags, Some(fuzzer))?;
         output_command
             .arg(&self.test)
             .arg("--")
