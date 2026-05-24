@@ -109,11 +109,14 @@ impl TestEngine {
     }
 
     fn rng_tests(&self) -> impl Iterator<Item = input::RngTest> {
-        use rand::{rngs::StdRng, RngCore, SeedableRng};
+        use rand::{
+            rngs::{StdRng, SysRng},
+            Rng as _, SeedableRng as _,
+        };
 
         let iterations = self.rng_cfg.iterations_or_default();
         // use StdRng for high entropy seeds
-        let mut seed_rng = StdRng::from_os_rng();
+        let mut seed_rng = StdRng::try_from_rng(&mut SysRng).unwrap();
 
         (0..iterations).map(move |_| {
             let mut seed = [0; size_of::<Seed>()];
