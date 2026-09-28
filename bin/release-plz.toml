@@ -1,0 +1,10 @@
+# release-plz config for the bolero CLI workspace (release.yml runs release-plz here with
+# `manifest_path: bin/Cargo.toml`).
+#
+# cargo-bolero is a CLI binary that depends on the fuzzer-engine crates with their `bin` feature, so
+# building it for cargo-semver-checks pulls in the same native fuzzer-runtime builds that the
+# release runner cannot compile. Skip semver-checks for it (release-plz still versions it from
+# conventional-commit history).
+[[package]]
+name = "cargo-bolero"
+semver_check = false

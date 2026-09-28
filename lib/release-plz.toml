@@ -1,0 +1,25 @@
+# release-plz config for the bolero library workspace (release.yml runs release-plz here with
+# `manifest_path: lib/Cargo.toml`, so this config applies to the lib crates).
+#
+# The fuzzer-engine crates (bolero-afl / bolero-honggfuzz / bolero-libfuzzer / bolero-kani) are thin
+# FFI shims whose build scripts compile native fuzzer runtimes — e.g. bolero-honggfuzz builds the
+# honggfuzz C sources, which need a C toolchain + headers (bfd.h from binutils-dev, libunwind, …)
+# that the release runner does not carry. cargo-semver-checks builds each crate to diff its API, so
+# it trips over those native builds. Skip semver-checks for these shims (release-plz still versions
+# them from conventional-commit history); the pure-Rust core crates below keep semver-checks, which
+# is where API-break detection actually matters.
+[[package]]
+name = "bolero-afl"
+semver_check = false
+
+[[package]]
+name = "bolero-honggfuzz"
+semver_check = false
+
+[[package]]
+name = "bolero-libfuzzer"
+semver_check = false
+
+[[package]]
+name = "bolero-kani"
+semver_check = false
