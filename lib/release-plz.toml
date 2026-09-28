@@ -1,8 +1,0 @@
-# release-plz config for the bolero library workspace.
-#
-# release-plz opens the version-bump + CHANGELOG PR and, once it is merged, pushes the per-crate
-# `<crate>-v<version>` tags. It does NOT publish: `publish = false` leaves crates.io to release.yml,
-# which publishes via OIDC Trusted Publishing when those tags are pushed.
-[workspace]
-# Tag + changelog only; the OIDC publish lives in release.yml.
-publish = false
