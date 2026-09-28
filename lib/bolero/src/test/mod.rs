@@ -265,7 +265,11 @@ impl TestEngine {
             }
         };
 
-        self.run_tests(test, testfn, !rng_options.shrink_time_or_default().is_zero())
+        self.run_tests(
+            test,
+            testfn,
+            !rng_options.shrink_time_or_default().is_zero(),
+        )
     }
 
     #[cfg(feature = "std")]
@@ -395,9 +399,7 @@ impl TestEngine {
         ctx.shrink_enabled = shrink_enabled;
         let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
-        let mut iteration = 0u64;
-
-        for input in tests {
+        for (iteration, input) in tests.enumerate() {
             if let Some(test_time) = test_time {
                 if start_time.elapsed() > test_time {
                     outcome.on_exit(outcome::ExitReason::MaxDurationExceeded {
@@ -420,10 +422,9 @@ impl TestEngine {
                         bolero_engine::TestInput::new(None, Some(f.path.clone()))
                     }
                 };
-                ctx.iteration = iteration;
+                ctx.iteration = iteration as u64;
                 ctx.run_phase = bolero_engine::RunPhase::Normal;
             });
-            iteration += 1;
 
             match testfn(&mut state, &input.data) {
                 Ok(is_valid) => {

@@ -174,7 +174,7 @@ mod kani_impl {
 
 #[cfg(not(kani))]
 mod std_impl {
-    use super::{RunPhase, TestInput, TestRunContext};
+    use super::TestRunContext;
     use core::cell::RefCell;
 
     thread_local! {
