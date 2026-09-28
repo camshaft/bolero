@@ -2,6 +2,13 @@ use crate::{env, Result};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
+    // The examples exercise the library through the fuzzing engines; they are dev tooling, not part
+    // of the library's MSRV contract, so skip them on an old (MSRV-probe) toolchain.
+    if !env::runs_tooling_stages() {
+        eprintln!("skipping examples on this toolchain (library-MSRV-only row)");
+        return Ok(());
+    }
+
     Test {}.run()?;
 
     Ok(())

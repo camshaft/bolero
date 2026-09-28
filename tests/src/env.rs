@@ -35,6 +35,18 @@ pub fn configure_toolchain(sh: &xshell::Shell) {
     let _ = xshell::cmd!(sh, "rustc -vV").run();
 }
 
+/// Whether to run the dev-tooling / fuzzing test stages (examples, fuzz engines, reduce).
+///
+/// Those stages exercise `cargo-bolero` (whose own MSRV is 1.76) and run the example crates under
+/// the fuzzing engines — they are NOT part of the library's 1.68 MSRV contract, and fuzzing example
+/// code under an old toolchain surfaces the examples' intentional bugs rather than a library
+/// regression. So on a toolchain older than the tooling MSRV we skip them, making the MSRV matrix
+/// row a true library-only gate. The `stable`/`nightly` matrix rows don't parse as a version, so
+/// `rustc()` is `None` there and the stages run (as does a local run with no pinned toolchain).
+pub fn runs_tooling_stages() -> bool {
+    rustc().map_or(true, |v| v.major > 1 || v.minor >= 76)
+}
+
 /// Refresh the (gitignored) `Cargo.lock` in the current directory.
 ///
 /// The MSRV-aware dependency resolver — which honors each crate's declared

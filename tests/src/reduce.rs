@@ -3,6 +3,13 @@ use std::{fs, path::PathBuf};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
+    // reduce drives cargo-bolero (MSRV 1.76) to fuzz + reduce an example corpus; this is dev
+    // tooling, not the library's MSRV contract, so skip it on an old (MSRV-probe) toolchain.
+    if !env::runs_tooling_stages() {
+        eprintln!("skipping reduce on this toolchain (library-MSRV-only row)");
+        return Ok(());
+    }
+
     let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
     Test {
