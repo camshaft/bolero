@@ -2,6 +2,13 @@ use crate::{env, Result};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
+    // The fuzzing engines drive cargo-bolero (MSRV 1.76) and fuzz the example crates; this is dev
+    // tooling, not the library's MSRV contract, so skip it on an old (MSRV-probe) toolchain.
+    if !env::runs_tooling_stages() {
+        eprintln!("skipping fuzz engines on this toolchain (library-MSRV-only row)");
+        return Ok(());
+    }
+
     let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
     for engine in ["random", "libfuzzer", "afl", "honggfuzz", "kani"] {

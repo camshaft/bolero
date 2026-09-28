@@ -3,6 +3,13 @@ use std::{fs, path::PathBuf};
 use xshell::{cmd, Shell};
 
 pub fn test() -> Result {
+    // reduce drives cargo-bolero (MSRV 1.76) to fuzz + reduce an example corpus; this is dev
+    // tooling, not the library's MSRV contract, so skip it on an old (MSRV-probe) toolchain.
+    if !env::runs_tooling_stages() {
+        eprintln!("skipping reduce on this toolchain (library-MSRV-only row)");
+        return Ok(());
+    }
+
     let is_nightly = env::rustc_build().map_or(false, |b| b == "nightly");
 
     Test {
@@ -23,10 +30,10 @@ impl Test {
         sh.change_dir(env::examples());
         sh.change_dir("reduce");
 
-        // make sure this is up-to-date
-        let _ = sh.remove_path("Cargo.lock");
-
         env::configure_toolchain(&sh);
+
+        // make sure this is up-to-date (MSRV-aware for older matrix toolchains)
+        env::regenerate_lockfile(&sh)?;
 
         let cargo_bolero = env::bins().to_string() + "/target/debug/cargo-bolero";
 

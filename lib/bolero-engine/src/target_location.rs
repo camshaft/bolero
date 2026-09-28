@@ -88,7 +88,7 @@ impl TargetLocation {
                 .expect("valid current_exe")
                 .display(),
             self.work_dir().expect("valid work_dir").display(),
-            &self.package_name,
+            self.package_name,
             self.is_harnessed(),
             self.item_path(),
         );

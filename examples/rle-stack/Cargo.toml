@@ -2,6 +2,7 @@
 name = "rle-stack"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.68.0"
 
 [dev-dependencies]
 bolero = { path = "../../lib/bolero" }

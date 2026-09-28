@@ -62,9 +62,9 @@ impl BuildClusterfuzz {
                 .append_file(
                     dir.join(&*fuzz_bin),
                     &mut std::fs::File::open(&fuzz_exe)
-                        .with_context(|| format!("opening {:?}", &fuzz_exe))?,
+                        .with_context(|| format!("opening {:?}", fuzz_exe))?,
                 )
-                .with_context(|| format!("appending {:?} to {:?}", &fuzz_exe, &output_path))?;
+                .with_context(|| format!("appending {:?} to {:?}", fuzz_exe, output_path))?;
 
             for t in tests {
                 // : is not in VALID_TARGET_NAME_REGEX ; so we don’t use it and make sure to end in _fuzzer so we get picked up as a fuzzer
