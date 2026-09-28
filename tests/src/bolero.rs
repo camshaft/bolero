@@ -22,8 +22,8 @@ impl Test {
 
         env::configure_toolchain(&sh);
 
-        // make sure this is up-to-date
-        let _ = sh.remove_path("Cargo.lock");
+        // make sure this is up-to-date (MSRV-aware for older matrix toolchains)
+        env::regenerate_lockfile(&sh)?;
 
         cmd!(sh, "cargo test").run()?;
 

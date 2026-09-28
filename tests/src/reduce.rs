@@ -23,10 +23,10 @@ impl Test {
         sh.change_dir(env::examples());
         sh.change_dir("reduce");
 
-        // make sure this is up-to-date
-        let _ = sh.remove_path("Cargo.lock");
-
         env::configure_toolchain(&sh);
+
+        // make sure this is up-to-date (MSRV-aware for older matrix toolchains)
+        env::regenerate_lockfile(&sh)?;
 
         let cargo_bolero = env::bins().to_string() + "/target/debug/cargo-bolero";
 

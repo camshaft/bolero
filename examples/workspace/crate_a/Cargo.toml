@@ -3,6 +3,7 @@ name = "crate_a"
 version = "0.1.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
 edition = "2018"
+rust-version = "1.68.0"
 
 [dev-dependencies]
 bolero = { path = "../../../lib/bolero" }
