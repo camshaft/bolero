@@ -38,6 +38,11 @@ env:
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  # release-plz runs cargo in each workspace dir, and lib/ and bin/ carry rust-toolchain files
+  # pinning old MSRV toolchains (1.68 / 1.76). Those predate `cargo info` (1.79) and cargo-semver-checks
+  # needs, and would make release-plz's internal cargo calls fail. Force the release pipeline onto
+  # stable, which overrides the pinned rust-toolchain files (RUSTUP_TOOLCHAIN has highest precedence).
+  RUSTUP_TOOLCHAIN: stable
 
 jobs:
   # Keep the version-bump + CHANGELOG "release PR" open/updated, once per workspace.
@@ -63,6 +68,7 @@ jobs:
         with:
           command: release-pr
           manifest_path: lib/Cargo.toml
+          config: lib/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: release-plz release-pr (bin)
@@ -70,6 +76,7 @@ jobs:
         with:
           command: release-pr
           manifest_path: bin/Cargo.toml
+          config: bin/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,6 +106,7 @@ jobs:
         with:
           command: release
           manifest_path: lib/Cargo.toml
+          config: lib/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
@@ -107,6 +115,7 @@ jobs:
         with:
           command: release
           manifest_path: bin/Cargo.toml
+          config: bin/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
