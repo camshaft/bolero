@@ -8,6 +8,14 @@
 # it trips over those native builds. Skip semver-checks for these shims (release-plz still versions
 # them from conventional-commit history); the pure-Rust core crates below keep semver-checks, which
 # is where API-break detection actually matters.
+
+# bolero is TWO workspaces (lib/ + bin/) and release.yml runs release-plz once per workspace in the
+# same job. release-plz derives the release-PR branch from `pr_branch_prefix` (default `release-plz-`),
+# so with the default BOTH invocations target one branch and the second resets it — clobbering the
+# first workspace's release PR. Give each workspace a distinct prefix so the two release PRs coexist.
+[workspace]
+pr_branch_prefix = "release-plz-lib-"
+
 [[package]]
 name = "bolero-afl"
 semver_check = false

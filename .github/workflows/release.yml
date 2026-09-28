@@ -9,8 +9,10 @@ name: release
 # bolero is split into TWO Cargo workspaces — `lib/` (the published libraries) and `bin/` (the
 # `cargo-bolero` CLI, which depends on the lib crates). release-plz operates per-manifest, so each
 # job runs it once per workspace via `manifest_path`, with `lib/` before `bin/` so the CLI's
-# dependencies are on crates.io before it publishes. There is no `binaries` job: `cargo-bolero` is
-# installed from source (`cargo install cargo-bolero`), not shipped as a prebuilt binary.
+# dependencies are on crates.io before it publishes. Each workspace's release-plz config sets a
+# distinct `pr_branch_prefix` (release-plz-lib- / release-plz-bin-) so the two release-pr
+# invocations open SEPARATE release PRs instead of colliding on one branch. There is no `binaries`
+# job: `cargo-bolero` is installed from source (`cargo install cargo-bolero`), not a prebuilt binary.
 #
 # On every push to `master`, release-plz (https://release-plz.dev):
 #   - `release-pr`: keeps a version-bump + CHANGELOG "release PR" open, derived from the

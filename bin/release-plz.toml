@@ -5,6 +5,13 @@
 # building it for cargo-semver-checks pulls in the same native fuzzer-runtime builds that the
 # release runner cannot compile. Skip semver-checks for it (release-plz still versions it from
 # conventional-commit history).
+
+# Distinct release-PR branch prefix from the lib workspace: release.yml runs release-plz once per
+# workspace in the same job, and with the default prefix both would target one branch and the second
+# would clobber the first. See lib/release-plz.toml for the full rationale.
+[workspace]
+pr_branch_prefix = "release-plz-bin-"
+
 [[package]]
 name = "cargo-bolero"
 semver_check = false
