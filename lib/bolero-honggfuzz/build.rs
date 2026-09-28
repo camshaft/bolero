@@ -28,7 +28,7 @@ fn build(target: &str, file: &str, lib: &str) -> String {
         .expect("could not copy target");
 
     println!("cargo:rustc-link-lib=static={lib}");
-    println!("cargo:rustc-link-search=native={}", &out_dir);
+    println!("cargo:rustc-link-search=native={out_dir}");
 
     std::fs::copy(
         "honggfuzz/libhfcommon/libhfcommon.a",

@@ -72,7 +72,7 @@ harness = false
             )
             .expect("could not write test config");
 
-        println!("Created {:?}", &self.test);
+        println!("Created {:?}", self.test);
 
         Ok(())
     }
