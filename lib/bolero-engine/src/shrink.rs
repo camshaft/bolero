@@ -86,6 +86,11 @@ impl<'a, T: Test, I: Input> Shrinker<'a, T, I> {
             return None;
         }
 
+        // Signal to the application that shrinking is in progress.
+        crate::test_context::update(|ctx| {
+            ctx.run_phase = crate::RunPhase::Shrink;
+        });
+
         panic::set_hook();
         let forward_panic = panic::forward_panic(false);
         let capture_backtrace = panic::capture_backtrace(false);
@@ -138,6 +143,12 @@ impl<'a, T: Test, I: Input> Shrinker<'a, T, I> {
         }
 
         panic::capture_backtrace(capture_backtrace);
+
+        // Set the failure phase before the final confirmed-failure execution so
+        // the application can capture diagnostic output for the minimal failing input.
+        crate::test_context::update(|ctx| {
+            ctx.run_phase = crate::RunPhase::Failure;
+        });
         let error = self.execute().err()?;
         panic::capture_backtrace(false);
 

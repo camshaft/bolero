@@ -38,11 +38,16 @@ pub mod fuzzer {
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             panic::set_hook();
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::Afl,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Afl,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // AFL does not shrink inputs within bolero — it transitions straight from
+            // Normal to Failure on a failing input.
+            ctx.shrink_enabled = false;
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             let mut input = AflInput::new(options);
 
@@ -50,8 +55,33 @@ pub mod fuzzer {
                 __afl_manual_init();
             }
 
+            let mut iteration = 0u64;
             while unsafe { __afl_persistent_loop(1000) } != 0 {
-                if test.test(&mut input.test_input()).is_err() {
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
+                // `test_input()` reads the next input from stdin, so run it in a scope
+                // that ends its borrow before any replay.
+                let failed = {
+                    let mut test_input = input.test_input();
+                    test.test(&mut test_input).is_err()
+                };
+                if failed {
+                    // No shrinking: set the Failure phase and replay the same input
+                    // (from the buffered bytes, not stdin) so the application can
+                    // capture diagnostic output, then invoke the failure callback.
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
+                    let mut replay = input::Bytes::new(&input.input, &input.options);
+                    let _ = test.test(&mut replay);
+                    bolero_engine::test_context::invoke_on_failure();
                     std::process::abort();
                 }
             }
@@ -70,11 +100,15 @@ pub mod fuzzer {
         {
             panic::set_hook();
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::Afl,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Afl,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // AFL does not shrink inputs within bolero.
+            ctx.shrink_enabled = false;
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             // extend the lifetime of the bytes so it can be stored in local storage
             let driver = bolero_engine::driver::bytes::Driver::new(vec![], &options);
@@ -87,7 +121,17 @@ pub mod fuzzer {
                 __afl_manual_init();
             }
 
+            let mut iteration = 0u64;
             while unsafe { __afl_persistent_loop(1000) } != 0 {
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
                 input.reset();
                 let bytes = core::mem::take(&mut input.input);
                 let tmp = driver.reset(bytes, &input.options);
@@ -96,6 +140,19 @@ pub mod fuzzer {
                 input.input = driver.reset(tmp, &input.options);
 
                 if result.is_err() {
+                    // No shrinking: set the Failure phase and replay the same input so
+                    // the application can capture diagnostic output, then invoke the
+                    // failure callback before aborting.
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
+                    let bytes = core::mem::take(&mut input.input);
+                    let tmp = driver.reset(bytes, &input.options);
+                    let (drv, _) = bolero_engine::any::run(driver, &mut test);
+                    driver = drv;
+                    input.input = driver.reset(tmp, &input.options);
+
+                    bolero_engine::test_context::invoke_on_failure();
                     std::process::abort();
                 }
             }

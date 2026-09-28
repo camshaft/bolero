@@ -29,16 +29,46 @@ pub mod fuzzer {
         fn run(self, mut test: T, options: driver::Options) -> Self::Output {
             bolero_panic::set_hook();
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::Honggfuzz,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Honggfuzz,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // Honggfuzz does not shrink inputs within bolero — it transitions straight
+            // from Normal to Failure on a failing input.
+            ctx.shrink_enabled = false;
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             let mut input = HonggfuzzInput::new(options);
 
+            let mut iteration = 0u64;
             loop {
-                if test.test(&mut input.test_input()).is_err() {
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
+                // `test_input()` fetches the next input via HF_ITER, so run it in a
+                // scope that ends its borrow before any replay.
+                let failed = {
+                    let mut test_input = input.test_input();
+                    test.test(&mut test_input).is_err()
+                };
+                if failed {
+                    // No shrinking: set the Failure phase and replay the same input
+                    // (without advancing HF_ITER) so the application can capture
+                    // diagnostic output, then invoke the failure callback.
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
+                    let mut replay = input::Bytes::new(input.current_slice(), &input.options);
+                    let _ = test.test(&mut replay);
+                    bolero_engine::test_context::invoke_on_failure();
                     std::process::abort();
                 }
             }
@@ -55,11 +85,15 @@ pub mod fuzzer {
         {
             bolero_panic::set_hook();
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::Honggfuzz,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::Honggfuzz,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // Honggfuzz does not shrink inputs within bolero.
+            ctx.shrink_enabled = false;
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             // extend the lifetime of the bytes so it can be stored in local storage
             let driver = bolero_engine::driver::bytes::Driver::new(&[][..], &options);
@@ -68,12 +102,34 @@ pub mod fuzzer {
 
             let mut input = HonggfuzzInput::new(options);
 
+            let mut iteration = 0u64;
             loop {
-                driver.reset(input.get_slice(), &input.options);
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
+                let slice = input.get_slice();
+                driver.reset(slice, &input.options);
                 let (drv, result) = bolero_engine::any::run(driver, &mut test);
                 driver = drv;
 
                 if result.is_err() {
+                    // No shrinking: set the Failure phase and replay the same input
+                    // (without advancing HF_ITER) so the application can capture
+                    // diagnostic output, then invoke the failure callback.
+                    bolero_engine::test_context::update(|ctx| {
+                        ctx.run_phase = bolero_engine::RunPhase::Failure;
+                    });
+                    driver.reset(slice, &input.options);
+                    // The driver is dropped after the replay since the process aborts.
+                    let (_drv, _) = bolero_engine::any::run(driver, &mut test);
+
+                    bolero_engine::test_context::invoke_on_failure();
                     std::process::abort();
                 }
             }
@@ -100,6 +156,14 @@ pub mod fuzzer {
                 HF_ITER(self.buf_ptr.as_mut_ptr(), self.len_ptr.as_mut_ptr());
                 slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init())
             }
+        }
+
+        /// Returns the most recently fetched input slice without advancing `HF_ITER`.
+        ///
+        /// Must only be called after at least one `get_slice`/`test_input` call has
+        /// initialized the buffer pointers (as is the case on the failure-replay path).
+        fn current_slice(&self) -> &'static [u8] {
+            unsafe { slice::from_raw_parts(self.buf_ptr.assume_init(), self.len_ptr.assume_init()) }
         }
 
         fn test_input(&mut self) -> input::Bytes {

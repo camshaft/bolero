@@ -43,18 +43,33 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::LibFuzzer,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::LibFuzzer,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // The non-scoped libfuzzer path shrinks failing inputs (see `test.shrink`
+            // below), so report shrinking as enabled unless the shrink budget is zero.
+            ctx.shrink_enabled = !options.shrink_time_or_default().is_zero();
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             let options = &options;
             let mut cache = driver::cache::Cache::default();
             let mut report = GeneratorReport::default();
             report.spawn_timer();
 
+            let mut iteration = 0u64;
             start(&mut |slice: &[u8]| {
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
                 let mut input = input::cache::Bytes::new(slice, options, &mut cache);
 
                 match test.test(&mut input) {
@@ -67,8 +82,18 @@ pub mod fuzzer {
                         let shrunken = test.shrink(slice.to_vec(), None, options);
 
                         if let Some(shrunken) = shrunken {
+                            // shrink.rs already ran the final confirmed-failure execution
+                            // with RunPhase::Failure set
                             eprintln!("{shrunken:#}");
                         } else {
+                            // Shrinking was skipped or made no progress.
+                            // Set failure phase and re-run the original input so the
+                            // application can capture diagnostic output.
+                            bolero_engine::test_context::update(|ctx| {
+                                ctx.run_phase = bolero_engine::RunPhase::Failure;
+                            });
+                            let mut replay = input::cache::Bytes::new(slice, options, &mut cache);
+                            let _ = test.test(&mut replay);
                             let input = input::Bytes::new(slice, options);
                             eprintln!(
                                 "{:#}",
@@ -80,6 +105,7 @@ pub mod fuzzer {
                             );
                         }
 
+                        bolero_engine::test_context::invoke_on_failure();
                         std::process::abort();
                     }
                 }
@@ -98,11 +124,16 @@ pub mod fuzzer {
             panic::set_hook();
             panic::forward_panic(false);
 
-            let _ctx_guard =
-                bolero_engine::test_context::enter(bolero_engine::TestRunContext::new(
-                    bolero_engine::EngineKind::LibFuzzer,
-                    bolero_engine::TestInput::default(),
-                ));
+            let mut ctx = bolero_engine::TestRunContext::new(
+                bolero_engine::EngineKind::LibFuzzer,
+                bolero_engine::TestInput::default(),
+                0,
+                bolero_engine::RunPhase::Normal,
+            );
+            // The scoped libfuzzer path does not shrink (see the caching TODO below),
+            // so it transitions straight from Normal to Failure on a failing input.
+            ctx.shrink_enabled = false;
+            let _ctx_guard = bolero_engine::test_context::enter(ctx);
 
             let options = &options;
             // TODO implement caching
@@ -116,9 +147,20 @@ pub mod fuzzer {
             let driver = Box::new(driver);
             let mut driver = Some(driver);
 
+            let mut iteration = 0u64;
             start(&mut |slice: &[u8]| {
                 // extend the lifetime of the slice so it can be stored in TLS
                 let input: &'static [u8] = unsafe { core::mem::transmute::<&[u8], &[u8]>(slice) };
+
+                // Clear any on_failure callback from the previous iteration, then reset
+                // the per-iteration context fields before running this input.
+                bolero_engine::test_context::clear_on_failure();
+                bolero_engine::test_context::update(|ctx| {
+                    ctx.iteration = iteration;
+                    ctx.run_phase = bolero_engine::RunPhase::Normal;
+                });
+                iteration += 1;
+
                 let mut drv = driver.take().unwrap();
                 drv.reset(input, options);
                 let (drv, result) = bolero_engine::any::run(drv, &mut test);
@@ -129,6 +171,17 @@ pub mod fuzzer {
                         report.on_result(is_valid);
                     }
                     Err(error) => {
+                        // No shrinking in scoped mode: set the Failure phase and replay
+                        // the same input so the application can capture diagnostic
+                        // output, then invoke the failure callback before aborting.
+                        bolero_engine::test_context::update(|ctx| {
+                            ctx.run_phase = bolero_engine::RunPhase::Failure;
+                        });
+                        let mut drv = driver.take().unwrap();
+                        drv.reset(input, options);
+                        let (drv, _) = bolero_engine::any::run(drv, &mut test);
+                        driver = Some(drv);
+
                         eprintln!(
                             "{:#}",
                             Failure {
@@ -138,6 +191,7 @@ pub mod fuzzer {
                             }
                         );
 
+                        bolero_engine::test_context::invoke_on_failure();
                         std::process::abort();
                     }
                 }
