@@ -1,0 +1,112 @@
+name: release
+
+# Fully-automatic, TOKENLESS release pipeline. This is the CANONICAL pattern shared across the
+# camshaft release repos (backbeat / bach / bolero / etude); mirror it. It is a SINGLE workflow —
+# the crates.io OIDC publish runs in THIS file (not a reusable workflow_call), so the OIDC token's
+# workflow claim is unambiguously `release.yml`, which is the filename the crates.io Trusted
+# Publishers are registered under.
+#
+# bolero is split into TWO Cargo workspaces — `lib/` (the published libraries) and `bin/` (the
+# `cargo-bolero` CLI, which depends on the lib crates). release-plz operates per-manifest, so each
+# job runs it once per workspace via `manifest_path`, with `lib/` before `bin/` so the CLI's
+# dependencies are on crates.io before it publishes. There is no `binaries` job: `cargo-bolero` is
+# installed from source (`cargo install cargo-bolero`), not shipped as a prebuilt binary.
+#
+# On every push to `master`, release-plz (https://release-plz.dev):
+#   - `release-pr`: keeps a version-bump + CHANGELOG "release PR" open, derived from the
+#     conventional-commit history. Versions are INDEPENDENT per crate (release-plz default): a change
+#     to one crate releases only it (plus any semver-required dependents), not the whole workspace.
+#   - `release`: once a release PR is merged, publishes each newly-versioned crate to crates.io in
+#     dependency order NATIVELY (`release-plz release` — no hand-rolled publish script), creates the
+#     per-package git tags, and creates the GitHub Releases.
+#
+# AUTH: crates.io Trusted Publishing via GitHub OIDC (rust-lang/crates-io-auth-action) — NO
+# CARGO_REGISTRY_TOKEN, NO PAT. Because the publish runs in the same workflow run as release-plz
+# (not triggered by the tag), GitHub's anti-recursion rule never applies, so no elevated token is
+# needed. One-time per-crate setup: crates.io → each crate → Settings → Trusted Publishing → repo
+# `camshaft/bolero`, workflow `release.yml`.
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+env:
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Keep the version-bump + CHANGELOG "release PR" open/updated, once per workspace.
+  release-pr:
+    name: release-plz PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-pr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup override set stable
+      - name: release-plz release-pr (lib)
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+          manifest_path: lib/Cargo.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: release-plz release-pr (bin)
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+          manifest_path: bin/Cargo.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # After a release PR merges, publish the newly-versioned crates (native, dependency-ordered) via
+  # OIDC, create the per-package tags, and create the GitHub Releases. lib/ publishes before bin/ so
+  # cargo-bolero's library dependencies are live on the index before it publishes.
+  release:
+    name: release-plz release (publish + tag)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create git tags + GitHub Releases
+      id-token: write # crates.io Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup override set stable
+      # Exchange the GitHub OIDC id-token for a short-lived crates.io token (Trusted Publishing).
+      - name: crates.io auth (OIDC Trusted Publishing)
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: release-plz release (lib)
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+          manifest_path: lib/Cargo.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: release-plz release (bin)
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+          manifest_path: bin/Cargo.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
