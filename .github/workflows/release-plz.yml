@@ -1,0 +1,79 @@
+name: release-plz
+
+# Automated release AUTHORING (the counterpart to release.yml, which does the publishing).
+#
+# On every push to `master`, release-plz:
+#   1. opens/updates a "release" PR that bumps versions and updates CHANGELOGs, with the bump for
+#      each crate derived from conventional-commit history since its last release (a breaking change
+#      → minor for 0.x, otherwise patch); and
+#   2. once that PR is merged, pushes the per-crate `<crate>-v<version>` git tags.
+#
+# It is configured with `publish = false` (see lib/release-plz.toml and bin/release-plz.toml), so it
+# never touches crates.io itself — the tags it pushes trigger release.yml, which does the OIDC
+# Trusted-Publishing publish. This keeps changes from sitting unreleased without any hand-rolled
+# release scripts.
+#
+# TOKEN — the default GITHUB_TOKEN cannot be used here: PRs and tags it creates do NOT trigger other
+# workflows (a GitHub anti-recursion rule), so the tags release-plz pushes would never fire
+# release.yml. release-plz therefore needs a token that CAN trigger workflows. ONE-TIME operator
+# setup: create a GitHub App (or a fine-grained PAT) with contents:write + pull-requests:write on
+# `camshaft/bolero`, and add it as the `RELEASE_PLZ_TOKEN` repository secret. See
+# https://release-plz.dev/docs/github/token.
+#
+# bolero is split into two Cargo workspaces (`lib/` publishes the libraries, `bin/` the cargo-bolero
+# CLI), so release-plz runs once per workspace via `manifest_path` + `config`.
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-plz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-plz-lib:
+    name: release-plz (lib)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: release-plz
+        uses: release-plz/action@v0
+        with:
+          manifest_path: lib/Cargo.toml
+          config: lib/release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+
+  release-plz-bin:
+    name: release-plz (bin)
+    runs-on: ubuntu-latest
+    # Run after lib so a shared release PR / tag push does not race the two workspaces.
+    needs: release-plz-lib
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: release-plz
+        uses: release-plz/action@v0
+        with:
+          manifest_path: bin/Cargo.toml
+          config: bin/release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}

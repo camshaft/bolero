@@ -1,0 +1,126 @@
+name: release
+
+# Publish the bolero workspace crates to crates.io when a version tag is pushed.
+#
+# This is the PUBLISH half of the release pipeline; release-plz.yml is the AUTHORING half.
+# release-plz opens a version-bump + CHANGELOG pull request on every merge to `main`; merging
+# that PR pushes the per-crate version tags (`<crate>-v<version>`), which trigger this workflow
+# to do the actual publish. release-plz itself is configured with `publish = false`, so this
+# workflow is the single place a crate is published.
+#
+# AUTH — crates.io TRUSTED PUBLISHING via GitHub OIDC: NO long-lived CARGO_REGISTRY_TOKEN secret.
+# The publish job requests an OIDC id-token and `rust-lang/crates-io-auth-action` exchanges it for
+# a short-lived, scoped crates.io token — nothing to store or rotate. ONE-TIME operator setup, once
+# per crate before its first OIDC publish can succeed: on crates.io, each crate → Settings → Trusted
+# Publishing → add repository `camshaft/bolero`, workflow `release.yml`. Until a crate's publisher is
+# registered its publish step fails auth; the loop below is idempotent, so a re-run after
+# registration completes cleanly.
+#
+# GATE — CI (main.yml) runs on pushes/PRs to `master` but NOT on tags, so a tag push is otherwise
+# ungated. This workflow therefore runs its OWN green gate (fmt + clippy + test, mirroring main.yml's
+# `check` job plus the library test suite) and the publish job depends on it, so a tag can never
+# publish a red tree.
+
+on:
+  push:
+    tags:
+      # release-plz emits one `<crate>-v<version>` tag per bumped crate. Any of them triggers a
+      # publish run; the loop below publishes every not-yet-published workspace crate, so concurrent
+      # runs from a multi-crate release converge idempotently.
+      - "*-v[0-9]+.[0-9]+.[0-9]+*"
+  # A manual run exercises the GATE only (the publish job is tag-gated), so the pipeline can be smoke
+  # tested without cutting a tag or touching the registry.
+  workflow_dispatch:
+
+concurrency:
+  # Serialize ALL release runs (not per-ref): a single release pushes several crate tags at once, and
+  # the idempotent publish loop below only needs to run to completion once — later runs then no-op.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: "10"
+  RUSTUP_MAX_RETRIES: "10"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  # Green gate before any publish. Mirrors main.yml's `check` job (fmt + clippy across the xtask, bin,
+  # and lib workspaces) plus the library test suite, so a tag build is self-gating even though the
+  # scheduled/PR CI does not run on tags.
+  gate:
+    name: gate (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils-dev libunwind-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: camshaft/rust-cache@v1
+
+      - name: fmt (xtask)
+        run: cargo fmt --all --check
+      - name: fmt (bin)
+        working-directory: bin
+        run: cargo fmt --all --check
+      - name: fmt (lib)
+        working-directory: lib
+        run: cargo fmt --all --check
+
+      - name: clippy (xtask)
+        run: cargo clippy -- -D warnings
+      - name: clippy (bin)
+        working-directory: bin
+        run: cargo clippy -- -D warnings
+      - name: clippy (lib)
+        working-directory: lib
+        run: cargo clippy -- -D warnings
+
+      - name: test (lib)
+        working-directory: lib
+        run: cargo test
+
+  publish:
+    name: publish to crates.io
+    needs: gate
+    # Only a real tag push publishes; a manual dispatch stops after the gate.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for crates.io Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: camshaft/rust-cache@v1
+
+      # Exchange the GitHub OIDC id-token for a short-lived crates.io token (Trusted Publishing).
+      # Exposes it as CARGO_REGISTRY_TOKEN for the publish steps below. No stored secret.
+      - name: crates.io auth (Trusted Publishing / OIDC)
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      # bolero is split into two Cargo workspaces: `lib/` holds every published library crate and
+      # `bin/` holds the `cargo-bolero` CLI, which depends on the lib crates. Publish `lib` first
+      # (in intra-workspace dependency order) so those versions are live on the index before the CLI
+      # resolves them, then `bin`.
+      - name: publish lib crates
+        working-directory: lib
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: bash "$GITHUB_WORKSPACE/.github/workflows/publish-workspace.sh"
+
+      - name: publish bin crates (cargo-bolero)
+        working-directory: bin
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: bash "$GITHUB_WORKSPACE/.github/workflows/publish-workspace.sh"
