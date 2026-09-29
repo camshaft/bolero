@@ -58,7 +58,7 @@ jobs:
       group: release-plz-pr-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Install rust toolchain
@@ -92,7 +92,7 @@ jobs:
       contents: write # create git tags + GitHub Releases
       id-token: write # crates.io Trusted Publishing (OIDC)
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Install rust toolchain
