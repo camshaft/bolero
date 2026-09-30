@@ -147,7 +147,6 @@ impl rand::RngCore for ReplayRng<'_> {
     }
 }
 
-#[allow(dead_code)]
 pub struct RngReplayInput<'a> {
     pub buffer: &'a mut Vec<u8>,
 }
@@ -209,5 +208,80 @@ impl AsMut<Vec<u8>> for ExhastiveInput<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut Vec<u8> {
         self.buffer
+    }
+}
+
+#[cfg(test)]
+mod shrink_regression_328 {
+    use super::*;
+    use bolero_engine::{ClonedGeneratorTest, Test};
+    use bolero_generator::produce;
+    use std::time::Duration;
+
+    // Regression for <https://github.com/camshaft/bolero/issues/328> (defect 2):
+    // a random-mode failure from a multi-byte generator must shrink to the
+    // minimal counterexample.
+    //
+    // `run_tests` records the rng stream that produced the failure and shrinks
+    // it. Shrinking that recording as a plain `Vec<u8>` replays it through a
+    // `ByteSliceDriver`, generating a *different* value that often passes, so the
+    // shrinker gives up and reports the original, unshrunk failure. Replaying it
+    // as an `RngReplayInput` uses the same `driver::Rng` that produced the
+    // failure, faithfully reproducing it so it can be minimized.
+    //
+    // The seed (from the issue) reproduces the divergence deterministically on
+    // every platform - the rng and generators are platform-independent.
+    #[test]
+    fn rng_recording_shrinks_via_replay_not_byte_slice() {
+        let seed: Seed = 18941062287044942462312765863378128962;
+        let rng_test = RngTest { seed };
+        let options = driver::Options::default().with_shrink_time(Duration::from_secs(2));
+
+        // Fails for any input of 8+ bytes, so the minimal counterexample is 8.
+        let make_test = || {
+            ClonedGeneratorTest::new(
+                |value: Vec<u8>| assert!(value.len() < 8, "len = {}", value.len()),
+                produce::<Vec<u8>>(),
+            )
+        };
+
+        // Record the rng stream that produced the failure (mirrors `run_tests`).
+        let mut buffer = vec![];
+        {
+            let test = make_test();
+            let mut input = rng_test.buffered_input(&mut buffer, &options);
+            let value = test.generate_value(&mut input);
+            assert!(value.len() >= 8, "seed no longer produces a failing input");
+        }
+
+        // Fix: replaying through `RngReplayInput` reproduces the failure and
+        // shrinks it to the minimal 8-byte input.
+        let mut replay = buffer.clone();
+        let mut test = make_test();
+        let shrunk = test
+            .shrink(
+                RngReplayInput {
+                    buffer: &mut replay,
+                },
+                Some(seed),
+                &options,
+            )
+            .expect("RngReplayInput must reproduce and shrink the failure");
+        assert_eq!(
+            shrunk.input.len(),
+            8,
+            "RngReplayInput did not shrink to the minimal length"
+        );
+
+        // Bug: shrinking the same recording as a plain `Vec<u8>` does not reach
+        // the minimal input (it replays a different value). Asserting the paths
+        // diverge documents why `run_tests` must use `RngReplayInput`.
+        let mut test = make_test();
+        let byte_slice = test.shrink(buffer.clone(), Some(seed), &options);
+        assert!(
+            byte_slice.map_or(true, |f| f.input.len() != 8),
+            "the plain Vec<u8> path unexpectedly shrank to minimal; \
+             the regression guard's seed needs updating"
+        );
     }
 }
