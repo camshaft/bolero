@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6](https://github.com/camshaft/bolero/compare/bolero-v0.13.5...bolero-v0.13.6) - 2026-09-30
+
+### Fixed
+
+- shrink to the minimal input in cargo-test mode ([#328](https://github.com/camshaft/bolero/pull/328)) ([#329](https://github.com/camshaft/bolero/pull/329))
+
 ## [0.13.5](https://github.com/camshaft/bolero/compare/bolero-v0.13.4...bolero-v0.13.5) - 2026-09-28
 
 ### Added
