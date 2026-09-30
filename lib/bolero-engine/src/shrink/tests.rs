@@ -106,3 +106,31 @@ shrink_test!(
         }
     }
 );
+
+// Regression for GH #328 (defect 1): `ShrinkInput::with_slice` must honor the
+// shrunken length. It previously passed the full buffer to slice targets,
+// ignoring the truncation transform, so those targets were reported at their
+// original, unshrunk length (e.g. a 64-byte crash file stayed 64 bytes).
+#[test]
+fn slice_shrink_to_min_len() {
+    panic::forward_panic(true);
+    panic::capture_backtrace(true);
+
+    // Fails for any input of 8+ bytes, so the minimal counterexample is 8 bytes.
+    let mut test = crate::ClonedSliceTest::new(|input: Vec<u8>| {
+        assert!(input.len() < 8, "len = {}", input.len());
+    });
+    let input = vec![0xAAu8; 64];
+    let options = driver::Options::default().with_shrink_time(Duration::from_secs(1));
+
+    let failure = Shrinker::new(&mut test, input, None, &options)
+        .shrink()
+        .expect("should produce a result");
+
+    assert_eq!(
+        failure.input.len(),
+        8,
+        "slice input was not shrunk to the minimal length: {:?}",
+        failure.input
+    );
+}

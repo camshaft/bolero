@@ -344,7 +344,11 @@ impl<'a, I: Input, Output> crate::Input<Output> for ShrinkInput<'a, I> {
     type Driver = I::Driver<'a>;
 
     fn with_slice<F: FnMut(&[u8]) -> Output>(&mut self, f: &mut F) -> Output {
-        f(self.input.as_ref())
+        // Honor the shrunken length: `with_driver` slices the input to `self.len`,
+        // so slice-based targets must see the same truncated view. Passing the full
+        // buffer here made length transforms (e.g. truncation) invisible, so
+        // slice targets were reported at their original, unshrunk length.
+        f(&self.input.as_ref()[..self.len])
     }
 
     fn with_driver<F: FnMut(&mut Self::Driver) -> Output>(&mut self, f: &mut F) -> Output {

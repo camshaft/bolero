@@ -233,7 +233,20 @@ impl TestEngine {
                             let mut input = conf.buffered_input(&mut buffer, rng_options);
                             let _ = test.generate_value(&mut input);
 
-                            test.shrink(buffer.clone(), data.seed(), rng_options)
+                            // Shrink the recorded rng stream as an `RngReplayInput` so it
+                            // replays through the same `driver::Rng` that produced the
+                            // failure. Shrinking it as a plain `Vec<u8>` would replay via a
+                            // `ByteSliceDriver`, generating a *different* value that often
+                            // passes, causing the shrinker to give up and report the
+                            // original, unshrunk failure.
+                            let mut replay = buffer.clone();
+                            test.shrink(
+                                input::RngReplayInput {
+                                    buffer: &mut replay,
+                                },
+                                data.seed(),
+                                rng_options,
+                            )
                         };
 
                         if let Some(shrunken) = shrunken {
