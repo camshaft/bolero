@@ -1,4 +1,4 @@
-use crate::{list::List, project::Project};
+use crate::list::List;
 use anyhow::{Context, Result};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct BuildClusterfuzz {
     #[structopt(flatten)]
-    project: Project,
+    list: List,
 }
 
 impl BuildClusterfuzz {
@@ -34,9 +34,7 @@ impl BuildClusterfuzz {
         );
 
         // Figure out the list of fuzz targets, grouped by which test executable they use
-        let targets = List::new(self.project.clone())
-            .list()
-            .context("listing fuzz targets")?;
+        let targets = self.list.list().context("listing fuzz targets")?;
         let mut targets_per_exe = HashMap::new();
         for t in targets {
             targets_per_exe
@@ -54,7 +52,7 @@ impl BuildClusterfuzz {
             let dir = PathBuf::from(format!("{list_bin}-{hash:x}"));
 
             let fuzz_exe =
-                crate::libfuzzer::build(self.project.clone(), tests[0].test_name.clone())
+                crate::libfuzzer::build(self.list.project().clone(), tests[0].test_name.clone())
                     .context("building to-be-fuzzed executable")?;
             // .cargo extension is not an ALLOWED_FUZZ_TARGET_EXTENSIONS for clusterfuzz, so it doesn’t get picked up as a fuzzer
             let fuzz_bin = format!("{}.cargo", fuzz_exe.file_name().unwrap().to_string_lossy());
