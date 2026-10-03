@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.7](https://github.com/camshaft/bolero/compare/bolero-v0.13.6...bolero-v0.13.7) - 2026-10-03
+
+### Added
+
+- *(bolero)* add seed-keyed HashMap/HashSet aliases for deterministic tests ([#331](https://github.com/camshaft/bolero/pull/331))
+
 ## [0.13.6](https://github.com/camshaft/bolero/compare/bolero-v0.13.5...bolero-v0.13.6) - 2026-09-30
 
 ### Fixed
