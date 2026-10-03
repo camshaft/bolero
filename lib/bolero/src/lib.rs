@@ -29,6 +29,10 @@ pub mod generator {
     pub use bolero_generator::{self, prelude::*};
 }
 
+/// Deterministic, seed-keyed `HashMap`/`HashSet` aliases for order-dependent tests
+#[cfg(feature = "std")]
+pub mod hash;
+
 // For users' sake, re-expose the prelude functions straight under bolero::
 pub use bolero_generator::prelude::*;
 
