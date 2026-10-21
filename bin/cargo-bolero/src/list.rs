@@ -11,22 +11,16 @@ pub struct List {
 }
 
 impl List {
-    pub fn new(project: Project) -> Self {
-        Self { project }
+    pub fn project(&self) -> &Project {
+        &self.project
     }
 
     pub fn list(&self) -> Result<Vec<TestTarget>> {
-        let mut build_command = self.cmd("test", &[], None)?;
-        build_command.arg("--no-run");
+        let build_command = self.cmd("test", false, &["--no-run"], &[], None)?;
         exec(build_command)?;
 
-        let output = self
-            .cmd("test", &[], None)?
-            .arg("--no-fail-fast")
-            .arg("--")
-            .arg("--nocapture")
-            .env("CARGO_BOLERO_SELECT", "all")
-            .output()?;
+        let mut cmd = self.cmd("test", true, &["--no-fail-fast"], &[], None)?;
+        let output = cmd.env("CARGO_BOLERO_SELECT", "all").output()?;
         // ignore the status in case any tests failed
 
         TestTarget::all_from_stdout(&output.stdout)
