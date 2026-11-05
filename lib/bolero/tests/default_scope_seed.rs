@@ -141,6 +141,26 @@ fn other_scope_child() {
 }
 
 #[test]
+fn unwind_out_of_with_child() {
+    if !is_child() {
+        return;
+    }
+
+    // a panic unwinds out of the closure that `with` runs
+    let unwound = std::panic::catch_unwind(|| {
+        let rng = StdRng::seed_from_u64(1);
+        let rng = driver::Rng::new(rng, &driver::Options::default());
+        let rng = Box::new(driver::object::Object(rng));
+        scope::with(rng, || fail("the closure that `with` runs panics"))
+    });
+    assert!(unwound.is_err());
+
+    // `with` set the default scope back as the panic unwound, so these draws come from it
+    println!("values={:?}", draw());
+    panic!("the test fails after it draws from the default scope");
+}
+
+#[test]
 fn check_child() {
     if !is_child() {
         return;
@@ -216,6 +236,20 @@ fn a_panic_after_draws_from_another_scope_doesnt_print_a_seed() {
     assert_eq!(output.status.code(), Some(FAILED), "{text}");
     assert!(text.contains("from a scope that `with` set"), "{text}");
     assert!(seeds(&output).is_empty(), "{text}");
+}
+
+#[test]
+fn a_panic_after_a_panic_out_of_with_prints_the_seed() {
+    let output = run_child("unwind_out_of_with_child", None);
+    let text = stderr(&output);
+    assert_eq!(output.status.code(), Some(FAILED), "{text}");
+    assert!(text.contains("the closure that `with` runs panics"), "{text}");
+    assert!(text.contains("the test fails after it draws"), "{text}");
+
+    // the draws after the unwind count as draws from the default scope, so its seed prints once
+    let printed = seeds(&output);
+    assert_eq!(printed.len(), 1, "{text}");
+    let _: u128 = printed[0].parse().unwrap();
 }
 
 #[test]
