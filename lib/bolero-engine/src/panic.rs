@@ -32,6 +32,11 @@ lazy_static! {
         .map(|v| v == "1")
         .unwrap_or(false);
     static ref PANIC_HOOK: () = {
+        // the default scope of `any` installs a panic hook too: install it first, so that its
+        // install doesn't run between this take and set, which would drop one of the two hooks
+        #[cfg(feature = "any")]
+        bolero_generator::any::scope::install_hook();
+
         let prev_hook = std::panic::take_hook();
 
         std::panic::set_hook(Box::new(move |reason| {

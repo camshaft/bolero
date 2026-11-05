@@ -124,9 +124,20 @@ fn borrow_with<F: FnOnce(&mut object::Borrowed) -> R, R>(f: F) -> R {
 /// Marks this thread as one that drew from its default scope, and installs the panic hook that
 /// reports the scope's seed
 fn on_default_draw() {
-    static HOOK: Once = Once::new();
-
     DRAWN.with(|drawn| drawn.set(true));
+    install_hook();
+}
+
+/// Installs the panic hook that reports the seed of a thread's default scope, once a process
+///
+/// The hook calls the hook it replaced, then reports the seed. An install takes the current hook
+/// and sets a new one in two steps, so two installs at the same time can both take one hook, and
+/// the second set drops the first install's hook. A crate that installs a hook of its own calls
+/// this function before it takes the current hook: the call returns once this hook is installed,
+/// so the crate's hook wraps this one, and neither install drops the other's hook.
+#[doc(hidden)]
+pub fn install_hook() {
+    static HOOK: Once = Once::new();
 
     // the panic hook can't change while this thread panics
     if std::thread::panicking() {
