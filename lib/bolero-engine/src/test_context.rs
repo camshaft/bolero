@@ -306,6 +306,10 @@ mod std_impl {
     #[doc(hidden)]
     pub struct ContextGuard {
         prev: Option<TestRunContext>,
+        // a harness reports the seed of its own failing input, so the default scope of `any`
+        // doesn't report its seed while the guard lives
+        #[cfg(feature = "any")]
+        _harness: bolero_generator::any::scope::HarnessGuard,
     }
 
     impl Drop for ContextGuard {
@@ -318,7 +322,11 @@ mod std_impl {
     #[doc(hidden)]
     pub fn enter(context: TestRunContext) -> ContextGuard {
         let prev = CONTEXT.with(|ctx| ctx.borrow_mut().replace(context));
-        ContextGuard { prev }
+        ContextGuard {
+            prev,
+            #[cfg(feature = "any")]
+            _harness: bolero_generator::any::scope::enter_harness(),
+        }
     }
 }
 
