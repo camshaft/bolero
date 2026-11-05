@@ -96,8 +96,8 @@ fn both_hooks_run_in_either_order_of_install() {
         // the default scope's hook printed one seed line, so the engine's install didn't drop it,
         // and it printed the line for the forwarded panic alone, so the engine's hook wraps it
         let prefix = format!("{SEED}=");
-        let lines = text.lines();
-        let seeds = lines.filter(|line| line.starts_with(prefix.as_str())).count();
+        let is_seed = |line: &&str| line.starts_with(prefix.as_str());
+        let seeds = text.lines().filter(is_seed).count();
         assert_eq!(seeds, 1, "{text}");
         let seed = line_of(&text, prefix.as_str());
         assert!(unforwarded < seed && seed < forwarded, "{text}");
