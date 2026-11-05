@@ -180,6 +180,20 @@ fn a_seed_draws_the_same_values_on_each_run() {
 }
 
 #[test]
+fn an_unset_or_unparseable_seed_draws_other_values_on_each_run() {
+    // `None` runs the child with the variable unset
+    for seed in [None, Some("not-a-seed")] {
+        let first = run_child("draw_child", seed);
+        let second = run_child("draw_child", seed);
+
+        assert!(first.status.success(), "{:?}: {}", seed, stderr(&first));
+        assert!(second.status.success(), "{:?}: {}", seed, stderr(&second));
+        // each run chooses its own random seed, so the two runs draw other values
+        assert_ne!(values(&first), values(&second), "{:?}", seed);
+    }
+}
+
+#[test]
 fn a_panic_prints_the_seed_that_replays_the_draws() {
     let first = run_child("panic_child", None);
     let text = stderr(&first);
