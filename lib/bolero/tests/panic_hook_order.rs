@@ -1,5 +1,6 @@
 //! The test engine's panic hook and the default scope's panic hook are both installed, in
-//! either order of first use, and the engine's hook wraps the default scope's.
+//! either order of first use, and the engine's hook wraps the default scope's. Where the engine
+//! doesn't install its hook, the default scope's first draw installs the default scope's.
 //!
 //! Each test below runs one of the `*_child` tests of this binary in a child process, so that
 //! each case starts without either hook, and reads what the child printed.
@@ -31,6 +32,13 @@ fn run_child(name: &str) -> Output {
 /// What the child printed on stderr
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+/// How many lines of `text` print a seed, as `BOLERO_RANDOM_SEED=<seed>`
+fn seed_lines(text: &str) -> usize {
+    let prefix = format!("{SEED}=");
+    let is_seed = |line: &&str| line.starts_with(prefix.as_str());
+    text.lines().filter(is_seed).count()
 }
 
 /// The number of the first line of `text` that holds `needle`
@@ -83,6 +91,16 @@ fn scope_hook_first_child() {
 }
 
 #[test]
+fn scope_hook_alone_child() {
+    if !is_child() {
+        return;
+    }
+
+    // only the default scope installs a hook, at the first draw
+    panic_after_draw(true);
+}
+
+#[test]
 fn both_hooks_run_in_either_order_of_install() {
     for name in ["engine_hook_first_child", "scope_hook_first_child"] {
         let output = run_child(name);
@@ -95,11 +113,22 @@ fn both_hooks_run_in_either_order_of_install() {
 
         // the default scope's hook printed one seed line, so the engine's install didn't drop it,
         // and it printed the line for the forwarded panic alone, so the engine's hook wraps it
-        let prefix = format!("{SEED}=");
-        let is_seed = |line: &&str| line.starts_with(prefix.as_str());
-        let seeds = text.lines().filter(is_seed).count();
-        assert_eq!(seeds, 1, "{text}");
-        let seed = line_of(&text, prefix.as_str());
+        assert_eq!(seed_lines(&text), 1, "{text}");
+        let seed = line_of(&text, SEED);
         assert!(unforwarded < seed && seed < forwarded, "{text}");
     }
+}
+
+#[test]
+fn the_default_scope_hook_runs_without_the_engine() {
+    let output = run_child("scope_hook_alone_child");
+    let text = stderr(&output);
+    assert!(output.status.success(), "{text}");
+
+    // the engine didn't install its hook, so it didn't record the panic
+    let panicked = line_of(&text, "forward=true recorded=false");
+
+    // the default scope's first draw installed its hook, which printed the seed line
+    assert_eq!(seed_lines(&text), 1, "{text}");
+    assert!(line_of(&text, SEED) < panicked, "{text}");
 }
