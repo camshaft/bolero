@@ -249,7 +249,13 @@ fn a_panic_after_a_panic_out_of_with_prints_the_seed() {
     // the draws after the unwind count as draws from the default scope, so its seed prints once
     let printed = seeds(&output);
     assert_eq!(printed.len(), 1, "{text}");
-    let _: u128 = printed[0].parse().unwrap();
+    let seed: u128 = printed[0].parse().unwrap();
+    let seed = seed.to_string();
+
+    // and they come from the default scope that `with` set back, so the seed replays them
+    let replay = run_child("draw_child", Some(seed.as_str()));
+    assert!(replay.status.success(), "{}", stderr(&replay));
+    assert_eq!(values(&replay), values(&output));
 }
 
 #[test]
