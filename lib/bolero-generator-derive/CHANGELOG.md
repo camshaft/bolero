@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6](https://github.com/camshaft/bolero/compare/bolero-generator-derive-v0.13.5...bolero-generator-derive-v0.13.6) - 2026-11-09
+
+### Fixed
+
+- *(bolero-generator-derive)* remove the exact indexmap pin ([#338](https://github.com/camshaft/bolero/pull/338))
+
 ## [0.13.5](https://github.com/camshaft/bolero/compare/bolero-generator-derive-v0.13.4...bolero-generator-derive-v0.13.5) - 2026-09-28
 
 ### Other
