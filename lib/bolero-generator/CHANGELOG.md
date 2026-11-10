@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.7](https://github.com/camshaft/bolero/compare/bolero-generator-v0.13.6...bolero-generator-v0.13.7) - 2026-11-10
+
+### Other
+
+- updated the following local packages: bolero-generator-derive
+
 ## [0.13.6](https://github.com/camshaft/bolero/compare/bolero-generator-v0.13.5...bolero-generator-v0.13.6) - 2026-09-28
 
 ### Other
